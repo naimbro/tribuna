@@ -140,6 +140,22 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
   no está en `naimbro.github.io`; hay que pegarla una vez ahí (⚙ MOTOR). Sin key, el
   juego online corre con el jurado heurístico y la audiencia paramétrica.
 
+## El público real
+
+Los alumnos que no debaten entran como **PÚBLICO** (`jugar.html`, tercer botón). No escriben:
+marcan con un deslizador dónde están frente a la moción (−100 en contra … +100 a favor) y lo
+mueven cuando algo los convence. Mientras dura el debate no ven notas del jurado, votos ni
+reacciones de la audiencia sintética: leen los textos y votan con criterio propio; al final
+ven todo.
+
+El profesor toma una foto de las posiciones al abrir cada ronda y al revelar al ganador; lo
+que se mueve cada alumno entre dos fotos se le anota a la bancada hacia la que se movió, con
+la misma medida que la sala sintética (voto suave). Es un **tercer marcador aparte** —EL
+PÚBLICO— que la ceremonia revela entre la sala y el jurado, y la lectura final dice si el
+público real coincidió o no con la sala sintética. En el CSV, una fila por alumno del
+público con su posición inicial, final y los votos que aportó (`delta_votos`, + hacia A FAVOR).
+Las posiciones individuales solo las ve el profesor.
+
 ## Pantalla del profesor
 
 Dos paneles, como el panel de debate de `mapuche_panel`: a la izquierda **el hilo** —una

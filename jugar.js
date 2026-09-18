@@ -51,19 +51,45 @@ $("btnEntrar").onclick = async () => {
 };
 
 function mostrarBancadas() {
-  $("pEntrar").classList.add("oculto"); $("pJuego").classList.add("oculto"); $("composer").classList.add("oculto");
+  $("pEntrar").classList.add("oculto"); $("pJuego").classList.add("oculto"); $("composer").classList.add("oculto"); $("voto").classList.add("oculto");
   $("pBancada").classList.remove("oculto");
   $("mocion1").textContent = J.sala.mocion;
   $("btnA").textContent = `${J.sala.equipos.A.bandera} ${J.sala.equipos.A.nombre}`;
   $("btnB").textContent = `${J.sala.equipos.B.bandera} ${J.sala.equipos.B.nombre}`;
   $("btnA").onclick = () => elegir("A");
   $("btnB").onclick = () => elegir("B");
+  $("btnP").onclick = () => elegir("P");
 }
 
 async function elegir(k) {
   J.equipo = k;
   await setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { nombre: J.nombre, email: J.email, equipo: k, unido: Date.now() });
+  // el público parte indeciso si no había marcado nada: así queda contado desde el inicio
+  if (k === "P") {
+    const yo = await getDoc(doc(db, "salas", J.codigo, "publico", J.uid)).catch(() => null);
+    if (!yo || !yo.exists()) await guardarPos(0);
+  }
   await entrarAlJuego();
+}
+
+/* ---------- público: posición frente a la moción ---------- */
+const describePos = v => { const a = Math.abs(v); if (a <= 8) return "indeciso"; const lado = v > 0 ? "a favor" : "en contra"; return (a > 60 ? "muy " : a > 25 ? "" : "algo ") + lado; };
+async function guardarPos(v) {
+  await setDoc(doc(db, "salas", J.codigo, "publico", J.uid), { pos: Math.round(v), nombre: J.nombre, email: J.email, actualizado: Date.now() });
+}
+function prepararVoto() {
+  const r = $("rngPos");
+  const pinta = () => { $("lblPos").textContent = describePos(+r.value); };
+  r.oninput = () => {
+    pinta();
+    clearTimeout(J.guardandoPos);
+    J.guardandoPos = setTimeout(() => guardarPos(+r.value).then(() => { $("avisoVoto").textContent = "✓ guardado"; $("voto").classList.remove("pide"); })
+      .catch(e => $("avisoVoto").textContent = "No se guardó: " + e.code), 300);
+  };
+  subs.push(onSnapshot(doc(db, "salas", J.codigo, "publico", J.uid), snap => {
+    const d = snap.data(); if (d && document.activeElement !== r) { r.value = d.pos; pinta(); }
+  }));
+  pinta();
 }
 
 /* ---------- jugar ---------- */
@@ -71,15 +97,22 @@ let subs = [];
 async function entrarAlJuego() {
   subs.forEach(u => u()); subs = [];
   $("pEntrar").classList.add("oculto"); $("pBancada").classList.add("oculto");
-  $("pJuego").classList.remove("oculto"); $("composer").classList.remove("oculto");
+  $("pJuego").classList.remove("oculto");
+  const esPublico = J.equipo === "P";
+  document.body.classList.toggle("es-publico", esPublico);
+  $("composer").classList.toggle("oculto", esPublico);
+  $("voto").classList.toggle("oculto", !esPublico);
   $("salaLbl").textContent = `sala ${J.codigo} · ${J.nombre}`;
   $("salaLbl").title = J.email || "";
   subs.push(onSnapshot(doc(db, "salas", J.codigo), snap => { J.sala = snap.data(); pintarSala(); }));
-  subs.push(onSnapshot(doc(db, "salas", J.codigo, "intervenciones", J.uid), snap => { J.mia = snap.data() || null; pintarComposer(); }));
-  // los de mi bancada (las reglas no dejan leer a la rival): nombre y palabras, en vivo
-  subs.push(onSnapshot(query(collection(db, "salas", J.codigo, "intervenciones"), where("equipo", "==", J.equipo)), snap => {
-    J.companeros = {}; snap.forEach(d => J.companeros[d.id] = d.data()); pintarCompaneros();
-  }));
+  if (esPublico) prepararVoto();
+  else {
+    subs.push(onSnapshot(doc(db, "salas", J.codigo, "intervenciones", J.uid), snap => { J.mia = snap.data() || null; pintarComposer(); }));
+    // los de mi bancada (las reglas no dejan leer a la rival): nombre y palabras, en vivo
+    subs.push(onSnapshot(query(collection(db, "salas", J.codigo, "intervenciones"), where("equipo", "==", J.equipo)), snap => {
+      J.companeros = {}; snap.forEach(d => J.companeros[d.id] = d.data()); pintarCompaneros();
+    }));
+  }
   $("btnCambiar").onclick = mostrarBancadas;
   $("tx").addEventListener("input", alEscribir);
   $("btnEntregar").onclick = entregar;
@@ -88,10 +121,22 @@ async function entrarAlJuego() {
 
 function pintarSala() {
   const s = J.sala; if (!s) return;
-  const eq = s.equipos[J.equipo];
+  const eq = J.equipo === "P" ? { bandera: "🗳", nombre: "PÚBLICO", color: "#a78bfa" } : s.equipos[J.equipo];
   $("tema").textContent = `Semana ${s.semana} · ${s.tema}`;
   $("miBancada").textContent = `${eq.bandera} ${eq.nombre}`;
   $("miBancada").style.color = eq.color;
+  if (J.equipo === "P") {
+    // al terminar se ve todo; mientras tanto el público no ve notas ni reacciones
+    document.body.classList.toggle("es-publico", !s.veredicto);
+    $("tickerP").textContent = "› " + (s.ticker || "").replace(/^›\s*/, "");
+    const nT = (s.turnos || []).length;
+    if (J.turnosVistos !== undefined && nT > J.turnosVistos) {
+      $("voto").classList.add("pide");
+      $("avisoVoto").textContent = "Se revelaron intervenciones nuevas: ¿te movieron? Ajusta tu posición.";
+    }
+    J.turnosVistos = nT;
+    $("votoTitulo").textContent = s.fase === "fin" && s.veredicto ? "Tu posición final" : "¿Dónde estás frente a la moción? Muévete cuando algo te convenza.";
+  }
   $("rondaPill").textContent = `Ronda ${s.ronda + 1}/${s.totalRondas} · ${s.rondaNombre}`;
   $("rolLbl").textContent = s.rol;
   $("pauta").textContent = s.pauta;
@@ -152,7 +197,8 @@ function pintarSala() {
         <div style="color:var(--dim);font-size:13px">rúbrica: <span style="color:var(--A)">${v.rA}</span> / <span style="color:var(--B)">${v.rB}</span> sobre 20</div></div>`;
   } else cv.classList.add("oculto");
 
-  pintarComposer(); pintarReloj();
+  if (J.equipo !== "P") pintarComposer();
+  pintarReloj();
 }
 
 // El ganador, en grande, cuando el profesor lo revela (misma secuencia que el proyector).
@@ -164,13 +210,15 @@ function ceremonia(s, v) {
   el.innerHTML = `<div class="k" style="color:var(--amber);font-size:14px">EL VEREDICTO</div>
     <div class="cb" id="c1"><div class="k">La sala · votos ganados</div><div class="cg" style="color:${col(v.ganaP)}">${band(v.ganaP)}${esc(v.ganaP)}</div>
       <div class="cs">${v.movA > 0 ? "+" : ""}${v.movA} · ${v.movB > 0 ? "+" : ""}${v.movB}</div></div>
+    ${v.pubN ? `<div class="cb" id="cP"><div class="k">El público · ${v.pubN} alumnos</div><div class="cg" style="color:${col(v.ganaU)}">${band(v.ganaU)}${esc(v.ganaU)}</div>
+      <div class="cs">${v.pubA > 0 ? "+" : ""}${v.pubA} · ${v.pubB > 0 ? "+" : ""}${v.pubB}</div></div>` : ""}
     <div class="cb" id="c2"><div class="k">El jurado · rigor /20</div><div class="cg" style="color:${col(v.ganaR)}">${band(v.ganaR)}${esc(v.ganaR)}</div>
       <div class="cs">${v.rA} · ${v.rB}</div></div>
     <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>`;
   document.body.appendChild(el);
-  setTimeout(() => $("c1")?.classList.add("on"), 2600);
-  setTimeout(() => $("c2")?.classList.add("on"), 5600);
-  setTimeout(() => $("c3")?.classList.add("on"), 8400);
+  const ids = v.pubN ? ["c1", "cP", "c2"] : ["c1", "c2"];
+  ids.forEach((id, i) => setTimeout(() => $(id)?.classList.add("on"), 2600 + i * 3000));
+  setTimeout(() => $("c3")?.classList.add("on"), 2600 + ids.length * 3000 - 200);
   $("c3").onclick = () => el.remove();
 }
 

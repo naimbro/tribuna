@@ -64,6 +64,17 @@ textarea[readonly]{opacity:.6}
 #ceremonia .on{opacity:1;transform:scale(1)}
 #ceremonia .cg{font-size:40px;font-weight:800;text-shadow:0 0 24px currentColor}
 #ceremonia .cs{font-family:ui-monospace,Menlo,monospace;color:var(--dim)}
+.btn.P{background:#6d4fd8;color:#fff;border-color:transparent}
+#voto{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#0c1319;border-top:1px solid var(--line);padding:10px 14px 12px}
+#voto .in{max-width:640px;margin:0 auto}
+#voto .k{text-transform:none;letter-spacing:0;font-size:13px;color:var(--txt)}
+#voto input[type=range]{padding:0;height:34px;accent-color:#a78bfa;background:transparent;border:none}
+#voto .escala{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--dim)}
+#voto .escala b{font-size:14px;color:#a78bfa}
+#voto.pide{box-shadow:0 -6px 30px rgba(167,139,250,.35);border-top-color:#a78bfa}
+/* el público vota con criterio propio: no ve notas del jurado ni reacciones hasta el veredicto */
+body.es-publico #cardMarc, body.es-publico #cardGente, body.es-publico .chip, body.es-publico .nota,
+body.es-publico .dice, body.es-publico .turno .pill, body.es-publico .int .pill, body.es-publico .turno .th span{display:none}
 .ticker{font-size:11px;color:var(--neon);padding:3px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
 </head>
@@ -91,7 +102,8 @@ textarea[readonly]{opacity:.6}
     <button class="btn A" id="btnA"></button>
     <button class="btn B" id="btnB"></button>
   </div>
-  <p class="aviso">Si tu profe te asignó bancada, respeta esa. Se puede cambiar después con el botón de abajo.</p>
+  <button class="btn P" id="btnP">🗳 PÚBLICO — no debato, voto</button>
+  <p class="aviso">Si tu profe te asignó bancada, respeta esa. El público lee el debate y marca cuánto lo convence cada lado. Se puede cambiar después con el botón de abajo.</p>
 </section>
 
 <!-- 3. jugar: estado, marcador, hilo, audiencia; la caja va fija abajo -->
@@ -108,7 +120,7 @@ textarea[readonly]{opacity:.6}
     <p id="pauta" style="margin:0;color:#c9d3dc"></p>
   </div>
 
-  <div class="card">
+  <div class="card" id="cardMarc">
     <div class="k">Marcador</div>
     <div class="marc">
       <div><div class="n mono" id="persuA" style="color:var(--A)">0</div><div class="l"><span id="lblA"></span> · la sala (votos)</div></div>
@@ -122,7 +134,7 @@ textarea[readonly]{opacity:.6}
 
   <div class="card oculto" id="cardVeredicto"></div>
 
-  <div class="card">
+  <div class="card" id="cardGente">
     <div class="k">La audiencia</div>
     <div class="gente" id="gente"></div>
   </div>
@@ -137,6 +149,17 @@ textarea[readonly]{opacity:.6}
 
 </main>
 
+<!-- público: posición frente a la moción, fija abajo -->
+<div id="voto" class="oculto">
+  <div class="in">
+    <div class="k" id="votoTitulo">¿Dónde estás frente a la moción?</div>
+    <input type="range" id="rngPos" min="-100" max="100" step="1" value="0">
+    <div class="escala"><span style="color:var(--B)">Totalmente en contra</span><b id="lblPos">indeciso</b><span style="color:var(--A)">Totalmente a favor</span></div>
+    <p class="aviso" id="avisoVoto" style="margin:4px 0 0"></p>
+    <div class="ticker mono" id="tickerP">›</div>
+  </div>
+</div>
+
 <div id="composer" class="oculto">
   <div class="in">
     <div class="k" id="compTitulo">—</div>
@@ -150,6 +173,6 @@ textarea[readonly]{opacity:.6}
     <div class="ticker mono" id="ticker">›</div>
   </div>
 </div>
-<script type="module" src="jugar.js?v=20260919h"></script>
+<script type="module" src="jugar.js?v=20260919i"></script>
 </body>
 </html>

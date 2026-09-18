@@ -40,7 +40,7 @@ service cloud.firestore {
         allow write: if conSesion() && uid == request.auth.uid
           && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 40
           && request.resource.data.email == request.auth.token.email
-          && request.resource.data.equipo in ['A', 'B'];
+          && request.resource.data.equipo in ['A', 'B', 'P'];     // P = público
       }
 
       // Una intervención por alumno y ronda (se sobreescribe cada ronda). Solo su dueño la
@@ -52,8 +52,20 @@ service cloud.firestore {
         allow write: if conSesion() && uid == request.auth.uid
           && esJugador(codigo)
           && request.resource.data.equipo == jugador(codigo).data.equipo
+          && request.resource.data.equipo in ['A', 'B']
           && sala(codigo).data.fase == 'abierta'
           && request.resource.data.texto is string && request.resource.data.texto.size() <= 4000;
+      }
+
+      // El público: cada alumno que no debate guarda su posición frente a la moción (−100…+100).
+      // La escribe solo él, solo si entró como público; la lee él y el profesor (nadie más ve
+      // cómo votó cada uno).
+      match /publico/{uid} {
+        allow read: if esProfe(codigo) || (conSesion() && uid == request.auth.uid);
+        allow write: if conSesion() && uid == request.auth.uid
+          && esJugador(codigo) && jugador(codigo).data.equipo == 'P'
+          && request.resource.data.pos is number
+          && request.resource.data.pos >= -100 && request.resource.data.pos <= 100;
       }
     }
   }

@@ -25,7 +25,7 @@ const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
 const db = HAY_FIREBASE ? getFirestore(app) : null;
 
-const ON = { codigo: null, uid: null, email: null, jugadores: {}, intervenciones: {}, timer: null, pendiente: false };
+const ON = { codigo: null, uid: null, email: null, jugadores: {}, intervenciones: {}, publico: {}, timer: null, pendiente: false };
 const CODIGO_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const nuevoCodigo = () => Array.from({ length: 4 }, () => CODIGO_CHARS[Math.floor(Math.random() * CODIGO_CHARS.length)]).join("");
 const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, "")}jugar.html?sala=${ON.codigo}`;
@@ -43,6 +43,7 @@ function estadoPublico() {
     abreEn: S.abreEn || null,                                   // epoch ms; el alumno calcula el reloj
     marcador: {
       persuA: $("persuA").textContent, persuB: $("persuB").textContent,
+      publicoA: $("publicoA").textContent, publicoB: $("publicoB").textContent, publicoN: S.publico.n,
       rigorA: $("rigorA").textContent, rigorB: $("rigorB").textContent,
       conteo: conteo()
     },
@@ -69,8 +70,11 @@ function estadoPublico() {
 function resumenVeredicto() {
   const movA = persuasion("A"), movB = persuasion("B");
   const rA = rigorMedio("A") || 0, rB = rigorMedio("B") || 0;
+  const P = S.publico;
   return {
     movA, movB, rA: +rA.toFixed(1), rB: +rB.toFixed(1),
+    pubN: P.n, pubA: decima(P.A), pubB: decima(P.B),
+    ganaU: !P.n ? null : empatanEnVotos(P.A, P.B) ? "EMPATE" : P.A > P.B ? EQUIPOS.A.nombre : EQUIPOS.B.nombre,
     ganaP: empatanEnVotos(movA, movB) ? "EMPATE" : movA > movB ? EQUIPOS.A.nombre : EQUIPOS.B.nombre,
     ganaR: Math.abs(rA - rB) < 0.05 ? "EMPATE" : rA > rB ? EQUIPOS.A.nombre : EQUIPOS.B.nombre
   };
@@ -81,6 +85,7 @@ function estadoPrivado() {
   return {
     ronda: S.ronda, fase: S.fase, seq: S.seq, votoInicial: S.votoInicial, iniPos: S.iniPos,
     historial: S.historial, turnos: S.turnos, shocks: S.shocks, abreEn: S.abreEn || null,
+    publicoSnaps: S.publicoSnaps || [],
     audiencia: Object.fromEntries(AUDIENCIA.map(p => [p.id, { pos: p.pos, memoria: p.memoria || [], ultimo: p.ultimo || "" }]))
   };
 }
@@ -131,14 +136,14 @@ function activarOnline() {
     }
     return out;
   };
-  envolver("abrirRonda", () => { S.abreEn = Date.now(); ON.avisoTodos = null; pintarListas(); });
+  envolver("abrirRonda", () => { S.abreEn = Date.now(); ON.avisoTodos = null; pintarListas(); fotoPublico(); });
   envolver("cerrarRonda", () => {
     S.abreEn = null;
     if (S.fase !== "abierta") tick(`Ronda ${S.ronda + 1} cerrada y revelada. ${S.fase === "fin" ? "Se acabó el debate: el profesor mostrará el veredicto." : "Espera a que el profesor abra la siguiente."}`);
   });
   envolver("siguienteRonda");
   envolver("veredicto");
-  envolver("ceremonia");
+  envolver("ceremonia", () => fotoPublico());
   envolver("lanzarEvento");
   envolver("pintarMarcador");
   envolver("pintarAudiencia");
@@ -164,6 +169,13 @@ function activarOnline() {
     }
     primera = false;
     pintarListas();
+  });
+
+  // El público: sus posiciones en vivo
+  onSnapshot(collection(db, "salas", ON.codigo, "publico"), snap => {
+    ON.publico = {};
+    snap.forEach(d => { const x = d.data(); if (typeof x.pos === "number") ON.publico[d.id] = x; });
+    calcPublico(); pintarBarraOnline(); publicar();
   });
 
   // Quiénes están en la sala
@@ -208,6 +220,37 @@ function pintarListas() {
 
 const collectionJugadores = () => collection(db, "salas", ON.codigo, "jugadores");
 
+/* ---------- EL PÚBLICO: alumnos que no debaten marcan su posición (−100…+100) ----------
+   Se toma una foto de las posiciones al abrir cada ronda y al revelar al ganador. Lo que se
+   mueve un votante entre dos fotos es efecto de lo que se reveló entre ellas: si se acerca a
+   A FAVOR suma a A, si se acerca a EN CONTRA suma a B. Misma medida que la sala sintética
+   (voto suave: tanh(pos/12)), así los dos marcadores de votos son comparables. */
+function fotoPublico() {
+  S.publicoSnaps = S.publicoSnaps || [];
+  S.publicoSnaps.push({ t: Date.now(), ronda: S.ronda, pos: Object.fromEntries(Object.entries(ON.publico).map(([u, d]) => [u, d.pos])) });
+  calcPublico();
+}
+function calcPublico() {
+  const fotos = [...(S.publicoSnaps || []), { pos: Object.fromEntries(Object.entries(ON.publico).map(([u, d]) => [u, d.pos])) }];
+  const suave = v => Math.tanh(v / ESCALA_VOTO);
+  let A = 0, B = 0; const aporte = {}, inicial = {}, final = {};
+  for (let i = 0; i + 1 < fotos.length; i++) {
+    for (const [u, pos] of Object.entries(fotos[i + 1].pos)) {
+      const antes = fotos[i].pos[u];
+      if (antes === undefined) continue;                      // entró después: su primera foto es su base
+      if (inicial[u] === undefined) inicial[u] = antes;
+      final[u] = pos;
+      const d = suave(pos) - suave(antes);
+      if (d > 0) A += d; else B -= d;
+      aporte[u] = (aporte[u] || 0) + d;
+    }
+  }
+  const votantes = Object.entries(ON.publico).map(([u, d]) => ({
+    uid: u, nombre: d.nombre, email: d.email, inicial: inicial[u] ?? d.pos, final: final[u] ?? d.pos, aporte: aporte[u] || 0 }));
+  S.publico = { A: decima(A), B: decima(B), n: Object.keys(ON.publico).length, votantes };
+  pintarMarcador();
+}
+
 /* ---------- barra de la sala: código, URL, jugadores ---------- */
 function pintarBarraOnline() {
   let bar = $("barraOnline");
@@ -218,10 +261,10 @@ function pintarBarraOnline() {
     document.querySelector(".marcador").before(bar);
   }
   const js = Object.values(ON.jugadores);
-  const nA = js.filter(j => j.equipo === "A").length, nB = js.filter(j => j.equipo === "B").length;
+  const nA = js.filter(j => j.equipo === "A").length, nB = js.filter(j => j.equipo === "B").length, nP = js.filter(j => j.equipo === "P").length;
   bar.innerHTML = `<b style="color:var(--neon);letter-spacing:.14em">SALA ${ON.codigo}</b>
     <span title="profesor">${ON.email || ""}</span>
-    <span>${js.length} en la sala · <span style="color:var(--A)">${EQUIPOS.A.nombre} ${nA}</span> · <span style="color:var(--B)">${EQUIPOS.B.nombre} ${nB}</span></span>
+    <span>${js.length} en la sala · <span style="color:var(--A)">${EQUIPOS.A.nombre} ${nA}</span> · <span style="color:var(--B)">${EQUIPOS.B.nombre} ${nB}</span> · <span style="color:#a78bfa">PÚBLICO ${nP}</span></span>
     <span class="mono" style="color:var(--txt)">${urlJugar()}</span>
     <button class="btn" id="btnCodigo" style="margin-left:auto">⛶ MOSTRAR CÓDIGO</button>`;
   $("btnCodigo").onclick = mostrarCodigo;
@@ -271,6 +314,7 @@ async function restaurar(codigo) {
   ON.codigo = codigo;
   if (priv && priv.historial) {
     S.ronda = priv.ronda; S.seq = priv.seq || 0; S.shocks = priv.shocks || [];
+    S.publicoSnaps = priv.publicoSnaps || [];
     S.historial = priv.historial; S.turnos = priv.turnos || []; S.votoInicial = priv.votoInicial || S.votoInicial; S.iniPos = priv.iniPos || S.iniPos;
     for (const p of AUDIENCIA) { const a = priv.audiencia?.[p.id]; if (a) { p.pos = a.pos; p.memoria = a.memoria || []; p.ultimo = a.ultimo || ""; } }
     // una ronda que estaba abierta cuando se cerró la pestaña se vuelve a abrir a mano

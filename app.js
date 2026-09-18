@@ -10,6 +10,9 @@ const S = {
   ronda: 0,
   historial: [],          // una entrada por intervención (por alumno)
   turnos: [],             // una entrada por bancada y ronda: lo que movió a la sala ese conjunto
+  // EL PÚBLICO: alumnos que no debaten y marcan su posición (solo online; lo calcula online.js).
+  // A / B = votos que movió cada bancada en ellos (voto suave, como la sala); n = cuántos votan.
+  publico: { A: 0, B: 0, n: 0, votantes: [] },
   votoInicial: null,
   reloj: null,
   seg: 0,
@@ -365,6 +368,14 @@ function pintarMarcador() {
   $("persuB").parentElement.classList.toggle("lidera", hay && !empatanEnVotos(pA, pB) && pB > pA);
   $("rigorA").parentElement.classList.toggle("lidera", rA !== null && rB !== null && rA - rB >= 0.05);
   $("rigorB").parentElement.classList.toggle("lidera", rA !== null && rB !== null && rB - rA >= 0.05);
+  // el público real: se muestra solo si hay alumnos votando
+  const P = S.publico, hayP = P.n > 0;
+  for (const k of ["A", "B"]) {
+    $("publico" + k).parentElement.style.display = hayP ? "" : "none";
+    $("publico" + k).textContent = hayP ? conSigno(P[k]) : "—";
+  }
+  $("publicoA").parentElement.classList.toggle("lidera", hayP && !empatanEnVotos(P.A, P.B) && P.A > P.B);
+  $("publicoB").parentElement.classList.toggle("lidera", hayP && !empatanEnVotos(P.A, P.B) && P.B > P.A);
   const probA = clamp((c.a + c.n * 0.5) / c.total, 0.06, 0.94);
   $("cuotaA").textContent = (1 / probA).toFixed(2);
   $("cuotaB").textContent = (1 / (1 - probA)).toFixed(2);
@@ -600,11 +611,16 @@ function ceremonia() {
   const rA = rigorMedio("A") || 0, rB = rigorMedio("B") || 0;
   const gP = empatanEnVotos(movA, movB) ? null : (movA > movB ? "A" : "B");
   const gR = Math.abs(rA - rB) < 0.05 ? null : (rA > rB ? "A" : "B");
+  const P = S.publico, hayP = P.n > 0;
+  const gU = !hayP || empatanEnVotos(P.A, P.B) ? null : (P.A > P.B ? "A" : "B");
   const nombre = k => k ? `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}` : "EMPATE";
   const color = k => k ? EQUIPOS[k].color : "var(--txt)";
   const lectura = gP && gR && gP !== gR ? "Una bancada ganó la sala y la otra el jurado. Esto es la clase."
     : gP && gR ? `${EQUIPOS[gP].nombre} ganó la sala y el jurado.`
     : !gP && !gR ? "Empate total." : !gP ? "La sala empató; el jurado decidió." : "El jurado empató; la sala decidió.";
+  const lecturaP = !hayP ? "" : gU === gP
+    ? `<div style="font-size:18px;color:var(--dim);margin-top:8px">El público real coincidió con la sala sintética.</div>`
+    : `<div style="font-size:18px;color:var(--amber);margin-top:8px">El público real no coincidió con la sala sintética: ¿qué vieron los agentes que ustedes no, o al revés?</div>`;
   const el = document.createElement("div");
   el.id = "ceremonia";
   el.innerHTML = `
@@ -612,18 +628,23 @@ function ceremonia() {
     <div class="cer-bloque" id="cer1"><div class="cer-k">LA SALA · votos ganados</div>
       <div class="cer-g" style="color:${color(gP)}">${nombre(gP)}</div>
       <div class="cer-s"><span style="color:${EQUIPOS.A.color}">${conSigno(movA)}</span> · <span style="color:${EQUIPOS.B.color}">${conSigno(movB)}</span></div></div>
+    ${hayP ? `<div class="cer-bloque" id="cerP"><div class="cer-k">EL PÚBLICO · ${P.n} alumno${P.n === 1 ? "" : "s"} · votos ganados</div>
+      <div class="cer-g" style="color:${color(gU)}">${nombre(gU)}</div>
+      <div class="cer-s"><span style="color:${EQUIPOS.A.color}">${conSigno(P.A)}</span> · <span style="color:${EQUIPOS.B.color}">${conSigno(P.B)}</span></div></div>` : ""}
     <div class="cer-bloque" id="cer2"><div class="cer-k">EL JURADO · rigor promedio /20</div>
       <div class="cer-g" style="color:${color(gR)}">${nombre(gR)}</div>
       <div class="cer-s"><span style="color:${EQUIPOS.A.color}">${rA.toFixed(1)}</span> · <span style="color:${EQUIPOS.B.color}">${rB.toFixed(1)}</span></div></div>
-    <div class="cer-lect" id="cer3">${lectura}
+    <div class="cer-lect" id="cer3">${lectura}${lecturaP}
       <div style="margin-top:18px;display:flex;gap:10px;justify-content:center">
         <button class="btn pri" id="cerDetalle">Ver detalle</button><button class="btn" id="cerCerrar">Cerrar</button></div></div>`;
   document.body.appendChild(el);
   const ver = (id, t) => setTimeout(() => $(id)?.classList.add("on"), t);
   sonar("redoble");
-  ver("cer1", 2600); setTimeout(() => sonar(gP ? "fanfarria" : "whoosh"), 2600);
-  ver("cer2", 5600); setTimeout(() => sonar(gR ? "fanfarria" : "whoosh"), 5600);
-  ver("cer3", 8400);
+  // tres (o dos) revelaciones, una cada 3 s; los bloques se compactan para caber en pantalla
+  if (hayP) el.classList.add("tres");
+  const pasos = hayP ? [["cer1", gP], ["cerP", gU], ["cer2", gR]] : [["cer1", gP], ["cer2", gR]];
+  pasos.forEach(([id, g], i) => { ver(id, 2600 + i * 3000); setTimeout(() => sonar(g ? "fanfarria" : "whoosh"), 2600 + i * 3000); });
+  ver("cer3", 2600 + pasos.length * 3000 - 200);
   $("cerCerrar").onclick = () => el.remove();
   $("cerDetalle").onclick = () => { el.remove(); veredicto(); };
   $("btnPrincipal").textContent = "VER VEREDICTO";
@@ -676,6 +697,13 @@ function veredicto() {
         ${S.shocks.length ? `<div class="sub">Sala de control (${S.shocks.length} shock${S.shocks.length > 1 ? "s" : ""}, no cuenta):
           <b>${decima(shockA) === 0 ? "0" : conSigno(Math.abs(shockA)) + " hacia " + (shockA > 0 ? EQUIPOS.A.nombre : EQUIPOS.B.nombre)}</b></div>` : ""}
       </div>
+      ${S.publico.n ? `<div class="vcard" style="--c:var(--A)">
+        <div class="l">GANA EN EL PÚBLICO REAL</div>
+        <div class="n" style="font-size:19px">${empatanEnVotos(S.publico.A, S.publico.B) ? "EMPATE" : S.publico.A > S.publico.B ? EQUIPOS.A.nombre : EQUIPOS.B.nombre}</div>
+        <div class="sub">${S.publico.n} alumno${S.publico.n === 1 ? "" : "s"} votando · votos movidos:
+          <b style="color:var(--A)">${conSigno(S.publico.A)}</b> /
+          <b style="color:var(--B)">${conSigno(S.publico.B)}</b></div>
+      </div>` : ""}
       <div class="vcard" style="--c:var(--amber)">
         <div class="l">GANA EN RIGOR</div>
         <div class="n" style="font-size:19px">${ganaR}</div>
@@ -834,6 +862,12 @@ function exportarCsv() {
     "SHOCK:" + x.id + (x.swing ? "|HACIA:" + EQUIPOS[x.swing > 0 ? "A" : "B"].nombre : ""),
     x.titular.replace(/"/g, "'")
   ]);
+  // el público: una fila por alumno, al final; delta_votos = votos que movió hacia A FAVOR
+  // (negativo = hacia EN CONTRA); la posición inicial y final van en banderas
+  const filasPublico = (S.publico.votantes || []).map(v => [1e12,
+    "PÚBLICO", "PÚBLICO", v.nombre || "", v.email || "", "", "", "", "", "", "",
+    decima(v.aporte), "", `INICIAL:${Math.round(v.inicial)}|FINAL:${Math.round(v.final)}`, ""]);
+  filasShock.push(...filasPublico);
   // intercaladas en el orden en que ocurrieron; el índice de orden no se exporta
   const cuerpo = [...filas, ...filasShock].sort((p, q) => p[0] - q[0])
     .map(f => f.slice(1).map(v => `"${v}"`).join(","));
