@@ -147,8 +147,8 @@ function activarOnline() {
     snap.forEach(d => {
       const x = d.data(); if (typeof x.pos !== "number") return;
       ON.publico[d.id] = x;
-      // la base de cada votante: la que guardó al entrar, o la primera posición que se le vio
-      if (!S.publicoBase[d.id]) S.publicoBase[d.id] = { t: x.desde || Date.now(), pos: typeof x.inicial === "number" ? x.inicial : x.pos };
+      // la base de cada votante: la que guardó al entrar (quienes entraron antes de este cambio partieron en 0)
+      if (!S.publicoBase[d.id]) S.publicoBase[d.id] = { t: x.desde || Date.now(), pos: typeof x.inicial === "number" ? x.inicial : 0 };   // todos entran en 0 (indeciso)
     });
     calcPublico(); pintarBarraOnline(); publicar();
   });
