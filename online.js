@@ -221,12 +221,16 @@ async function restaurar(codigo) {
 /* ---------- arranque: el profesor entra con Google ---------- */
 const google = new GoogleAuthProvider();
 
+// Arriba, a la vista: el primer intento de uso real no encontró el botón en la barra inferior.
 function botonEntrar() {
-  const b = document.createElement("button");
-  b.className = "btn"; b.id = "btnEntrarGoogle"; b.textContent = "🔑 ENTRAR CON GOOGLE";
-  b.title = "Entra con tu cuenta para crear salas online";
-  b.onclick = () => signInWithPopup(auth, google).catch(e => alert("No se pudo entrar: " + e.code));
-  $("btnLlm").after(b);
+  const bar = document.createElement("div");
+  bar.id = "barraEntrar";
+  bar.style.cssText = "display:flex;gap:14px;align-items:center;padding:8px 18px;background:#0c1319;border-bottom:1px solid var(--line);font-size:13px;color:var(--dim)";
+  bar.innerHTML = `<span>Para que las bancadas escriban desde sus teléfonos, entra con tu cuenta y crea una sala.</span>
+    <button class="btn pri" id="btnEntrarGoogle" style="margin-left:auto">🔑 ENTRAR CON GOOGLE</button>`;
+  document.querySelector(".marcador").before(bar);
+  $("btnEntrarGoogle").onclick = () => signInWithPopup(auth, google)
+    .catch(e => alert("No se pudo entrar: " + e.code + (e.code === "auth/popup-blocked" ? " — el navegador bloqueó la ventana de Google; permite ventanas emergentes para este sitio." : "")));
 }
 
 function botonCrear() {
@@ -244,7 +248,7 @@ function botonCrear() {
 }
 
 if (HAY_FIREBASE) onAuthStateChanged(auth, async user => {
-  $("btnEntrarGoogle")?.remove(); $("btnOnline")?.remove(); $("btnSalir")?.remove();
+  $("barraEntrar")?.remove(); $("btnOnline")?.remove(); $("btnSalir")?.remove();
   if (!user) { botonEntrar(); return; }
   // sesiones anónimas de la versión anterior: se cierran y se pide Google
   if (user.isAnonymous || !user.email) { await signOut(auth); return; }
