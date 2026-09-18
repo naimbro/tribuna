@@ -202,6 +202,11 @@ function reaccionar(textos, evs, dir, ecos = []) {
 
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
+// La instrucción "sin groserías" no basta (salió un "weones" en una partida): si la frase trae
+// una, esa reacción se muestra sin frase. El movimiento de la persona no cambia.
+const GROSERIAS = /\b(we[oó]n(es|a|as)?|hue[vb]?[oó]n(es|a|as)?|ctm|conchetumadre|conchetumare|culia[dot]o?s?|culiando|chucha|put[oa]s?|mierdas?|carajo|pico|raja|maric[oó]n(es)?|hueva(da|s)?|sacowea|pendej[oa]s?)\b/i;
+const limpiaFrase = f => GROSERIAS.test(norm(f)) ? null : f;
+
 function actitudEvidencia(p) {
   return p.peso_rigor < 0.3 ? "Las citas y la bibliografía te dan lo mismo. Te llega que alguien diga las cosas como son y en tu idioma."
     : p.peso_rigor < 0.7 ? "Una cita no te impresiona por sí sola. Te importa que lo que dicen calce con lo que has vivido."
@@ -285,7 +290,7 @@ async function reaccionarSociedad(textos, evs, eq, ctx) {
     let delta, comentario = null;
     try {
       const a = await consultarAgente(p, p.pos, p.memoria || [], bloque, eq, ctxSoc);
-      delta = saturar(a.delta, p.pos); comentario = esc(a.frase);
+      delta = saturar(a.delta, p.pos); comentario = limpiaFrase(a.frase) ? esc(a.frase) : null;
       (p.memoria = p.memoria || []).push({ rondaNombre: ctx.rondaNombre, equipo: eq, hacia: a.hacia, cuanto: a.cuanto, frase: a.frase });
     } catch (e) {
       caidos++;                                              // ese agente no contestó: paramétrico
@@ -353,6 +358,13 @@ function pintarMarcador() {
     const r = rigorMedio(k);
     $("rigor" + k).textContent = r === null ? "—" : r.toFixed(1);
   }
+  // quién lidera cada competencia: la sala (votos ganados) y el jurado (rigor)
+  const pA = persuasion("A"), pB = persuasion("B"), rA = rigorMedio("A"), rB = rigorMedio("B");
+  const hay = S.turnos.length > 0;
+  $("persuA").parentElement.classList.toggle("lidera", hay && !empatanEnVotos(pA, pB) && pA > pB);
+  $("persuB").parentElement.classList.toggle("lidera", hay && !empatanEnVotos(pA, pB) && pB > pA);
+  $("rigorA").parentElement.classList.toggle("lidera", rA !== null && rB !== null && rA - rB >= 0.05);
+  $("rigorB").parentElement.classList.toggle("lidera", rA !== null && rB !== null && rB - rA >= 0.05);
   const probA = clamp((c.a + c.n * 0.5) / c.total, 0.06, 0.94);
   $("cuotaA").textContent = (1 / probA).toFixed(2);
   $("cuotaB").textContent = (1 / (1 - probA)).toFixed(2);
@@ -526,6 +538,8 @@ async function cerrarRonda() {
     };
     // el jurado lee cada intervención por separado (en paralelo); cada alumno tiene su nota
     const evs = await Promise.all(textos.map(t => S.motor.activo ? evaluarConLLM(t.texto, ctx, k) : Promise.resolve(evaluarRigor(t.texto, ctx))));
+    // el jurado "canta" cada nota: un tono por intervención, más agudo cuanto más rigor
+    evs.forEach((ev, i) => setTimeout(() => sonar("nota", ev.rubrica.total), i * 220));
     const turnoOrden = S.seq++;
     textos.forEach((t, i) => S.historial.push({
       orden: S.seq++, turnoOrden,
@@ -544,7 +558,10 @@ async function cerrarRonda() {
     S.turnos.push({ orden: turnoOrden, equipo: k, ronda: R.id, rondaNombre: R.nombre, n: textos.length,
                     autores: textos.map(t => t.autor), rigorMedio: rig, deltaVotos: dv, reacciones });
     pintarFeed(); pintarAudiencia(reacciones); pintarMarcador();
-    sonar(dv > 0.5 ? "aplauso" : dv < -0.5 ? "abucheo" : "whoosh");
+    // el resultado del turno (votos + murmullos) es lo importante: el hilo se detiene ahí
+    const cabs = document.querySelectorAll("#feed .turno");
+    if (cabs.length) cabs[cabs.length - 1].scrollIntoView({ block: "start", behavior: "smooth" });
+    setTimeout(() => sonar(dv > 0.5 ? "aplauso" : dv < -0.5 ? "abucheo" : "whoosh"), evs.length * 220 + 150);
     if (rig >= 14) setTimeout(() => sonar("moneda"), 450);
     if (inyeccion)
       tick(`⚑ ${EQUIPOS[k].nombre} intentó manipular al evaluador. Rigor 0 y la sala se le da vuelta.`);
@@ -554,8 +571,10 @@ async function cerrarRonda() {
   $("btnPrincipal").disabled = false;
   const ultima = S.ronda >= RONDAS.length - 1;
   S.fase = ultima ? "fin" : "resuelta";
-  $("btnPrincipal").textContent = ultima ? "VER VEREDICTO" : "SIGUIENTE RONDA";
+  $("btnPrincipal").textContent = ultima ? "🏆 REVELAR GANADOR" : "SIGUIENTE RONDA";
   $("hint").textContent = ultima ? "Se acabó el debate." : "";
+  $("reloj").textContent = "--:--";
+  tick(ultima ? "Se acabó el debate. Revela al ganador cuando quieras." : `Ronda ${S.ronda + 1} revelada.`);
 }
 
 function siguienteRonda() {
@@ -564,6 +583,43 @@ function siguienteRonda() {
   pintarRonda();
   $("btnPrincipal").textContent = "ABRIR RONDA";
   ["A", "B"].forEach(k => { $("tx" + k).value = ""; $("banca" + k).classList.remove("lista"); contarPal(k); });
+}
+
+// El momento dramático: pantalla completa, redoble, la sala elige, el jurado elige, y la lectura.
+// Al final, "Ver detalle" abre el veredicto con la tabla por bloque.
+function ceremonia() {
+  S.veredictoRevelado = true;
+  const movA = persuasion("A"), movB = persuasion("B");
+  const rA = rigorMedio("A") || 0, rB = rigorMedio("B") || 0;
+  const gP = empatanEnVotos(movA, movB) ? null : (movA > movB ? "A" : "B");
+  const gR = Math.abs(rA - rB) < 0.05 ? null : (rA > rB ? "A" : "B");
+  const nombre = k => k ? `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}` : "EMPATE";
+  const color = k => k ? EQUIPOS[k].color : "var(--txt)";
+  const lectura = gP && gR && gP !== gR ? "Una bancada ganó la sala y la otra el jurado. Esto es la clase."
+    : gP && gR ? `${EQUIPOS[gP].nombre} ganó la sala y el jurado.`
+    : !gP && !gR ? "Empate total." : !gP ? "La sala empató; el jurado decidió." : "El jurado empató; la sala decidió.";
+  const el = document.createElement("div");
+  el.id = "ceremonia";
+  el.innerHTML = `
+    <div class="cer-k" id="cer0">EL VEREDICTO</div>
+    <div class="cer-bloque" id="cer1"><div class="cer-k">LA SALA · votos ganados</div>
+      <div class="cer-g" style="color:${color(gP)}">${nombre(gP)}</div>
+      <div class="cer-s"><span style="color:${EQUIPOS.A.color}">${conSigno(movA)}</span> · <span style="color:${EQUIPOS.B.color}">${conSigno(movB)}</span></div></div>
+    <div class="cer-bloque" id="cer2"><div class="cer-k">EL JURADO · rigor promedio /20</div>
+      <div class="cer-g" style="color:${color(gR)}">${nombre(gR)}</div>
+      <div class="cer-s"><span style="color:${EQUIPOS.A.color}">${rA.toFixed(1)}</span> · <span style="color:${EQUIPOS.B.color}">${rB.toFixed(1)}</span></div></div>
+    <div class="cer-lect" id="cer3">${lectura}
+      <div style="margin-top:18px;display:flex;gap:10px;justify-content:center">
+        <button class="btn pri" id="cerDetalle">Ver detalle</button><button class="btn" id="cerCerrar">Cerrar</button></div></div>`;
+  document.body.appendChild(el);
+  const ver = (id, t) => setTimeout(() => $(id)?.classList.add("on"), t);
+  sonar("redoble");
+  ver("cer1", 2600); setTimeout(() => sonar(gP ? "fanfarria" : "whoosh"), 2600);
+  ver("cer2", 5600); setTimeout(() => sonar(gR ? "fanfarria" : "whoosh"), 5600);
+  ver("cer3", 8400);
+  $("cerCerrar").onclick = () => el.remove();
+  $("cerDetalle").onclick = () => { el.remove(); veredicto(); };
+  $("btnPrincipal").textContent = "VER VEREDICTO";
 }
 
 function veredicto() {
@@ -664,7 +720,10 @@ function audioCtx() {
   return _ac;
 }
 const sonidoActivo = () => localStorage.getItem("tribuna_sonido") !== "0";
-function sonar(tipo) {
+// Los navegadores no dejan sonar hasta el primer clic o tecla en la página: se desbloquea ahí.
+["pointerdown", "keydown"].forEach(ev => document.addEventListener(ev, () => audioCtx(), { once: true }));
+
+function sonar(tipo, valor) {
   if (!sonidoActivo()) return;
   const ac = audioCtx(); if (!ac) return;
   const now = ac.currentTime;
@@ -707,6 +766,38 @@ function sonar(tipo) {
     o.frequency.setValueAtTime(320, now); o.frequency.exponentialRampToValueAtTime(640, now + 0.12);
     o.frequency.exponentialRampToValueAtTime(260, now + 0.35);
     o.connect(g); o.start(now); o.stop(now + 0.35);
+  } else if (tipo === "nota") {
+    // una nota del jurado: de 0 (grave) a 20 (agudo)
+    const o = ac.createOscillator(); o.type = "sine";
+    const g = env(0.16, 0.22);
+    o.frequency.setValueAtTime(260 + (valor || 0) * 32, now);
+    o.connect(g); o.start(now); o.stop(now + 0.22);
+  } else if (tipo === "pop") {
+    // alguien entregó su intervención
+    const o = ac.createOscillator(); o.type = "square";
+    const g = env(0.08, 0.09);
+    o.frequency.setValueAtTime(520, now); o.frequency.exponentialRampToValueAtTime(1040, now + 0.06);
+    o.connect(g); o.start(now); o.stop(now + 0.09);
+  } else if (tipo === "redoble") {
+    // redoble de tambor ~2.4 s: golpes de ruido cada vez más seguidos
+    for (let t = 0, dt = 0.09; t < 2.4; t += dt, dt = Math.max(0.035, dt * 0.965)) {
+      const t0 = now + t, len = Math.floor(ac.sampleRate * 0.06);
+      const n = ac.createBufferSource(), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      n.buffer = buf;
+      const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 900;
+      const g = ac.createGain(); g.gain.setValueAtTime(0.12 + 0.25 * (t / 2.4), t0);
+      n.connect(lp); lp.connect(g); g.connect(ac.destination); n.start(t0);
+    }
+  } else if (tipo === "fanfarria") {
+    // arpegio ascendente y acorde
+    [523, 659, 784, 1047].forEach((f, i) => {
+      const t0 = now + i * 0.11, o = ac.createOscillator(), g = ac.createGain();
+      o.type = "triangle"; o.frequency.setValueAtTime(f, t0);
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.2, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + (i === 3 ? 0.9 : 0.25));
+      o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + 1);
+    });
   } else if (tipo === "campana") {
     const o = ac.createOscillator(); o.type = "sine";
     const g = env(0.15, 0.6);
@@ -1032,6 +1123,7 @@ function init() {
     if (S.fase === "listo") abrirRonda();
     else if (S.fase === "abierta") cerrarRonda();
     else if (S.fase === "resuelta") siguienteRonda();
+    else if (!S.veredictoRevelado) ceremonia();
     else veredicto();
   };
   $("btnEjemplo").onclick = rellenarEjemplo;

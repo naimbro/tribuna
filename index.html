@@ -87,6 +87,21 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 body > header, body > .marcador, body > footer, #barraEntrar, #barraOnline{flex:0 0 auto}
 main{display:grid;grid-template-columns:1fr 372px;gap:0;flex:1 1 auto;min-height:0}
 #modoLbl{cursor:pointer;text-decoration:underline dotted}
+.cifra{min-width:82px}
+.cifra .l{white-space:nowrap}
+.cifra.lidera .n{text-shadow:0 0 14px currentColor}
+.cifra.lidera .l{color:var(--txt)}
+.cifra.lidera .l::before{content:"★ ";color:var(--amber)}
+/* ceremonia del ganador */
+#ceremonia{position:fixed;inset:0;z-index:60;background:radial-gradient(900px 500px at 50% 40%,#0f1c26 0%,rgba(3,6,9,.98) 70%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;text-align:center}
+#ceremonia .cer-k{font-size:15px;letter-spacing:.32em;color:var(--dim)}
+#cer0{font-size:22px;color:var(--amber);animation:pulso 1s infinite}
+#ceremonia .cer-bloque,#ceremonia .cer-lect{opacity:0;transform:scale(.7);transition:all .7s cubic-bezier(.2,1.5,.4,1)}
+#ceremonia .on{opacity:1;transform:scale(1)}
+#ceremonia .cer-g{font-size:84px;font-weight:800;letter-spacing:.05em;line-height:1.05;text-shadow:0 0 40px currentColor}
+#ceremonia .cer-s{font-family:var(--mono);font-size:22px;color:var(--dim);margin-top:6px}
+#ceremonia .cer-lect{font-size:24px;color:var(--txt);max-width:900px}
 .col{display:flex;flex-direction:column;min-height:0}
 .col.der{border-left:1px solid var(--line);background:#0b1117}
 .cab{
@@ -266,19 +281,19 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   <div class="eq" id="eqA" style="--c:var(--A)">
     <div class="flag" id="flagA"></div>
     <div class="id"><b id="nomA"></b><small id="lemaA"></small></div>
-    <div class="cifra persu"><div class="n mono" id="persuA">0</div><div class="l">PERSUASIÓN</div></div>
-    <div class="cifra rigor"><div class="n mono" id="rigorA">—</div><div class="l">RIGOR /20</div></div>
+    <div class="cifra persu" title="Votos que movió esta bancada en la sala (gana quien mueve más)"><div class="n mono" id="persuA">0</div><div class="l">LA SALA · votos</div></div>
+    <div class="cifra rigor" title="Promedio de la rúbrica del jurado sobre 20 (gana quien argumenta mejor)"><div class="n mono" id="rigorA">—</div><div class="l">EL JURADO · /20</div></div>
   </div>
   <div class="linea">
-    <div class="lbl">LÍNEA EN VIVO</div>
+    <div class="lbl">LÍNEA EN VIVO · cuotas de la sala</div>
     <div class="cuotas"><span class="cuota" id="cuotaA" style="color:var(--A)">—</span><span class="cuota" id="cuotaB" style="color:var(--B)">—</span></div>
     <div class="barra-votos"><i id="vA" style="background:var(--A);width:50%"></i><i id="vN" style="background:#2c3a48;width:0%"></i><i id="vB" style="background:var(--B);width:50%"></i></div>
   </div>
   <div class="eq" id="eqB" style="--c:var(--B)">
     <div class="flag" id="flagB"></div>
     <div class="id"><b id="nomB"></b><small id="lemaB"></small></div>
-    <div class="cifra persu"><div class="n mono" id="persuB">0</div><div class="l">PERSUASIÓN</div></div>
-    <div class="cifra rigor"><div class="n mono" id="rigorB">—</div><div class="l">RIGOR /20</div></div>
+    <div class="cifra persu" title="Votos que movió esta bancada en la sala (gana quien mueve más)"><div class="n mono" id="persuB">0</div><div class="l">LA SALA · votos</div></div>
+    <div class="cifra rigor" title="Promedio de la rúbrica del jurado sobre 20 (gana quien argumenta mejor)"><div class="n mono" id="rigorB">—</div><div class="l">EL JURADO · /20</div></div>
   </div>
 </div>
 
@@ -345,10 +360,10 @@ table.rank td.num{font-family:var(--mono);text-align:right}
     document.write('<script src="contenido/semana' + ok + '.js?v=20260919a"><\/script>');
   })();
 </script>
-<script src="app.js?v=20260919e"></script>
+<script src="app.js?v=20260919f"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260919e"></script>
+<script type="module" src="online.js?v=20260919f"></script>
 </body>
 </html>

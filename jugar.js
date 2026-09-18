@@ -142,6 +142,7 @@ function pintarSala() {
   J.rondaVista = turnos.length;
 
   const v = s.veredicto, cv = $("cardVeredicto");
+  if (v && !J.ceremoniaVista) { J.ceremoniaVista = true; ceremonia(s, v); }
   if (v) {
     cv.classList.remove("oculto");
     cv.innerHTML = `<div class="k">Veredicto de la sala</div>
@@ -152,6 +153,25 @@ function pintarSala() {
   } else cv.classList.add("oculto");
 
   pintarComposer(); pintarReloj();
+}
+
+// El ganador, en grande, cuando el profesor lo revela (misma secuencia que el proyector).
+function ceremonia(s, v) {
+  const col = n => n === s.equipos.A.nombre ? s.equipos.A.color : n === s.equipos.B.nombre ? s.equipos.B.color : "var(--txt)";
+  const band = n => n === s.equipos.A.nombre ? s.equipos.A.bandera + " " : n === s.equipos.B.nombre ? s.equipos.B.bandera + " " : "";
+  const el = document.createElement("div");
+  el.id = "ceremonia";
+  el.innerHTML = `<div class="k" style="color:var(--amber);font-size:14px">EL VEREDICTO</div>
+    <div class="cb" id="c1"><div class="k">La sala · votos ganados</div><div class="cg" style="color:${col(v.ganaP)}">${band(v.ganaP)}${esc(v.ganaP)}</div>
+      <div class="cs">${v.movA > 0 ? "+" : ""}${v.movA} · ${v.movB > 0 ? "+" : ""}${v.movB}</div></div>
+    <div class="cb" id="c2"><div class="k">El jurado · rigor /20</div><div class="cg" style="color:${col(v.ganaR)}">${band(v.ganaR)}${esc(v.ganaR)}</div>
+      <div class="cs">${v.rA} · ${v.rB}</div></div>
+    <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>`;
+  document.body.appendChild(el);
+  setTimeout(() => $("c1")?.classList.add("on"), 2600);
+  setTimeout(() => $("c2")?.classList.add("on"), 5600);
+  setTimeout(() => $("c3")?.classList.add("on"), 8400);
+  $("c3").onclick = () => el.remove();
 }
 
 function pintarReloj() {

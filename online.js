@@ -60,7 +60,8 @@ function estadoPublico() {
       conceptos: h.ev.conceptos.map(c => c.etiqueta)
     })),
     shocks: S.shocks.map(x => ({ titular: x.titular, ronda: x.ronda, swing: x.swing })),
-    veredicto: S.fase === "fin" ? resumenVeredicto() : null,
+    // el ganador llega a los teléfonos cuando el profesor lo revela, no antes
+    veredicto: S.fase === "fin" && S.veredictoRevelado ? resumenVeredicto() : null,
     ticker: $("ticker").textContent, motor: $("modoLbl").textContent
   };
 }
@@ -137,15 +138,25 @@ function activarOnline() {
   });
   envolver("siguienteRonda");
   envolver("veredicto");
+  envolver("ceremonia");
   envolver("lanzarEvento");
   envolver("pintarMarcador");
   envolver("pintarAudiencia");
   envolver("guardarMotor");
 
   // Quién va escribiendo en cada bancada (nombre + palabras), en vivo
+  let primera = true;
   onSnapshot(collection(db, "salas", ON.codigo, "intervenciones"), snap => {
+    const antes = ON.intervenciones;
     ON.intervenciones = {};
     snap.forEach(d => ON.intervenciones[d.id] = d.data());
+    // sonido cuando alguien entrega (o su texto supera las 20 palabras por primera vez)
+    if (!primera) for (const [uid, it] of Object.entries(ON.intervenciones)) {
+      const a = antes[uid], n = (it.texto || "").trim().split(/\s+/).length;
+      const nAntes = a && a.ronda === it.ronda ? (a.texto || "").trim().split(/\s+/).length : 0;
+      if (it.ronda === S.ronda && ((it.entregado && !(a && a.entregado && a.ronda === it.ronda)) || (n >= 20 && nAntes < 20))) { sonar("pop"); break; }
+    }
+    primera = false;
     pintarListas();
   });
 
