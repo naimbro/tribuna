@@ -254,22 +254,23 @@ function botonEntrar() {
     .catch(e => alert("No se pudo entrar: " + e.code + (e.code === "auth/popup-blocked" ? " — el navegador bloqueó la ventana de Google; permite ventanas emergentes para este sitio." : "")));
 }
 
+// Misma barra de arriba que el login: la primera vez nadie encontró el botón abajo.
 function botonCrear() {
-  const b = document.createElement("button");
-  b.className = "btn"; b.id = "btnOnline"; b.textContent = "🌐 SALA ONLINE";
-  b.title = `Crea una sala para que las bancadas escriban desde sus teléfonos (${ON.email})`;
-  b.onclick = () => crearSala().catch(e => alert(e.code === "permission-denied"
+  const bar = document.createElement("div");
+  bar.id = "barraEntrar";
+  bar.style.cssText = "display:flex;gap:14px;align-items:center;padding:8px 18px;background:#0c1319;border-bottom:1px solid var(--line);font-size:13px;color:var(--dim)";
+  bar.innerHTML = `<span>Conectado como <b style="color:var(--txt)">${ON.email}</b>. Crea una sala para que las bancadas escriban desde sus teléfonos.</span>
+    <button class="btn pri" id="btnOnline" style="margin-left:auto">🌐 CREAR SALA ONLINE</button>
+    <button class="btn" id="btnSalir" title="Salir">⎋ salir</button>`;
+  document.querySelector(".marcador").before(bar);
+  $("btnOnline").onclick = () => crearSala().catch(e => alert(e.code === "permission-denied"
     ? `La cuenta ${ON.email} no está autorizada para crear salas. El administrador la agrega en la colección "profesores".`
     : "No se pudo crear la sala: " + e.message));
-  $("btnLlm").after(b);
-  const salir = document.createElement("button");
-  salir.className = "btn"; salir.id = "btnSalir"; salir.textContent = "⎋"; salir.title = `Salir (${ON.email})`;
-  salir.onclick = () => signOut(auth).then(() => location.href = location.pathname);
-  b.after(salir);
+  $("btnSalir").onclick = () => signOut(auth).then(() => location.href = location.pathname);
 }
 
 if (HAY_FIREBASE) onAuthStateChanged(auth, async user => {
-  $("barraEntrar")?.remove(); $("btnOnline")?.remove(); $("btnSalir")?.remove();
+  $("barraEntrar")?.remove();
   if (!user) { botonEntrar(); return; }
   // sesiones anónimas de la versión anterior: se cierran y se pide Google
   if (user.isAnonymous || !user.email) { await signOut(auth); return; }
