@@ -550,22 +550,32 @@ async function cerrarRonda() {
   // tramo, que todos leyeron en vivo: el jurado juzga la refutación contra lo que de verdad se dijo.
   const previas = S.historial.slice();
   const entregas = recogerEntregas();
-  // ⚖ el relator resume, dice qué revisar y con qué criterios, y pide el voto (a humanos y máquinas)
-  const relator = await relatorPideVoto();
+  // Todo lo lento corre a la vez: ⚖ el relator (resume y pide el voto a humanos y máquinas) y el
+  // jurado de AMBAS bancadas, cada intervención por separado. El jurado juzga con su rúbrica y no
+  // espera al relator; la sala sintética sí lo escucha, porque reacciona después.
+  const t0 = Date.now();
+  const relatorP = relatorPideVoto();
   const chatTramo = transcripcionChat(m => m.ronda === S.ronda, 60);
-
+  const prep = {};
   for (const k of orden) {
     const textos = entregas[k];
-    if (!textos.length) { tick(`${EQUIPOS[k].nombre} no entregó. Cero puntos, cero movimiento.`); continue; }
     const rivalPrev = previas.filter(h => h.equipo !== k).slice(-1)[0];
     const ctx = {
       ronda: R.id, rondaNombre: R.nombre, pauta: R.pauta, dir: EQUIPOS[k].dir,
       conceptosRival: rivalPrev ? rivalPrev.ev.conceptos.map(c => c.id) : [],
       previas: previas.map(h => ({ equipo: h.equipo, rondaNombre: h.rondaNombre, texto: h.texto })),
-      ecos: ecosDe(previas, k), chatTramo, relator
+      ecos: ecosDe(previas, k), chatTramo
     };
-    // el jurado lee cada intervención por separado (en paralelo); cada alumno tiene su nota
-    const evs = await Promise.all(textos.map(t => S.motor.activo ? evaluarConLLM(t.texto, ctx, k) : Promise.resolve(evaluarRigor(t.texto, ctx))));
+    const evsP = Promise.all(textos.map(t => S.motor.activo ? evaluarConLLM(t.texto, ctx, k) : Promise.resolve(evaluarRigor(t.texto, ctx))));
+    prep[k] = { textos, ctx, evsP };
+  }
+  const relator = await relatorP;
+
+  for (const k of orden) {
+    const { textos, ctx } = prep[k];
+    if (!textos.length) { tick(`${EQUIPOS[k].nombre} no entregó. Cero puntos, cero movimiento.`); continue; }
+    const evs = await prep[k].evsP;
+    ctx.relator = relator;   // para la sala sintética
     // el jurado "canta" cada nota: un tono por intervención, más agudo cuanto más rigor
     evs.forEach((ev, i) => setTimeout(() => sonar("nota", ev.rubrica.total), i * 220));
     const turnoOrden = S.seq++;
@@ -598,8 +608,11 @@ async function cerrarRonda() {
     if (rig >= 14) setTimeout(() => sonar("moneda"), 450);
     if (inyeccion)
       tick(`⚑ ${EQUIPOS[k].nombre} intentó manipular al evaluador. Rigor 0 y la sala se le da vuelta.`);
-    await new Promise(r => setTimeout(r, 1400));
+    // sin sociedad la reacción es instantánea: una pausa corta separa las dos bancadas.
+    // Con sociedad, la consulta a los agentes de la siguiente bancada ya hace de pausa.
+    if (!conSociedad && k !== orden[1]) await new Promise(r => setTimeout(r, 1400));
   }
+  console.info(`TRIBUNA: votación del tramo en ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 
   $("btnPrincipal").disabled = false;
   const ultima = S.ronda >= RONDAS.length - 1;
