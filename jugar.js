@@ -201,11 +201,14 @@ function pintarComposer() {
   const n = palabras(tx.value);
   $("wc").textContent = n + " palabras";
   const entregada = miaDeEstaRonda() && J.mia.entregado;
-  $("estadoTx").textContent = !abierta ? (miaDeEstaRonda() ? "enviada" : "") : entregada ? "✓ entregada" : n >= 20 ? "se guarda sola" : "";
+  $("estadoTx").textContent = !abierta ? (miaDeEstaRonda() ? "enviada" : "") : entregada ? "✓ entregada" : n >= 5 ? "guardado" : "";
+  $("avisoTx").textContent = abierta && entregada ? "✓ Tu intervención llegó al profesor. Puedes seguir editándola hasta que cierre la ronda; el jurado la lee al revelar." : $("avisoTx").textContent.startsWith("✓") ? "" : $("avisoTx").textContent;
+  $("avisoTx").style.color = abierta && entregada ? "var(--neon)" : "";
   $("compTitulo").textContent = !abierta ? "Ronda cerrada" : `${s.rol} · ${s.pauta}`;
   $("btnEntregar").style.display = abierta ? "" : "none";
   $("btnEntregar").disabled = n < 5 || entregada;
   $("btnEntregar").textContent = entregada ? "✓ Entregada" : "Entregar";
+  if (entregada) $("btnEntregar").style.background = "#1b3a2a";
   tx.placeholder = abierta ? "Escribe tu intervención. Se guarda mientras escribes; al cerrar la ronda entra lo que haya." : "Espera a que el profesor abra la ronda.";
 }
 
@@ -219,6 +222,8 @@ function pintarCompaneros() {
 
 async function guardar(entregado) {
   if (!J.sala || J.sala.fase !== "abierta") return;
+  // editar después de entregar mantiene la entrega
+  if (!entregado && miaDeEstaRonda() && J.mia.entregado) entregado = true;
   const texto = $("tx").value.slice(0, 4000);
   await setDoc(doc(db, "salas", J.codigo, "intervenciones", J.uid),
     { equipo: J.equipo, ronda: J.sala.ronda, texto, nombre: J.nombre, email: J.email, actualizado: Date.now(), entregado: !!entregado });

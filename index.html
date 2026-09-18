@@ -90,6 +90,8 @@ main{display:grid;grid-template-columns:1fr 372px;gap:0;flex:1 1 auto;min-height
 .cifra{min-width:82px}
 .cifra .l{white-space:nowrap}
 .cifra.lidera .n{text-shadow:0 0 14px currentColor}
+.btn.pri.todos-listos{animation:pulso 1s infinite;box-shadow:0 0 0 3px rgba(0,224,122,.35)}
+.banca .lista-int span{font-size:11.5px}
 .cifra.lidera .l{color:var(--txt)}
 .cifra.lidera .l::before{content:"★ ";color:var(--amber)}
 /* ceremonia del ganador */
@@ -364,6 +366,6 @@ table.rank td.num{font-family:var(--mono);text-align:right}
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260919f"></script>
+<script type="module" src="online.js?v=20260919h"></script>
 </body>
 </html>

@@ -131,7 +131,7 @@ function activarOnline() {
     }
     return out;
   };
-  envolver("abrirRonda", () => { S.abreEn = Date.now(); });
+  envolver("abrirRonda", () => { S.abreEn = Date.now(); ON.avisoTodos = null; pintarListas(); });
   envolver("cerrarRonda", () => {
     S.abreEn = null;
     if (S.fase !== "abierta") tick(`Ronda ${S.ronda + 1} cerrada y revelada. ${S.fase === "fin" ? "Se acabó el debate: el profesor mostrará el veredicto." : "Espera a que el profesor abra la siguiente."}`);
@@ -154,7 +154,13 @@ function activarOnline() {
     if (!primera) for (const [uid, it] of Object.entries(ON.intervenciones)) {
       const a = antes[uid], n = (it.texto || "").trim().split(/\s+/).length;
       const nAntes = a && a.ronda === it.ronda ? (a.texto || "").trim().split(/\s+/).length : 0;
-      if (it.ronda === S.ronda && ((it.entregado && !(a && a.entregado && a.ronda === it.ronda)) || (n >= 20 && nAntes < 20))) { sonar("pop"); break; }
+      const recienEntrega = it.entregado && !(a && a.entregado && a.ronda === it.ronda);
+      if (it.ronda === S.ronda && recienEntrega) {
+        sonar("pop");
+        tick(`✓ ${it.nombre || "Alguien"} (${EQUIPOS[it.equipo]?.nombre || it.equipo}) entregó su intervención.`);
+        break;
+      }
+      if (it.ronda === S.ronda && n >= 20 && nAntes < 20) { sonar("pop"); break; }
     }
     primera = false;
     pintarListas();
@@ -181,14 +187,23 @@ function activarOnline() {
 
 // Chips por bancada: cada integrante con sus palabras; verde cuando ya tiene 20+.
 function pintarListas() {
+  let total = 0, listos = 0;
   for (const k of ["A", "B"]) {
     const miembros = Object.entries(ON.jugadores).filter(([, j]) => j.equipo === k);
     $("lista" + k).innerHTML = miembros.map(([uid, j]) => {
       const it = ON.intervenciones[uid];
-      const n = it && it.ronda === S.ronda ? (it.texto.trim().match(/\S+/g) || []).length : 0;
-      return `<span class="${n >= 20 ? "ok" : ""}" title="${(j.email || "").replace(/"/g, "")}">${(j.nombre || "?").replace(/</g, "&lt;")} · ${n}</span>`;
+      const deRonda = it && it.ronda === S.ronda;
+      const n = deRonda ? (it.texto.trim().match(/\S+/g) || []).length : 0;
+      const entrego = deRonda && it.entregado;
+      total++; if (entrego) listos++;
+      return `<span class="${entrego ? "ok" : ""}" title="${(j.email || "").replace(/"/g, "")}">${entrego ? "✓ " : ""}${(j.nombre || "?").replace(/</g, "&lt;")} · ${n} palabras${entrego ? "" : n ? " · escribiendo" : ""}</span>`;
     }).join("") || `<span style="border-style:dashed">nadie en esta bancada</span>`;
   }
+  // cuando todos los conectados entregaron, el botón lo dice
+  const todos = S.fase === "abierta" && total > 0 && listos === total;
+  $("btnPrincipal").classList.toggle("todos-listos", todos);
+  if (todos && !ON.avisoTodos) { ON.avisoTodos = S.ronda; tick(`Todos entregaron (${listos}). Puedes CERRAR Y REVELAR.`); }
+  if (!todos && ON.avisoTodos === S.ronda && S.fase !== "abierta") ON.avisoTodos = null;
 }
 
 const collectionJugadores = () => collection(db, "salas", ON.codigo, "jugadores");
