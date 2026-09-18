@@ -14,7 +14,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection }
   from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js";
+import { firebaseConfig } from "./firebase-config.js?v=20260918a";
 
 const params = new URLSearchParams(location.search);
 // Sin proyecto configurado (firebase-config.js vacío) esta capa no hace nada: el juego es local.
