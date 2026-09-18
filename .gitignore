@@ -3,3 +3,5 @@ __pycache__/
 *.tmp
 .firebase/
 firebase-debug.log
+functions/node_modules/
+functions/lib/

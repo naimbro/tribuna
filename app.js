@@ -13,7 +13,7 @@ const S = {
   votoInicial: null,
   reloj: null,
   seg: 0,
-  motor: { activo: false, prov: "anthropic", key: "", modelo: "claude-sonnet-5", proxy: false, sociedad: false },
+  motor: { activo: false, prov: "anthropic", key: "", modelo: "claude-sonnet-5", proxy: false, funcion: false, sociedad: false },
   proxyProvs: [],         // proveedores con key en el .env de servidor.py (la key no sale de ahí)
   entregado: { A: false, B: false },
   shocks: [],           // { id, titular, ronda, swing } — lo que movió la sala de control
@@ -748,7 +748,7 @@ function cerrarModal() { const m = $("modalWrap"); if (m) m.remove(); }
 
 function pintarModo() {
   $("modoLbl").textContent = !S.motor.activo ? "motor: heurístico local"
-    : `motor: ${S.motor.modelo}${S.motor.proxy ? " (.env)" : ""}${S.motor.sociedad ? " · sociedad de agentes" : ""}`;
+    : `motor: ${S.motor.modelo}${S.motor.proxy ? " (.env)" : S.motor.funcion ? " (servidor TRIBUNA)" : ""}${S.motor.sociedad ? " · sociedad de agentes" : ""}`;
 }
 
 function configMotor() {
@@ -757,9 +757,12 @@ function configMotor() {
     <p>Sin key, TRIBUNA evalúa con un lector heurístico que busca los conceptos de
     <code>contenido/semana5.js</code> y las marcas de la rúbrica. Funciona, es instantáneo y gratis,
     pero no entiende un argumento: entiende palabras.</p>
-    <p>Con key, un LLM aplica la misma rúbrica leyendo de verdad.
-    <b style="color:var(--amber)">La key queda solo en este navegador</b> (localStorage) y va directo
-    al proveedor. Para una clase real esto va detrás de un proxy, no en el browser.</p>
+    <p>Con el motor LLM, un modelo aplica la misma rúbrica leyendo de verdad.
+    ${typeof window.llmServidor === "function"
+      ? `<b style="color:var(--neon)">Estás conectado como profesor: el servidor de TRIBUNA tiene la key.</b>
+         Elige Anthropic y deja el campo de key vacío; nadie ve la key, ni siquiera este navegador.`
+      : `Para usar la key del servidor de TRIBUNA, entra con Google arriba. También puedes pegar una key
+         propia: <b style="color:var(--amber)">queda solo en este navegador</b> (localStorage).`}</p>
     <h3>PROVEEDOR</h3>
     <select id="mProv" style="width:100%;background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:9px">
       <option value="anthropic">Anthropic — claude-sonnet-5</option>
@@ -774,7 +777,7 @@ function configMotor() {
     ${S.proxyProvs.length ? `<p style="color:var(--neon)">El servidor local tiene key en <code>.env</code> para:
       <b>${S.proxyProvs.map(x => x.id).join(", ")}</b>. Deja el campo vacío para usarla: la key se queda
       en el servidor y nunca llega al navegador.</p>` : ""}
-    <input id="mKey" type="password" placeholder="${S.proxyProvs.length ? "vacío = usar la de .env" : "sk-…"}" value="${S.motor.key}">
+    <input id="mKey" type="password" placeholder="${S.proxyProvs.length ? "vacío = usar la de .env" : typeof window.llmServidor === "function" ? "vacío = usar la del servidor TRIBUNA" : "sk-…"}" value="${S.motor.key}">
     <div style="margin-top:18px;display:flex;gap:9px">
       <button class="btn pri" onclick="guardarMotor()">Activar</button>
       <button class="btn" onclick="apagarMotor()">Usar heurístico</button>
@@ -789,14 +792,16 @@ function guardarMotor() {
   S.motor.sociedad = $("mSoc").value === "1";
   S.motor.modelo = S.motor.prov === "anthropic" ? "claude-sonnet-5" : "gpt-4o-mini";
   S.motor.proxy = !S.motor.key && S.proxyProvs.some(x => x.id === S.motor.prov);
-  S.motor.activo = !!S.motor.key || S.motor.proxy;
-  if (!S.motor.activo) tick(`Sin key: no hay una para ${S.motor.prov} ni aquí ni en .env.`);
+  // servidor TRIBUNA (Cloud Function con la key en Secret Manager): solo Anthropic, solo profesores
+  S.motor.funcion = !S.motor.key && !S.motor.proxy && S.motor.prov === "anthropic" && typeof window.llmServidor === "function";
+  S.motor.activo = !!S.motor.key || S.motor.proxy || S.motor.funcion;
+  if (!S.motor.activo) tick(`Sin key: no hay una para ${S.motor.prov} ni aquí, ni en .env, ni en el servidor (entra con Google).`);
   localStorage.setItem("tribuna_motor", JSON.stringify(S.motor));
   pintarModo();
   cerrarModal(); tick("Motor: " + (S.motor.activo ? S.motor.modelo : "heurístico local"));
 }
 function apagarMotor() {
-  S.motor.activo = false; S.motor.key = ""; S.motor.proxy = false; S.motor.sociedad = false;
+  S.motor.activo = false; S.motor.key = ""; S.motor.proxy = false; S.motor.funcion = false; S.motor.sociedad = false;
   localStorage.removeItem("tribuna_motor");
   pintarModo();
   cerrarModal();
@@ -867,6 +872,10 @@ async function pedirLLM(p, uso = "jurado") {
     return j;
   };
   const soc = uso === "sociedad";
+  if (S.motor.funcion) {
+    if (typeof window.llmServidor !== "function") throw new Error("entra con Google para usar el servidor de TRIBUNA");
+    return await window.llmServidor(p, uso);
+  }
   if (S.motor.proxy) {
     const r = await fetch("/api/evaluar", {
       method: "POST", headers: { "content-type": "application/json" },

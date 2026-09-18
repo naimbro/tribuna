@@ -15,6 +15,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection }
   from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-functions.js";
 import { firebaseConfig } from "./firebase-config.js?v=20260918a";
 
 const params = new URLSearchParams(location.search);
@@ -306,6 +307,12 @@ if (HAY_FIREBASE) onAuthStateChanged(auth, async user => {
   // sesiones anónimas de la versión anterior: se cierran y se pide Google
   if (user.isAnonymous || !user.email) { await signOut(auth); return; }
   ON.uid = user.uid; ON.email = user.email;
+  // motor LLM por el servidor de TRIBUNA (Cloud Function `evaluar`): la key vive en Secret Manager
+  const evaluarFn = httpsCallable(getFunctions(app, "us-central1"), "evaluar", { timeout: 130000 });
+  window.llmServidor = async (prompt, uso) => {
+    try { return (await evaluarFn({ prompt, uso })).data.text; }
+    catch (e) { throw new Error(e.message || e.code); }
+  };
   const codigo = (params.get("sala") || "").toUpperCase();
   if (codigo && await restaurar(codigo)) activarOnline();
   else botonCrear();
