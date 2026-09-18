@@ -1042,6 +1042,8 @@ function init() {
   $("btnSonido").onclick = () => { localStorage.setItem("tribuna_sonido", sonidoActivo() ? "0" : "1"); pintarSonido(); if (sonidoActivo()) sonar("moneda"); };
   $("btnCsv").onclick = exportarCsv;
   $("btnLlm").onclick = configMotor;
+  $("modoLbl").onclick = configMotor;           // el rótulo del motor también abre la configuración
+  $("modoLbl").title = "Configurar el motor de evaluación";
   $("btnReset").onclick = () => location.reload();
 }
 init();

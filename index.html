@@ -81,7 +81,12 @@ header{
 .barra-votos i{display:block;height:100%;transition:width .8s cubic-bezier(.2,.8,.2,1)}
 
 /* ---------- layout ---------- */
-main{display:grid;grid-template-columns:1fr 372px;gap:0;height:calc(100vh - 138px)}
+/* la página cabe siempre en la pantalla: las barras de arriba (login, sala) y el pie ocupan lo
+   suyo y main toma el resto; antes la altura fija empujaba la SALA DE CONTROL fuera de la vista */
+body{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+body > header, body > .marcador, body > footer, #barraEntrar, #barraOnline{flex:0 0 auto}
+main{display:grid;grid-template-columns:1fr 372px;gap:0;flex:1 1 auto;min-height:0}
+#modoLbl{cursor:pointer;text-decoration:underline dotted}
 .col{display:flex;flex-direction:column;min-height:0}
 .col.der{border-left:1px solid var(--line);background:#0b1117}
 .cab{
@@ -340,7 +345,7 @@ table.rank td.num{font-family:var(--mono);text-align:right}
     document.write('<script src="contenido/semana' + ok + '.js?v=20260919a"><\/script>');
   })();
 </script>
-<script src="app.js?v=20260919c"></script>
+<script src="app.js?v=20260919d"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
