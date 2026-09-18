@@ -3,19 +3,21 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function conSesion() { return request.auth != null; }
-    function sala() { return get(/databases/$(database)/documents/salas/$(codigo)); }
-    function esProfe() { return conSesion() && sala().data.profeUid == request.auth.uid; }
-    function jugador() { return get(/databases/$(database)/documents/salas/$(codigo)/jugadores/$(request.auth.uid)); }
+    // Los helpers reciben el código: una función definida fuera del match no ve {codigo}.
+    function sala(codigo) { return get(/databases/$(database)/documents/salas/$(codigo)); }
+    function esProfe(codigo) { return conSesion() && sala(codigo).data.profeUid == request.auth.uid; }
+    function jugador(codigo) { return get(/databases/$(database)/documents/salas/$(codigo)/jugadores/$(request.auth.uid)); }
+    function esJugador(codigo) { return exists(/databases/$(database)/documents/salas/$(codigo)/jugadores/$(request.auth.uid)); }
 
     match /salas/{codigo} {
       // Cualquiera con el código lee la sala (alumnos entran con sesión anónima).
       allow read: if conSesion();
       // Solo la pantalla que la creó la escribe. Anónimo, pero el uid persiste en ese navegador.
       allow create: if conSesion() && request.resource.data.profeUid == request.auth.uid;
-      allow update, delete: if esProfe();
+      allow update, delete: if esProfe(codigo);
 
       match /privado/{doc} {
-        allow read, write: if esProfe();
+        allow read, write: if esProfe(codigo);
       }
 
       match /jugadores/{uid} {
@@ -30,10 +32,10 @@ service cloud.firestore {
         // Escribe el profe, o un jugador de ESA bancada mientras la ronda está abierta.
         // Quién tiene el teclado se coordina en el cliente (redactorUid); acá solo se
         // garantiza que nadie escriba por la bancada contraria ni fuera de tiempo.
-        allow write: if esProfe() || (conSesion()
-          && exists(/databases/$(database)/documents/salas/$(codigo)/jugadores/$(request.auth.uid))
-          && jugador().data.equipo == equipo
-          && sala().data.fase == 'abierta'
+        allow write: if esProfe(codigo) || (conSesion()
+          && esJugador(codigo)
+          && jugador(codigo).data.equipo == equipo
+          && sala(codigo).data.fase == 'abierta'
           && request.resource.data.texto is string && request.resource.data.texto.size() <= 4000);
       }
     }
