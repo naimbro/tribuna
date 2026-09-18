@@ -477,11 +477,23 @@ function abrirRonda() {
 
 // Qué entregó cada bancada. En local: las dos cajas de la mesa. En línea, online.js la
 // reemplaza para juntar lo que escribió cada alumno desde su teléfono (más la caja del profe).
+// Una caja puede traer varias intervenciones: cada párrafo que empieza con "@Nombre:" es la de
+// un alumno distinto (bancada sin teléfonos, o el profesor transcribiendo a varios).
+function partirCaja(t, autorPorDefecto, emailPorDefecto = "") {
+  const out = [];
+  for (const parte of t.trim().split(/\n(?=\s*@[^:\n]{1,40}:)/)) {
+    const m = parte.trim().match(/^@([^:\n]{1,40}):\s*([\s\S]*)$/);
+    const texto = (m ? m[2] : parte).trim();
+    if (texto) out.push({ autor: m ? m[1].trim() : autorPorDefecto, email: m ? "" : emailPorDefecto, texto: texto.slice(0, 4000) });
+  }
+  return out;
+}
+
 function recogerEntregas() {
   const out = { A: [], B: [] };
   for (const k of ["A", "B"]) {
     const texto = $("tx" + k).value.trim();
-    if (texto) out[k].push({ autor: $("sel" + k).value, email: "", texto });
+    if (texto) out[k].push(...partirCaja(texto, $("sel" + k).value));
   }
   return out;
 }

@@ -124,17 +124,9 @@ function activarOnline() {
       if (it.ronda === S.ronda && ["A", "B"].includes(it.equipo) && (it.texto || "").trim())
         out[it.equipo].push({ autor: it.nombre || "alumno", email: it.email || "", texto: it.texto.trim().slice(0, 4000) });
     }
-    // La caja del profesor puede traer varias intervenciones: cada párrafo que empieza con
-    // "@Nombre:" es la de un alumno distinto (bancada sin teléfonos, o una transcripción).
     for (const k of ["A", "B"]) {
       const t = $("tx" + k).value.trim();
-      if (!t) continue;
-      const partes = t.split(/\n(?=\s*@[^:\n]{1,40}:)/);
-      for (const parte of partes) {
-        const m = parte.trim().match(/^@([^:\n]{1,40}):\s*([\s\S]*)$/);
-        const texto = (m ? m[2] : parte).trim();
-        if (texto) out[k].push({ autor: m ? m[1].trim() : "(profesor)", email: m ? "" : (ON.email || ""), texto: texto.slice(0, 4000) });
-      }
+      if (t) out[k].push(...partirCaja(t, "(profesor)", ON.email || ""));
     }
     return out;
   };
@@ -309,10 +301,16 @@ if (HAY_FIREBASE) onAuthStateChanged(auth, async user => {
   ON.uid = user.uid; ON.email = user.email;
   // motor LLM por el servidor de TRIBUNA (Cloud Function `evaluar`): la key vive en Secret Manager
   const evaluarFn = httpsCallable(getFunctions(app, "us-central1"), "evaluar", { timeout: 130000 });
-  window.llmServidor = async (prompt, uso) => {
-    try { return (await evaluarFn({ prompt, uso })).data.text; }
-    catch (e) { throw new Error(e.message || e.code); }
-  };
+  // Sondeo sin costo: un prompt vacío. Si la función existe responde "invalid-argument" sin
+  // llamar al modelo; si no está desplegada (o no eres profesor) el motor por servidor no se ofrece.
+  evaluarFn({ prompt: "" }).catch(e => {
+    if (e.code !== "functions/invalid-argument") return;
+    window.llmServidor = async (prompt, uso) => {
+      try { return (await evaluarFn({ prompt, uso })).data.text; }
+      catch (e) { throw new Error(e.message || e.code); }
+    };
+    tick("El servidor de TRIBUNA tiene el motor LLM disponible (⚙ MOTOR, sin key).");
+  });
   const codigo = (params.get("sala") || "").toUpperCase();
   if (codigo && await restaurar(codigo)) activarOnline();
   else botonCrear();
