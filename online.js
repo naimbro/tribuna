@@ -105,10 +105,11 @@ function envolver(nombre, despues) {
 }
 
 function activarOnline() {
-  // Las cajas dejan de ser editables acá: lo que escriben las bancadas llega de Firestore.
+  // Las cajas espejan lo que escriben las bancadas desde Firestore. Si nadie ha tomado el
+  // teclado por una bancada, el profesor puede escribir por ella (una bancada sin teléfono,
+  // o una prueba con una sola persona).
   ["A", "B"].forEach(k => {
-    $("tx" + k).readOnly = true;
-    $("tx" + k).placeholder = "Esperando a la bancada… (escriben desde su teléfono)";
+    $("tx" + k).placeholder = "Esperando a la bancada… (escriben desde su teléfono). Si nadie toma el teclado, puedes escribir tú aquí.";
   });
   envolver("abrirRonda", () => {
     S.abreEn = Date.now();
@@ -120,7 +121,7 @@ function activarOnline() {
     S.abreEn = null;
     // el correo del redactor viaja al historial (y de ahí al CSV); el nombre ya va en `autor`
     for (const h of S.historial) if (h.ronda === RONDAS[S.ronda].id && !h.autorEmail)
-      h.autorEmail = ON.borradores[h.equipo]?.redactorEmail || "";
+      h.autorEmail = ON.borradores[h.equipo]?.redactorEmail || (ON.borradores[h.equipo]?.redactorUid ? "" : ON.email);
     if (S.fase !== "abierta") tick(`Ronda ${S.ronda + 1} cerrada y revelada. ${S.fase === "fin" ? "Se acabó el debate: el profesor mostrará el veredicto." : "Espera a que el profesor abra la siguiente."}`);
   });
   envolver("siguienteRonda");
@@ -134,11 +135,13 @@ function activarOnline() {
   ["A", "B"].forEach(k => onSnapshot(doc(db, "salas", ON.codigo, "borradores", k), snap => {
     const b = snap.data() || {};
     ON.borradores[k] = b;
-    if (S.fase === "abierta" || S.fase === "listo") {
+    const alguien = !!b.redactorUid;                      // un alumno tiene el teclado
+    $("tx" + k).readOnly = alguien;
+    if (alguien && (S.fase === "abierta" || S.fase === "listo")) {
       $("tx" + k).value = b.texto || "";
       contarPal(k);
     }
-    const quien = b.redactorNombre || "—";
+    const quien = b.redactorNombre || "(profesor)";
     $("sel" + k).innerHTML = `<option>${quien.replace(/</g, "&lt;")}</option>`;
   }));
 
