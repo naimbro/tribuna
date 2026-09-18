@@ -586,17 +586,17 @@ function lanzarEvento() {
 /* ====================== 8. EXPORTAR ================================= */
 
 function exportarCsv() {
-  const cab = ["ronda", "equipo", "autor", "palabras", "evidencia", "refutacion", "estructura",
+  const cab = ["ronda", "equipo", "autor", "autor_email", "palabras", "evidencia", "refutacion", "estructura",
     "concesion", "rigor_total", "delta_votos", "conceptos", "banderas", "texto"];
   const filas = S.historial.map(h => [h.orden,
-    h.rondaNombre, EQUIPOS[h.equipo].nombre, h.autor, h.ev.palabras || palabras(h.texto),
+    h.rondaNombre, EQUIPOS[h.equipo].nombre, h.autor, h.autorEmail || "", h.ev.palabras || palabras(h.texto),
     h.ev.rubrica.evidencia, h.ev.rubrica.refutacion, h.ev.rubrica.estructura, h.ev.rubrica.concesion,
     h.ev.rubrica.total, h.deltaVotos,
     h.ev.conceptos.map(c => c.id).join("|"), h.ev.banderas.join("|"),
     h.texto.replace(/"/g, "'")
   ]);
   const filasShock = S.shocks.map(x => [x.orden,
-    x.ronda, "SALA DE CONTROL", "profesor", "", "", "", "", "", "",
+    x.ronda, "SALA DE CONTROL", "profesor", "", "", "", "", "", "", "",
     Math.abs(x.swing), "",   // delta_votos sigue siendo numérico; la dirección va en banderas
     "SHOCK:" + x.id + (x.swing ? "|HACIA:" + EQUIPOS[x.swing > 0 ? "A" : "B"].nombre : ""),
     x.titular.replace(/"/g, "'")

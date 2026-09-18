@@ -11,7 +11,7 @@
    Se carga como módulo; los globales de app.js (S, AUDIENCIA, abrirRonda…) son visibles.
    ===================================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection }
   from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
@@ -23,7 +23,7 @@ const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
 const db = HAY_FIREBASE ? getFirestore(app) : null;
 
-const ON = { codigo: null, uid: null, jugadores: {}, borradores: {}, timer: null, pendiente: false };
+const ON = { codigo: null, uid: null, email: null, jugadores: {}, borradores: {}, timer: null, pendiente: false };
 const CODIGO_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const nuevoCodigo = () => Array.from({ length: 4 }, () => CODIGO_CHARS[Math.floor(Math.random() * CODIGO_CHARS.length)]).join("");
 const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, "")}jugar.html?sala=${ON.codigo}`;
@@ -32,7 +32,7 @@ const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, 
 function estadoPublico() {
   const R = RONDAS[S.ronda];
   return {
-    profeUid: ON.uid, actualizado: Date.now(),
+    profeUid: ON.uid, profeEmail: ON.email, actualizado: Date.now(),
     semana: SESION.semana, tema: SESION.tema, mocion: SESION.mocion,
     equipos: { A: { nombre: EQUIPOS.A.nombre, bandera: EQUIPOS.A.bandera, color: EQUIPOS.A.color },
                B: { nombre: EQUIPOS.B.nombre, bandera: EQUIPOS.B.bandera, color: EQUIPOS.B.color } },
@@ -118,6 +118,9 @@ function activarOnline() {
   });
   envolver("cerrarRonda", () => {
     S.abreEn = null;
+    // el correo del redactor viaja al historial (y de ahí al CSV); el nombre ya va en `autor`
+    for (const h of S.historial) if (h.ronda === RONDAS[S.ronda].id && !h.autorEmail)
+      h.autorEmail = ON.borradores[h.equipo]?.redactorEmail || "";
     if (S.fase !== "abierta") tick(`Ronda ${S.ronda + 1} cerrada y revelada. ${S.fase === "fin" ? "Se acabó el debate: el profesor mostrará el veredicto." : "Espera a que el profesor abra la siguiente."}`);
   });
   envolver("siguienteRonda");
@@ -167,6 +170,7 @@ function pintarBarraOnline() {
   const js = Object.values(ON.jugadores);
   const nA = js.filter(j => j.equipo === "A").length, nB = js.filter(j => j.equipo === "B").length;
   bar.innerHTML = `<b style="color:var(--neon);letter-spacing:.14em">SALA ${ON.codigo}</b>
+    <span title="profesor">${ON.email || ""}</span>
     <span>${js.length} en la sala · <span style="color:var(--A)">${EQUIPOS.A.nombre} ${nA}</span> · <span style="color:var(--B)">${EQUIPOS.B.nombre} ${nB}</span></span>
     <span class="mono" style="color:var(--txt)">${urlJugar()}</span>
     <button class="btn" id="btnCodigo" style="margin-left:auto">⛶ MOSTRAR CÓDIGO</button>`;
@@ -214,22 +218,35 @@ async function restaurar(codigo) {
   return true;
 }
 
-/* ---------- arranque ---------- */
-function botonCrear() {
+/* ---------- arranque: el profesor entra con Google ---------- */
+const google = new GoogleAuthProvider();
+
+function botonEntrar() {
   const b = document.createElement("button");
-  b.className = "btn"; b.id = "btnOnline"; b.textContent = "🌐 SALA ONLINE";
-  b.title = "Crea una sala para que las bancadas escriban desde sus teléfonos";
-  b.onclick = () => crearSala().catch(e => alert("No se pudo crear la sala: " + e.message));
+  b.className = "btn"; b.id = "btnEntrarGoogle"; b.textContent = "🔑 ENTRAR CON GOOGLE";
+  b.title = "Entra con tu cuenta para crear salas online";
+  b.onclick = () => signInWithPopup(auth, google).catch(e => alert("No se pudo entrar: " + e.code));
   $("btnLlm").after(b);
 }
 
+function botonCrear() {
+  const b = document.createElement("button");
+  b.className = "btn"; b.id = "btnOnline"; b.textContent = "🌐 SALA ONLINE";
+  b.title = `Crea una sala para que las bancadas escriban desde sus teléfonos (${ON.email})`;
+  b.onclick = () => crearSala().catch(e => alert(e.code === "permission-denied"
+    ? `La cuenta ${ON.email} no está autorizada para crear salas. El administrador la agrega en la colección "profesores".`
+    : "No se pudo crear la sala: " + e.message));
+  $("btnLlm").after(b);
+  const salir = document.createElement("button");
+  salir.className = "btn"; salir.id = "btnSalir"; salir.textContent = "⎋"; salir.title = `Salir (${ON.email})`;
+  salir.onclick = () => signOut(auth).then(() => location.href = location.pathname);
+  b.after(salir);
+}
+
 if (HAY_FIREBASE) onAuthStateChanged(auth, async user => {
-  if (!user) {
-    try { await signInAnonymously(auth); }
-    catch (e) { tick("Sin acceso a Firebase (" + e.code + "): el juego sigue en modo local."); botonCrear(); }
-    return;
-  }
-  ON.uid = user.uid;
+  $("btnEntrarGoogle")?.remove(); $("btnOnline")?.remove(); $("btnSalir")?.remove();
+  if (!user) { botonEntrar(); return; }
+  ON.uid = user.uid; ON.email = user.email;
   const codigo = (params.get("sala") || "").toUpperCase();
   if (codigo && await restaurar(codigo)) activarOnline();
   else botonCrear();

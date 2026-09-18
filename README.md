@@ -109,13 +109,16 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
 - **Datos:** `salas/{codigo}` (público para quien tenga el código; solo el creador escribe),
   `jugadores/{uid}` (cada uno el suyo), `borradores/{A|B}` (solo la bancada dueña, solo con
   la ronda abierta, máximo 4000 caracteres) y `privado/estado` (solo el profesor). Reglas en
-  `firestore.rules`. Entrada con sesión anónima de Firebase: no hay cuentas ni correos.
+  `firestore.rules`. Todos entran **con su cuenta Google** (igual que en `ml2-master-game`):
+  el uid es estable, así que el mismo alumno queda identificado de clase a clase y el CSV
+  lleva `autor_email`. Salas solo las crea `naim.bro@gmail.com` o un correo listado en la
+  colección `profesores/{email}` (la edita el admin desde la consola).
 - **La key del LLM** va en el navegador del profesor (⚙ MOTOR, "key pegada"), no en el de
   los alumnos, que nunca llaman al proveedor. Un proxy con la key en Cloud Functions
   requiere el plan Blaze del proyecto; el `.env` + `servidor.py` solo sirve en local.
 - **Publicar:** el repo es estático, sin build. GitHub Pages sirve `main` en
   `https://naimbro.github.io/tribuna/` (profesor) y `.../tribuna/jugar.html` (alumnos).
-  Proyecto Firebase `tribuna-csc00155` (plan Spark: Firestore + acceso anónimo, sin
+  Proyecto Firebase `tribuna-csc00155` (plan Spark: Firestore + acceso con Google, sin
   Functions). Reglas: `firebase deploy --only firestore:rules` desde WSL con Node 20.
 - **Probado el 18-sep-2026** de punta a punta: sala creada, dos alumnos desde orígenes
   distintos (uno desde GitHub Pages), tres rondas escritas desde los teléfonos, jurado LLM +

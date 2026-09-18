@@ -5,7 +5,7 @@
    pulsa "Tomar el teclado" escribe; el resto ve el borrador crecer en vivo.
    ===================================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -16,7 +16,8 @@ const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
 const db = HAY_FIREBASE ? getFirestore(app) : null;
 
-const J = { uid: null, codigo: null, nombre: "", equipo: null, sala: null, borrador: null, reloj: null, escribiendo: null };
+const J = { uid: null, email: null, codigo: null, nombre: "", equipo: null, sala: null, borrador: null, reloj: null, escribiendo: null };
+const google = new GoogleAuthProvider();
 const TECLADO_VENCE = 90_000;      // ms sin escribir tras los cuales otro puede tomar el teclado
 
 /* ---------- entrar ---------- */
@@ -30,6 +31,11 @@ $("btnEntrar").onclick = async () => {
   $("errEntrar").textContent = "";
   if (codigo.length !== 4) return $("errEntrar").textContent = "El código tiene 4 letras.";
   if (nombre.length < 2) return $("errEntrar").textContent = "Pon tu nombre: es el que sale en el registro de la sesión.";
+  if (!J.uid) {
+    // La cuenta Google identifica al alumno de clase a clase; el popup necesita un clic.
+    try { await signInWithPopup(auth, google); } catch (e) { return $("errEntrar").textContent = "No se pudo entrar con Google: " + e.code; }
+    return;   // onAuthStateChanged vuelve a pulsar este botón
+  }
   try {
     const snap = await getDoc(doc(db, "salas", codigo));
     if (!snap.exists()) return $("errEntrar").textContent = `No existe la sala ${codigo}.`;
@@ -54,7 +60,7 @@ function mostrarBancadas() {
 
 async function elegir(k) {
   J.equipo = k;
-  await setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { nombre: J.nombre, equipo: k, unido: Date.now() });
+  await setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { nombre: J.nombre, email: J.email, equipo: k, unido: Date.now() });
   await entrarAlJuego();
 }
 
@@ -63,6 +69,7 @@ async function entrarAlJuego() {
   $("pEntrar").classList.add("oculto"); $("pBancada").classList.add("oculto");
   $("pJuego").classList.remove("oculto");
   $("salaLbl").textContent = `sala ${J.codigo} · ${J.nombre}`;
+  $("salaLbl").title = J.email || "";
   onSnapshot(doc(db, "salas", J.codigo), snap => { J.sala = snap.data(); pintarSala(); });
   onSnapshot(doc(db, "salas", J.codigo, "borradores", J.equipo), snap => { J.borrador = snap.data() || {}; pintarBorrador(); });
   $("btnCambiar").onclick = mostrarBancadas;
@@ -170,7 +177,7 @@ async function tomarTeclado() {
   }
   if (!tecladoLibre()) return;
   await setDoc(doc(db, "salas", J.codigo, "borradores", J.equipo),
-    { texto: J.borrador?.texto || "", redactorUid: J.uid, redactorNombre: J.nombre, actualizado: Date.now(), ronda: J.sala.ronda });
+    { texto: J.borrador?.texto || "", redactorUid: J.uid, redactorNombre: J.nombre, redactorEmail: J.email, actualizado: Date.now(), ronda: J.sala.ronda });
   $("tx").focus();
 }
 
@@ -180,18 +187,18 @@ function alEscribir() {
   $("wc").textContent = ($("tx").value.trim().match(/\S+/g) || []).length + " palabras";
   clearTimeout(J.escribiendo);
   J.escribiendo = setTimeout(() => setDoc(doc(db, "salas", J.codigo, "borradores", J.equipo),
-    { texto: $("tx").value.slice(0, 4000), redactorUid: J.uid, redactorNombre: J.nombre, actualizado: Date.now(), ronda: J.sala.ronda })
+    { texto: $("tx").value.slice(0, 4000), redactorUid: J.uid, redactorNombre: J.nombre, redactorEmail: J.email, actualizado: Date.now(), ronda: J.sala.ronda })
     .catch(e => $("avisoTx").textContent = "No se guardó lo último: " + e.message), 350);
 }
 
 /* ---------- arranque ---------- */
 if (!HAY_FIREBASE) $("errEntrar").textContent = "Esta copia de TRIBUNA no tiene configurado el proyecto Firebase (firebase-config.js).";
-else onAuthStateChanged(auth, async user => {
-  if (!user) {
-    try { await signInAnonymously(auth); }
-    catch (e) { $("errEntrar").textContent = "No hay conexión con la sala (" + e.code + ")."; }
-    return;
-  }
-  J.uid = user.uid;
+else onAuthStateChanged(auth, user => {
+  J.uid = user?.uid || null; J.email = user?.email || null;
+  if (!user) { $("btnEntrar").textContent = "Entrar con Google"; return; }
+  $("btnEntrar").textContent = "Entrar";
+  if (!$("inNombre").value && user.displayName) $("inNombre").value = user.displayName;
+  $("errEntrar").innerHTML = `Conectado como <b>${esc(user.email)}</b> · <a href="#" id="salir" style="color:var(--dim)">salir</a>`;
+  $("salir").onclick = e => { e.preventDefault(); signOut(auth).then(() => location.reload()); };
   if ($("inCodigo").value.length === 4 && $("inNombre").value) $("btnEntrar").click();
 });
