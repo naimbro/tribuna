@@ -828,12 +828,18 @@ const EJEMPLOS = {
     B: `El punto de desacuerdo es el peso de la agencia. Ellos creen que un puñado de reguladores puede reorientar una tecnología general; nosotros creemos que la restricción es la estructura de costos y que las buenas intenciones no la mueven. Ahí se juega el debate, y no en si nos cae bien o mal Elon Musk.`
   }
 };
+// Los ejemplos están escritos para la semana 5; otra sesión puede traer los suyos en
+// contenido/semanaN.js como EJEMPLOS_SESION = { apertura: {A, B}, refutacion: {…}, cierre: {…} }.
+const ejemplosDeLaSesion = () => (typeof EJEMPLOS_SESION !== "undefined") ? EJEMPLOS_SESION
+  : (SESION.semana === 5 ? EJEMPLOS : null);
 function rellenarEjemplo() {
+  const EJ = ejemplosDeLaSesion();
+  if (!EJ) return;
   if (S.fase === "listo") abrirRonda();   // escribir en una ronda cerrada se perdía al abrirla
   if (S.fase !== "abierta") return;
   const R = RONDAS[S.ronda];
-  $("txA").value = EJEMPLOS[R.id].A;
-  $("txB").value = EJEMPLOS[R.id].B;
+  $("txA").value = EJ[R.id].A;
+  $("txB").value = EJ[R.id].B;
   ["A", "B"].forEach(k => { contarPal(k); $("banca" + k).classList.add("lista"); });
 }
 
@@ -885,6 +891,19 @@ function init() {
     else veredicto();
   };
   $("btnEjemplo").onclick = rellenarEjemplo;
+  if (!ejemplosDeLaSesion()) $("btnEjemplo").style.display = "none";
+  // selector de sesión (manifiesto contenido/sesiones.js): cambia ?semana=N y recarga
+  if (typeof SESIONES !== "undefined" && SESIONES.length > 1) {
+    const sel = document.createElement("select");
+    sel.id = "selSemana"; sel.title = "Sesión";
+    sel.className = $("selEvento").className;
+    sel.innerHTML = SESIONES.map(x => `<option value="${x.semana}" ${x.semana === SESION.semana ? "selected" : ""}>SEMANA ${x.semana} · ${x.tema}</option>`).join("");
+    sel.onchange = () => {
+      if (S.historial.length && !confirm("Cambiar de sesión reinicia la partida. ¿Seguir?")) { sel.value = SESION.semana; return; }
+      location.href = location.pathname + "?semana=" + sel.value;
+    };
+    $("selEvento").before(sel);
+  }
   $("btnEvento").onclick = lanzarEvento;
   $("btnCsv").onclick = exportarCsv;
   $("btnLlm").onclick = configMotor;

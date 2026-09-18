@@ -224,8 +224,10 @@ Es una v0 en lo estructural: un agente por bloque, sin conversación entre agent
 
 ## Cambiar de semana
 
-Todo el contenido está en `contenido/semana5.js`. Para montar otra sesión se copia
-el archivo y se editan seis cosas:
+Todo el contenido de una sesión está en `contenido/semana<N>.js`; `contenido/sesiones.js`
+las lista y la pantalla las ofrece en un selector (o `index.html?semana=7`). Una sala online
+recuerda su sesión. Para montar otra se copia el archivo, se agrega al manifiesto y se
+editan seis cosas:
 
 1. `SESION` — curso, semana, moción.
 2. `RONDAS` — nombres, roles y segundos.

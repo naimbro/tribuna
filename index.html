@@ -306,9 +306,18 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   <div class="ticker" id="ticker"></div>
 </footer>
 
-<script src="contenido/semana5.js?v=20260918b"></script>
-<script src="app.js?v=20260918b"></script>
+<script src="contenido/sesiones.js?v=20260918c"></script>
+<script>
+  // La sesión se elige con ?semana=N (por defecto la primera del manifiesto). document.write
+  // para que el archivo cargue de forma síncrona antes de app.js, que espera sus globales.
+  (function () {
+    const pedida = +new URLSearchParams(location.search).get("semana");
+    const ok = SESIONES.some(x => x.semana === pedida) ? pedida : SESIONES[0].semana;
+    document.write('<script src="contenido/semana' + ok + '.js?v=20260918c"><\/script>');
+  })();
+</script>
+<script src="app.js?v=20260918c"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260918b"></script>
+<script type="module" src="online.js?v=20260918c"></script>
 </body>
 </html>

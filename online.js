@@ -153,6 +153,11 @@ function activarOnline() {
   $("btnEjemplo").style.display = "none";        // en línea escriben los alumnos, no el botón
   // REINICIAR en línea = sala nueva (la vieja queda en Firestore)
   $("btnReset").onclick = () => { if (confirm("¿Crear una sala nueva? La actual queda guardada pero deja de usarse.")) crearSala(); };
+  const selSemana = $("selSemana");
+  if (selSemana) selSemana.onchange = () => {
+    if (confirm("Cambiar de sesión crea una sala nueva. ¿Seguir?")) location.href = `${location.pathname}?semana=${selSemana.value}`;
+    else selSemana.value = SESION.semana;
+  };
   publicar();
 }
 
@@ -190,8 +195,7 @@ async function crearSala() {
   ON.codigo = nuevoCodigo();
   await setDoc(doc(db, "salas", ON.codigo), limpio({ ...estadoPublico(), creada: Date.now() }));
   await setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado()));
-  history.replaceState(null, "", `?sala=${ON.codigo}`);
-  location.reload();
+  location.href = `${location.pathname}?sala=${ON.codigo}&semana=${SESION.semana}`;
 }
 
 async function restaurar(codigo) {
@@ -200,6 +204,11 @@ async function restaurar(codigo) {
   if (pub.data().profeUid !== ON.uid) {
     alert("Esta sala la creó otro navegador. Solo la pantalla que la creó puede dirigirla; crea una sala nueva.");
     history.replaceState(null, "", location.pathname); return false;
+  }
+  // la sala se creó con una sesión: si la URL trae otra, se recarga con la correcta
+  if (pub.data().semana && pub.data().semana !== SESION.semana) {
+    location.href = `${location.pathname}?sala=${codigo}&semana=${pub.data().semana}`;
+    return false;
   }
   const priv = (await getDoc(doc(db, "salas", codigo, "privado", "estado"))).data();
   ON.codigo = codigo;
