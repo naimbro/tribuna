@@ -183,10 +183,22 @@ function pintarBarraOnline() {
 }
 
 function mostrarCodigo() {
+  // QR con la URL de la sala (como en ml2); si la librería no cargó, queda la URL y el código
+  let qr = "";
+  if (typeof qrcode === "function") {
+    const q = qrcode(0, "M"); q.addData(urlJugar()); q.make();
+    qr = `<div style="background:#fff;padding:14px;border-radius:12px;display:inline-block">${q.createSvgTag({ cellSize: 6, margin: 0 })}</div>`;
+  }
   abrirModal(`<h2 style="text-align:center">Entra con tu teléfono</h2>
-    <p class="mono" style="text-align:center;font-size:22px;color:var(--txt);word-break:break-all">${urlJugar()}</p>
-    <p style="text-align:center;color:var(--dim)">o abre <b>jugar.html</b> y escribe el código</p>
-    <div class="mono" style="text-align:center;font-size:96px;letter-spacing:.3em;color:var(--neon);margin:10px 0 20px">${ON.codigo}</div>
+    <div style="display:flex;gap:28px;align-items:center;justify-content:center;flex-wrap:wrap;margin:8px 0 14px">
+      ${qr}
+      <div style="text-align:center">
+        <div style="color:var(--dim);font-size:12px;letter-spacing:.14em">CÓDIGO DE LA SALA</div>
+        <div class="mono" style="font-size:96px;letter-spacing:.3em;color:var(--neon);line-height:1.1">${ON.codigo}</div>
+        <div style="color:var(--dim)">o abre <b>jugar.html</b> y escribe el código</div>
+      </div>
+    </div>
+    <p class="mono" style="text-align:center;font-size:18px;color:var(--txt);word-break:break-all">${urlJugar()}</p>
     <div style="text-align:center"><button class="btn" onclick="cerrarModal()">Volver</button></div>`);
 }
 

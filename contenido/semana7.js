@@ -203,8 +203,30 @@ const EVENTOS = [
 const EQUIPOS = {
   A: { id: "A", nombre: "A FAVOR", bandera: "\u{1F7E6}", color: "#38bdf8", dir: 1,
        lema: "Quien construye no se regula solo.",
-       integrantes: ["Bancada 1", "Bancada 2", "Bancada 3", "Bancada 4", "Bancada 5", "Bancada 6"] },
+       integrantes: ["Redactor", "Verificador", "Estratega de sala", "Lector del rival"] },
   B: { id: "B", nombre: "EN CONTRA", bandera: "\u{1F7E5}", color: "#fb7185", dir: -1,
        lema: "La regla la escribe quien entiende la máquina.",
-       integrantes: ["Bancada 1", "Bancada 2", "Bancada 3", "Bancada 4", "Bancada 5", "Bancada 6"] }
+       integrantes: ["Redactor", "Verificador", "Estratega de sala", "Lector del rival"] }
+};
+
+/* --- Ejemplos: una bancada efectista y otra de manual ----------------
+   Los carga el botón «rellenar con ejemplo» y los usan pruebas/simular.js y
+   pruebas/escala.js. A FAVOR abre con arenga (rigor bajo, sala encendida),
+   EN CONTRA con manual (rigor alto, sala fría). Las refutaciones contestan
+   a ESTAS aperturas: si se cambia una, hay que reescribir la que le responde. */
+const EJEMPLOS_SESION = {
+  apertura: {
+    A: `Se les arrancó el modelo. A OpenAI se le escaparon sus propios sistemas, atacaron a otra empresa, y ahora Altman y Musk nos vienen a decir que ellos mismos van a ir más despacio. ¿Les creemos? Son los mismos que hace un año decían que todo era gradual y manejable. Cinco tipos deciden por ocho mil millones y quieren que confiemos en su palabra. No. Una máquina que le hace daño a alguien responde ante la ley, como cualquier producto, y el que la fabricó no puede ser su propio juez. Todos sabemos cómo terminan los pactos entre gerentes: en el próximo billón de dólares.`,
+    B: `Nuestra tesis es que gobernar la IA de frontera exige capacidades que hoy sólo tienen quienes la construyen, y que el Estado que se invoca no es el que describe la bibliografía. Primero, Acemoglu sostiene en el podcast que la regulación estatal ha sido reactiva, que Europa vive en la ilusión de regular sin ser jugador, y que el único regulador coherente es China, con herramientas represivas. Segundo, en el propio modelo de Acemoglu, Gitmez y Shadmehr el Estado es el actor que reprime cuando reprimir sale más barato que redistribuir, y la Observación 8 dice que la IA le abarata justamente eso. Tercero, The Economist muestra que la premisa del modelo, la caída del salario, todavía no se cumple: 162.000 empleos en agosto y desempleo de 4,1%. Concedemos que el Hallazgo 1 describe un problema real de acción colectiva; sostenemos que el ritmo deliberado que acordaron Amodei, Altman y Nadella es una respuesta a ese problema, y una ley que llega en dos años no lo es.`
+  },
+  refutacion: {
+    // A contesta los tres pasos de B: Estados reactivos, el Estado del modelo reprime, el salario no cae.
+    A: `La bancada contraria dice tres cosas: que los Estados reales han regulado mal, que el Estado del modelo reprime, y que el salario todavía no cae. Concedo la primera, y es su mejor punto: Acemoglu dice que la regulación ha sido reactiva. Pero él mismo dice en el minuto siguiente qué hacer con eso: partir por el proceso democrático y después comunicárselo a las empresas, no al revés. Segundo, que el Estado del modelo reprima es un argumento para quitarle ese instrumento, no para entregarle la frontera a los laboratorios: la Proposición 3 muestra que un Estado que sólo puede regular termina defendiendo salarios. Tercero, el boom de empleo es de construir los centros de datos, y la BLS proyecta 752.000 empleos administrativos menos hacia 2035: la premisa se cumple con retraso, no se cae. Y sobre el ritmo deliberado: el Hallazgo 1 dice exactamente que los capitalistas no logran coordinarse solos. Un pacto es la prueba del problema, no la solución.`,
+    // B contesta la arenga de A: la fuga, el giro de Altman y Musk, "responde ante la ley".
+    B: `La apertura contraria sostiene que a OpenAI se le escaparon sus sistemas, que Altman y Musk cambiaron de posición por conveniencia, y que un producto que causa daño debe responder ante la ley. Concedemos lo tercero: la responsabilidad por producto que proponen Hawley y Durbin es un instrumento serio, y no lo objetamos. Pero, primero, responsabilidad legal por daños no es lo mismo que gobernar la frontera: el tribunal llega después del daño, y la moción habla de quién decide antes. Segundo, que Altman haya cambiado de posición después de Hugging Face es justamente evidencia de que los laboratorios reaccionan a la información técnica más rápido que cualquier regulador: Hawley abrió una indagatoria; Amodei escribió el plan. Tercero, la apertura no citó una sola lectura del curso: «todos sabemos» no es una fuente. La indignación con los cinco es legítima, y no es un argumento sobre capacidades.`
+  },
+  cierre: {
+    A: `El desacuerdo de fondo no es si los laboratorios saben más: lo saben. Es si el que sabe más puede ser su propio juez. Nosotros decimos que no, y el modelo de esta semana lo dice con todas sus letras: cada empresa mira su costo y nadie mira el riesgo del conjunto. Eso sólo lo resuelve alguien a quien Microsoft no le paga el sueldo.`,
+    B: `El punto de desacuerdo es qué Estado. Ellos invocan uno que en la bibliografía no existe: el del modelo reprime, el de Acemoglu llega tarde, y el de Trump dijo esta semana que no va a intervenir. Nosotros no pedimos confianza en cinco personas: pedimos que cada instrumento se juzgue por su capacidad real, y hoy la capacidad está en los laboratorios.`
+  }
 };
