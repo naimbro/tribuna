@@ -128,12 +128,9 @@ function activarOnline() {
     for (const k of ["A", "B"]) {
       const t = $("tx" + k).value.trim();
       if (!t) continue;
-      const partes = t.split(/
-(?=\s*@[^:
-]{1,40}:)/);
+      const partes = t.split(/\n(?=\s*@[^:\n]{1,40}:)/);
       for (const parte of partes) {
-        const m = parte.trim().match(/^@([^:
-]{1,40}):\s*([\s\S]*)$/);
+        const m = parte.trim().match(/^@([^:\n]{1,40}):\s*([\s\S]*)$/);
         const texto = (m ? m[2] : parte).trim();
         if (texto) out[k].push({ autor: m ? m[1].trim() : "(profesor)", email: m ? "" : (ON.email || ""), texto: texto.slice(0, 4000) });
       }
