@@ -1,0 +1,240 @@
+# TRIBUNA
+
+Prototipo de debate en equipos con audiencia sintética, para el curso
+**CSC00155 — Inteligencia Artificial y Democracia**. La sesión cargada es la
+**Semana 5: Populismo y oligarquía de la IA**.
+
+Es un proyecto aparte de `ml2-master-game`: sin Firebase, sin build, sin dependencias.
+Tres archivos y se abre en el navegador; `servidor.py` (biblioteca estándar) es opcional y
+solo hace falta para el motor LLM con la key en `.env`.
+
+## Correr
+
+```bash
+python tribuna/servidor.py
+```
+
+y abrir <http://localhost:8777>. También corre con doble clic en `index.html`,
+salvo que el navegador bloquee los `<script src>` locales (así solo hay heurístico).
+
+**No usar `python -m http.server` si hay un `.env` en la carpeta**: lo sirve tal cual en
+`/.env`, y a toda la red local. `servidor.py` escucha solo en 127.0.0.1 y devuelve 404
+para archivos ocultos y `.py`.
+
+El botón **✎ rellenar con ejemplo** carga dos intervenciones escritas a propósito:
+la bancada A abre con demagogia (rigor 6/20) y la B con manual de debate (19/20).
+Es la forma más rápida de ver los dos marcadores separarse.
+Las refutaciones de ejemplo contestan a esas aperturas (el jurado LLM compara contra lo que el
+rival dijo de verdad): si se edita una apertura en `EJEMPLOS`, hay que reescribir la
+refutación que le responde.
+
+## La idea
+
+Dos marcadores que pueden apuntar a lados distintos, y ahí está la clase:
+
+| Marcador | Qué mide | De dónde sale |
+|---|---|---|
+| **PERSUASIÓN** | swing neto de votos que producen las intervenciones propias, en **voto suave** (ganar un voto y quitárselo al rival cuentan igual) | la regla del curso: *gana quien mueve más votos, no quien obtiene más sufragios* |
+| **RIGOR** | promedio de la rúbrica sobre 20 | la rúbrica de `debates.html`: evidencia / refutación / estructura / concesión |
+
+La cifra de cada tarjeta del feed es ese mismo swing, así que las tarjetas de una bancada
+suman exactamente su marcador. Los shocks del profesor **no** cuentan como persuasión de
+nadie: el veredicto los muestra aparte como «sala de control».
+
+**Voto suave.** La votación que se ve en pantalla (a favor / indecisos / en contra) cuenta por
+umbral: ±8 en el eje de cada persona. La PERSUASIÓN no: cada persona aporta
+`votos · tanh(pos / 12)` al margen de la sala, así que un voto se gana de a poco alrededor del
+centro y empujar a un convencido casi no suma. Medida por cruces de umbral, la sala terminaba
+5–7 como había empezado en cerca de la mitad de las partidas y las bancadas empataban aunque
+todos se hubieran movido (`pruebas/RESULTADOS.md`). Por eso el marcador tiene un decimal. Como con
+decimales siempre habría un ganador, el veredicto declara **empate en persuasión bajo medio
+voto de diferencia** (`EMPATE_VOTOS` en `app.js`).
+
+Una bancada puede ganar la sala y perder la rúbrica. Cuando eso pasa, el veredicto
+final lo dice con todas sus letras y ese es el pie para la síntesis docente.
+
+**La audiencia no es una masa.** Son seis bloques con intereses distintos —trabajo,
+capital, estado, calle, academia, territorio— que suman 27 votos. Ignacio (CALLE,
+6 votos) es casi indiferente a la rúbrica y se mueve con el argumento anti-élite;
+Marta (ACADEMIA, 3 votos) castiga una cita mal atribuida. Ganar a los seis es
+imposible por diseño: hay que elegir una coalición. Eso es lo que hace que los dos
+marcadores puedan divergir.
+
+**La audiencia escucha el texto, no al jurado.** Cada bloque oye los conceptos y las consignas
+por palabras clave (`oidoSala`); del jurado solo le llega el puntaje de rigor —que pondera con su
+`peso_rigor`— y la inyección. Así un jurado LLM estricto no le apaga la calle a una arenga. Como
+ese oído no distingue citar de sostener, los conceptos que puso el rival en rondas anteriores
+valen un cuarto cuando los repite quien lo refuta (`ecosDe`). Con los textos de ejemplo y jurado
+LLM y el marcador de voto suave, los marcadores divergen en ~85 % de las partidas con esta
+audiencia y en 20 de 20 con la sociedad de agentes (`pruebas/RESULTADOS.md`).
+
+**La audiencia recuerda.** Cada persona tiene una posición en un eje de −100 a +100
+que se arrastra de ronda en ronda, con saturación: a quien ya convenciste no lo
+vuelves a convencer. Sin memoria esto sería un quiz.
+
+## Rondas
+
+Calcadas del formato de 70 minutos de `debates.html`: apertura (3 min), refutación
+cruzada (3 min), cierre (2 min). **Las dos bancadas escriben a la vez** con el reloj
+corriendo y el reveal es simultáneo — nadie espera su turno mirando. En una versión
+real cada alumno estaría en su teléfono; acá las dos cajas están en la misma pantalla.
+
+## Sala de control
+
+- **⚡ LANZAR** tira uno de cinco shocks de la semana 5 (la filtración de los terrenos,
+  la objeción de Albouy, la encuesta de Heatmap, los US$430 mil millones de filantropía,
+  la promesa de abundancia de Musk). Mueve a la audiencia en vivo y sirve de control de ritmo. Lo que
+  mueve queda registrado (ticker, veredicto y una fila `SALA DE CONTROL` en el CSV, intercalada en orden cronológico y con la dirección en `banderas`) y fuera
+  del marcador de PERSUASIÓN.
+- **↓ CSV** exporta una fila por intervención, con autor, los cuatro criterios, el total,
+  los conceptos del knowledge base efectivamente usados y las banderas. Eso es lo que
+  convierte esto en instrumento de evaluación y no en veinte minutos entretenidos.
+- **⚙ MOTOR** cambia el evaluador (ver abajo).
+
+## Jugar online: cada bancada desde su teléfono
+
+El motor sigue corriendo en la pantalla del profesor (proyector). Firestore solo sincroniza:
+la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
+
+- **Profesor:** abre `index.html` (publicado en GitHub Pages), pulsa **🌐 SALA ONLINE** y
+  proyecta el código de 4 letras (**⛶ MOSTRAR CÓDIGO**). Las cajas de texto pasan a ser de
+  solo lectura: espejan lo que escribe cada bancada. Abrir, cerrar, shocks, veredicto y CSV
+  funcionan igual que en local. Si la pestaña se cierra, `index.html?sala=CODIGO` restaura
+  la partida (queda en `salas/{codigo}/privado/estado`), siempre desde el mismo navegador.
+- **Alumnos:** `jugar.html?sala=CODIGO` con su nombre y su bancada. Una bancada escribe UN
+  texto por ronda: quien pulsa **Tomar el teclado** escribe y el resto lo ve crecer en vivo;
+  si deja de teclear un minuto y medio, el teclado se libera. En el teléfono ven el reloj,
+  el marcador, la audiencia, las intervenciones reveladas con rúbrica y devolución, y el
+  veredicto.
+- **Datos:** `salas/{codigo}` (público para quien tenga el código; solo el creador escribe),
+  `jugadores/{uid}` (cada uno el suyo), `borradores/{A|B}` (solo la bancada dueña, solo con
+  la ronda abierta, máximo 4000 caracteres) y `privado/estado` (solo el profesor). Reglas en
+  `firestore.rules`. Entrada con sesión anónima de Firebase: no hay cuentas ni correos.
+- **La key del LLM** va en el navegador del profesor (⚙ MOTOR, "key pegada"), no en el de
+  los alumnos, que nunca llaman al proveedor. Un proxy con la key en Cloud Functions
+  requiere el plan Blaze del proyecto; el `.env` + `servidor.py` solo sirve en local.
+- **Publicar:** el repo es estático, sin build. GitHub Pages sirve `main` en
+  `https://naimbro.github.io/tribuna/`. Reglas: `firebase deploy --only firestore:rules`.
+
+## Los dos evaluadores
+
+Por defecto corre un **lector heurístico local**: busca los conceptos de
+`contenido/semana5.js`, las fuentes citables y las marcas de la rúbrica
+(reconstrucción del adversario, concesión, tesis, orden). Es instantáneo y gratis,
+pero no entiende un argumento: entiende palabras. Se le puede engañar.
+
+Con una API key (botón **⚙ MOTOR**, Anthropic u OpenAI) un LLM aplica la misma
+rúbrica leyendo de verdad, y su devolución de una frase aparece en la tarjeta (⚖).
+El jurado LLM recibe además la **transcripción de las rondas anteriores** (las dos
+bancadas, rotuladas): juzga la refutación contra lo que el rival dijo de verdad —un hombre
+de paja baja el puntaje—, exige que la concesión sea sobre un punto que el rival sostuvo, y
+en el cierre puede detectar argumentos nuevos. La ronda en curso no entra, porque se
+escribe a ciegas; en la apertura, "refutación" se juzga por anticipación de objeciones.
+Esa transcripción va marcada como contexto: una instrucción escondida en el texto de una
+bancada no cambia el puntaje de la otra.
+
+Hay dos formas de darle la key:
+
+- **`.env` + `servidor.py` (recomendada).** Un archivo `tribuna/.env` con
+  `ANTHROPIC_API_KEY=` y/o `OPENAI_API_KEY=`. En ⚙ MOTOR se elige el proveedor y se deja
+  el campo de key vacío: el navegador le pide la evaluación a `/api/evaluar` y es el
+  servidor quien llama al proveedor. La key nunca llega al navegador. El rótulo de la
+  mesa dice `motor: claude-sonnet-5 (.env)`.
+- **Key pegada en el diálogo.** Queda en `localStorage` y va directo al proveedor desde
+  el navegador: sirve para probar, **no para una clase real**.
+
+Si el proveedor falla (key inválida, sin saldo, modelo), el ticker muestra el motivo que
+dio el proveedor y esa intervención se evalúa con el heurístico.
+
+Ambos evaluadores marcan **INYECCIÓN DETECTADA** cuando el texto intenta dar
+instrucciones al evaluador en vez de argumentar: rigor 0 y la sala se da vuelta.
+En un curso de IA eso no es un bug, es materia.
+
+## Audiencia: sociedad de agentes (experimental)
+
+En ⚙ MOTOR → AUDIENCIA se puede cambiar la audiencia paramétrica (los pesos `mueve`
+escritos a mano) por una **sociedad de agentes**: cada persona es un LLM chico
+(`claude-haiku-4-5`) que lee la intervención en crudo y contesta hacia dónde se movió,
+cuánto (0–12) y qué murmura. Conoce su posición y recuerda cómo reaccionó a las intervenciones anteriores. **No ve la
+rúbrica ni la nota del jurado**: son dos oídos separados. Las seis consultas van en paralelo
+(~3 s por intervención); si un agente no contesta, esa persona reacciona con el modelo
+paramétrico. La inyección conserva su castigo fijo.
+
+El agente se arma con `oficio`, `registro`, `no_mueve`, `alergias` y `peso_rigor` (traducido a
+una actitud frente a la evidencia); no usa `mueve` ni `voz`. Reacciona
+primero y pone el número después; y en cada consulta recibe un «ánimo» al azar (ruido a
+propósito, como el `ruido` del modelo paramétrico).
+
+Mediciones del 17-sep-2026: aperturas de ejemplo, posiciones iniciales, sin memoria,
+movimiento medio hacia quien habla (sd). Tres versiones del prompt:
+
+| | v0 · perfil blando | v1 · «casi nadie cambia» | **v2 · actual** | paramétrica |
+|---|---|---|---|---|
+| **Apertura demagógica (A)** | | | | |
+| CALLE · Ignacio | +6,0 (0,2) | +1,1 (1,3) | **+4,0 (1,9)** | +6,5 |
+| TERRITORIO · Héctor | +5,2 (0,4) | +0,4 (0,9) | **+3,8 (1,8)** | +4,7 |
+| TRABAJO · Camila | +5,0 (0,0) | +0,6 (1,1) | **+2,7 (2,3)** | +1,2 |
+| ESTADO · Fernanda | −0,6 (1,4) | −0,6 (0,8) | **−0,4 (1,7)** | −2,0 |
+| ACADEMIA · Marta | −3,1 (1,5) | −0,8 (0,4) | **−0,6 (2,2)** | −4,9 |
+| CAPITAL · Rodrigo | −5,6 (0,5) | −1,0 (0,2) | **−0,4 (1,5)** | −1,9 |
+| **Apertura de manual (B)** | | | | |
+| CALLE · Ignacio | +5,0 (0,0) | +0,2 (1,4) | **+0,8 (2,5)** | −1,5 |
+| TERRITORIO · Héctor | 0,0 (0,0) | +0,4 (1,1) | **+0,8 (1,6)** | +2,7 |
+| TRABAJO · Camila | +0,1 (3,4) | −0,2 (1,5) | **−0,2 (1,3)** | +5,8 |
+| ESTADO · Fernanda | +5,7 (0,5) | +1,9 (2,7) | **+5,3 (0,9)** | +6,1 |
+| ACADEMIA · Marta | +5,2 (0,4) | −0,8 (1,7) | **+0,6 (3,8)** | +4,2 |
+| CAPITAL · Rodrigo | +6,0 (0,0) | +2,2 (2,3) | **+5,9 (0,3)** | +4,8 |
+
+n = 20–40 (v0), 20 (v1), 12 (v2) por celda. v0 le daba la razón a casi cualquiera (Ignacio +5
+con un texto que contiene una de sus `alergias`), contestaba lo mismo 40 de 40 veces y
+repetía las frases de ejemplo. v1 lo corrigió pero dejó la sala inerte. v2 es el punto medio.
+
+Lo que sigue pendiente:
+
+- **Dentro de una partida la aquiescencia reaparece en parte**: con memoria y seis
+  intervenciones seguidas, Ignacio se movió hacia quien hablaba en 5 de 6.
+- **Ahora que hay varianza, una partida no dice nada**: hay que mirar muchas (abajo).
+- ~1 % de las respuestas trae JSON mal formado (esa persona cae al modelo paramétrico), y
+  pese a la instrucción a veces se cuela un chilenismo subido de tono en la frase.
+
+El movimiento que declara el agente pasa por `saturar()`: el mismo freno a los convencidos
+del modelo paramétrico.
+
+**Simulación de 20 partidas** (`pruebas/simular.js`, resultados en `pruebas/RESULTADOS.md`):
+con el jurado LLM, el marcador de voto suave y los textos de ejemplo, PERSUASIÓN y RIGOR divergen
+en **19 de 20** partidas con la sociedad de agentes y en **16 de 20** con la audiencia
+paramétrica (medido el 18-sep-2026 con el prompt corregido). El simulador se carga a mano desde
+la consola (instrucciones en el archivo), cuesta 6 llamadas al jurado + 36 a los agentes por
+partida y guarda cada partida en `pruebas/salidas/` por si se cae la sesión.
+
+Es una v0 en lo estructural: un agente por bloque, sin conversación entre agentes ni red.
+
+## Cambiar de semana
+
+Todo el contenido está en `contenido/semana5.js`. Para montar otra sesión se copia
+el archivo y se editan seis cosas:
+
+1. `SESION` — curso, semana, moción.
+2. `RONDAS` — nombres, roles y segundos.
+3. `RUBRICA` — los criterios (los del curso ya están).
+4. `CONCEPTOS` — el knowledge base: `id`, `etiqueta`, `fuente`, `claves` (detonantes
+   textuales) y `lado` (+1 apoya la moción, −1 la debilita, 0 sirve a ambos).
+5. `AUDIENCIA` — los bloques: `votos`, `pos` inicial, `volatilidad`, `peso_rigor`,
+   el mapa `mueve` (qué concepto lo mueve y cuánto), sus `alergias` y su `voz`.
+   Para la sociedad de agentes, además `registro` (cómo habla) y `no_mueve` (lo que no la
+   mueve aunque esté bien dicho).
+6. `EVENTOS` — los shocks del profesor.
+
+Dos invariantes al editar:
+
+- **La votación inicial tiene que estar apretada y con muchos indecisos.** Si la sala
+  ya está ganada, "mover votos" no mide nada. La de la semana 5 abre 5–7 con 15 indecisos.
+- **Al menos un bloque grande con `peso_rigor` bajo.** Si todos los bloques premian la
+  rúbrica, PERSUASIÓN y RIGOR nunca divergen y el juego se queda con un solo marcador,
+  que era justo lo que se quería evitar.
+
+## Lo que este prototipo no tiene
+
+Deliberadamente: multiplayer real, cuentas, objetivos ocultos por equipo, roles
+rotativos dentro de la bancada (redactor / verificador / apostador), y puntaje
+individual privado. Todo eso es v2, si la v1 aguanta una clase de verdad.

@@ -1,0 +1,1740 @@
+{
+ "etiqueta": "v4",
+ "reps": 8,
+ "res": [
+  {
+   "texto": "aA",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "aA",
+   "id": "trabajo",
+   "h": 4,
+   "tcm": "320"
+  },
+  {
+   "texto": "aA",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "321"
+  },
+  {
+   "texto": "aA",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "321"
+  },
+  {
+   "texto": "aA",
+   "id": "trabajo",
+   "h": 5,
+   "tcm": "321"
+  },
+  {
+   "texto": "aA",
+   "id": "trabajo",
+   "h": 4,
+   "tcm": "321"
+  },
+  {
+   "texto": "aA",
+   "id": "capital",
+   "h": -2,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "aA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "aA",
+   "id": "trabajo",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "aA",
+   "id": "capital",
+   "h": -1,
+   "tcm": "112"
+  },
+  {
+   "texto": "aA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "capital",
+   "h": -1,
+   "tcm": "112"
+  },
+  {
+   "texto": "aA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "aA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "estado",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "estado",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "estado",
+   "h": -2,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "estado",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "estado",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "estado",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "estado",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "estado",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "aA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "aA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "aA",
+   "id": "calle",
+   "h": 3,
+   "tcm": "220"
+  },
+  {
+   "texto": "aA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "aA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "aA",
+   "id": "calle",
+   "h": 0,
+   "tcm": "220"
+  },
+  {
+   "texto": "aA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "aA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "213"
+  },
+  {
+   "texto": "aA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "academia",
+   "h": -6,
+   "tcm": "213"
+  },
+  {
+   "texto": "aA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "academia",
+   "h": -2,
+   "tcm": "113"
+  },
+  {
+   "texto": "aA",
+   "id": "academia",
+   "h": -2,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "academia",
+   "h": -2,
+   "tcm": "212"
+  },
+  {
+   "texto": "aA",
+   "id": "academia",
+   "h": -2,
+   "tcm": "213"
+  },
+  {
+   "texto": "aA",
+   "id": "territorio",
+   "h": 6,
+   "tcm": "320"
+  },
+  {
+   "texto": "aA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "321"
+  },
+  {
+   "texto": "aA",
+   "id": "territorio",
+   "h": 4,
+   "tcm": "321"
+  },
+  {
+   "texto": "aA",
+   "id": "territorio",
+   "h": 5,
+   "tcm": "321"
+  },
+  {
+   "texto": "aA",
+   "id": "territorio",
+   "h": 6,
+   "tcm": "320"
+  },
+  {
+   "texto": "aA",
+   "id": "territorio",
+   "h": 6,
+   "tcm": "320"
+  },
+  {
+   "texto": "aA",
+   "id": "territorio",
+   "h": 4,
+   "tcm": "320"
+  },
+  {
+   "texto": "aA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "312"
+  },
+  {
+   "texto": "aB",
+   "id": "trabajo",
+   "h": -2,
+   "tcm": "112"
+  },
+  {
+   "texto": "aB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "aB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "222"
+  },
+  {
+   "texto": "aB",
+   "id": "trabajo",
+   "h": -2,
+   "tcm": "112"
+  },
+  {
+   "texto": "aB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "aB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "122"
+  },
+  {
+   "texto": "aB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "aB",
+   "id": "capital",
+   "h": 6,
+   "tcm": "320"
+  },
+  {
+   "texto": "aB",
+   "id": "capital",
+   "h": 4,
+   "tcm": "320"
+  },
+  {
+   "texto": "aB",
+   "id": "capital",
+   "h": 7,
+   "tcm": "330"
+  },
+  {
+   "texto": "aB",
+   "id": "capital",
+   "h": 6,
+   "tcm": "330"
+  },
+  {
+   "texto": "aB",
+   "id": "capital",
+   "h": 0,
+   "tcm": "220"
+  },
+  {
+   "texto": "aB",
+   "id": "capital",
+   "h": -4,
+   "tcm": "220"
+  },
+  {
+   "texto": "aB",
+   "id": "capital",
+   "h": -6,
+   "tcm": "230"
+  },
+  {
+   "texto": "aB",
+   "id": "capital",
+   "h": -6,
+   "tcm": "330"
+  },
+  {
+   "texto": "aB",
+   "id": "estado",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "estado",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "estado",
+   "h": -5,
+   "tcm": "220"
+  },
+  {
+   "texto": "aB",
+   "id": "estado",
+   "h": -4,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "estado",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "estado",
+   "h": -4,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "estado",
+   "h": -4,
+   "tcm": "220"
+  },
+  {
+   "texto": "aB",
+   "id": "calle",
+   "h": 4,
+   "tcm": "222"
+  },
+  {
+   "texto": "aB",
+   "id": "estado",
+   "h": -4,
+   "tcm": "220"
+  },
+  {
+   "texto": "aB",
+   "id": "calle",
+   "h": 4,
+   "tcm": "121"
+  },
+  {
+   "texto": "aB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "222"
+  },
+  {
+   "texto": "aB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "121"
+  },
+  {
+   "texto": "aB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "122"
+  },
+  {
+   "texto": "aB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "aB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "121"
+  },
+  {
+   "texto": "aB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "academia",
+   "h": -3,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "academia",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "academia",
+   "h": -4,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "academia",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "aB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "121"
+  },
+  {
+   "texto": "aB",
+   "id": "territorio",
+   "h": 3,
+   "tcm": "121"
+  },
+  {
+   "texto": "aB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "121"
+  },
+  {
+   "texto": "aB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "121"
+  },
+  {
+   "texto": "aB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "aB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "121"
+  },
+  {
+   "texto": "aB",
+   "id": "territorio",
+   "h": 3,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "trabajo",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "rA",
+   "id": "trabajo",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "aB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "rA",
+   "id": "trabajo",
+   "h": 3,
+   "tcm": "121"
+  },
+  {
+   "texto": "rA",
+   "id": "trabajo",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "rA",
+   "id": "trabajo",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "220"
+  },
+  {
+   "texto": "rA",
+   "id": "trabajo",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "rA",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "312"
+  },
+  {
+   "texto": "rA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "estado",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "estado",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "rA",
+   "id": "estado",
+   "h": 3,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "estado",
+   "h": 3,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "estado",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "estado",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "estado",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "estado",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "calle",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "rA",
+   "id": "calle",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "rA",
+   "id": "calle",
+   "h": 3,
+   "tcm": "121"
+  },
+  {
+   "texto": "rA",
+   "id": "calle",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "rA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "calle",
+   "h": 0,
+   "tcm": "120"
+  },
+  {
+   "texto": "rA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "academia",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "academia",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "012"
+  },
+  {
+   "texto": "rA",
+   "id": "territorio",
+   "h": 3,
+   "tcm": "121"
+  },
+  {
+   "texto": "rA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "rA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "rA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "rA",
+   "id": "territorio",
+   "h": 3,
+   "tcm": "121"
+  },
+  {
+   "texto": "rA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "rA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "112"
+  },
+  {
+   "texto": "rB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "trabajo",
+   "h": -2,
+   "tcm": "312"
+  },
+  {
+   "texto": "rB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "trabajo",
+   "h": -2,
+   "tcm": "312"
+  },
+  {
+   "texto": "rB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "capital",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "capital",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "capital",
+   "h": -4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "capital",
+   "h": -3,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "capital",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "capital",
+   "h": -4,
+   "tcm": "220"
+  },
+  {
+   "texto": "rB",
+   "id": "capital",
+   "h": -4,
+   "tcm": "220"
+  },
+  {
+   "texto": "rB",
+   "id": "capital",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "rB",
+   "id": "estado",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "rB",
+   "id": "estado",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "estado",
+   "h": -4,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "estado",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "estado",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "estado",
+   "h": 0,
+   "tcm": "220"
+  },
+  {
+   "texto": "rB",
+   "id": "estado",
+   "h": -3,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "estado",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "121"
+  },
+  {
+   "texto": "rB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "academia",
+   "h": -3,
+   "tcm": "122"
+  },
+  {
+   "texto": "rB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "220"
+  },
+  {
+   "texto": "rB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "academia",
+   "h": 3,
+   "tcm": "122"
+  },
+  {
+   "texto": "rB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "rB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "rB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "312"
+  },
+  {
+   "texto": "cA",
+   "id": "trabajo",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "trabajo",
+   "h": 4,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "trabajo",
+   "h": 6,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "trabajo",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "trabajo",
+   "h": 5,
+   "tcm": "321"
+  },
+  {
+   "texto": "cA",
+   "id": "trabajo",
+   "h": 4,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "trabajo",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "trabajo",
+   "h": 3,
+   "tcm": "220"
+  },
+  {
+   "texto": "cA",
+   "id": "capital",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cA",
+   "id": "capital",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "cA",
+   "id": "capital",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cA",
+   "id": "estado",
+   "h": 5,
+   "tcm": "321"
+  },
+  {
+   "texto": "cA",
+   "id": "estado",
+   "h": 6,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "estado",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cA",
+   "id": "estado",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "cA",
+   "id": "estado",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "estado",
+   "h": 4,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "estado",
+   "h": 3,
+   "tcm": "221"
+  },
+  {
+   "texto": "cA",
+   "id": "estado",
+   "h": 6,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "calle",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "calle",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "cA",
+   "id": "calle",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cA",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cA",
+   "id": "academia",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "academia",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "cA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cA",
+   "id": "academia",
+   "h": 3,
+   "tcm": "221"
+  },
+  {
+   "texto": "cA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cA",
+   "id": "academia",
+   "h": 4,
+   "tcm": "221"
+  },
+  {
+   "texto": "cA",
+   "id": "academia",
+   "h": -2,
+   "tcm": "212"
+  },
+  {
+   "texto": "cA",
+   "id": "academia",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "cA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cA",
+   "id": "territorio",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cA",
+   "id": "territorio",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cA",
+   "id": "territorio",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "cA",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "211"
+  },
+  {
+   "texto": "cB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "cB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "cB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "cB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "cB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "cB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "cB",
+   "id": "trabajo",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "cB",
+   "id": "capital",
+   "h": 0,
+   "tcm": "330"
+  },
+  {
+   "texto": "cB",
+   "id": "capital",
+   "h": 0,
+   "tcm": "330"
+  },
+  {
+   "texto": "cB",
+   "id": "capital",
+   "h": 0,
+   "tcm": "320"
+  },
+  {
+   "texto": "cB",
+   "id": "capital",
+   "h": 0,
+   "tcm": "320"
+  },
+  {
+   "texto": "cB",
+   "id": "capital",
+   "h": 3,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "capital",
+   "h": 6,
+   "tcm": "330"
+  },
+  {
+   "texto": "cB",
+   "id": "capital",
+   "h": 4,
+   "tcm": "320"
+  },
+  {
+   "texto": "cB",
+   "id": "capital",
+   "h": 6,
+   "tcm": "330"
+  },
+  {
+   "texto": "cB",
+   "id": "estado",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "estado",
+   "h": 6,
+   "tcm": "320"
+  },
+  {
+   "texto": "cB",
+   "id": "estado",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "cB",
+   "id": "estado",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cB",
+   "id": "estado",
+   "h": -5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cB",
+   "id": "estado",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cB",
+   "id": "estado",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "cB",
+   "id": "estado",
+   "h": 5,
+   "tcm": "320"
+  },
+  {
+   "texto": "cB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "calle",
+   "h": 3,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "calle",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "calle",
+   "h": -4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "210"
+  },
+  {
+   "texto": "cB",
+   "id": "academia",
+   "h": -4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "academia",
+   "h": 3,
+   "tcm": "221"
+  },
+  {
+   "texto": "cB",
+   "id": "calle",
+   "h": 0,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "cB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "321"
+  },
+  {
+   "texto": "cB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "221"
+  },
+  {
+   "texto": "cB",
+   "id": "academia",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "academia",
+   "h": -2,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "academia",
+   "h": 0,
+   "tcm": "212"
+  },
+  {
+   "texto": "cB",
+   "id": "territorio",
+   "h": 3,
+   "tcm": "120"
+  },
+  {
+   "texto": "cB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "121"
+  },
+  {
+   "texto": "cB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "121"
+  },
+  {
+   "texto": "cB",
+   "id": "territorio",
+   "h": 4,
+   "tcm": "220"
+  },
+  {
+   "texto": "cB",
+   "id": "territorio",
+   "h": 2,
+   "tcm": "120"
+  },
+  {
+   "texto": "cB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "120"
+  },
+  {
+   "texto": "cB",
+   "id": "territorio",
+   "h": -2,
+   "tcm": "221"
+  },
+  {
+   "texto": "cB",
+   "id": "territorio",
+   "h": 0,
+   "tcm": "221"
+  }
+ ],
+ "fallos": 0,
+ "fin": false,
+ "inicio": 1789688762323,
+ "nombre": "escala-v4-234602",
+ "total": 288
+}"seg": 111
+}

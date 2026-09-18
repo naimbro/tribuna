@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TRIBUNA — prototipo</title>
+<style>
+:root{
+  --bg:#070a0e; --panel:#0e141b; --panel2:#131b24; --line:#1e2a36;
+  --txt:#e6edf3; --dim:#7d8fa1; --dim2:#4d5f70;
+  --neon:#00e07a; --amber:#ffb020; --hot:#f43f5e;
+  --A:#38bdf8; --B:#fb7185;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:
+    radial-gradient(1200px 600px at 50% -10%, #10202b 0%, transparent 60%),
+    var(--bg);
+  color:var(--txt);
+  font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  overflow:hidden;
+}
+button{font:inherit;cursor:pointer}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- marquesina superior ---------- */
+header{
+  display:flex;align-items:center;gap:18px;padding:10px 18px;
+  border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0d151d,#0a1016);
+}
+.brand{display:flex;align-items:baseline;gap:9px;flex:0 0 auto}
+.brand b{
+  font-family:var(--mono);font-size:21px;letter-spacing:.22em;color:var(--neon);
+  text-shadow:0 0 18px rgba(0,224,122,.55);
+}
+.brand span{font-size:10px;color:var(--dim2);letter-spacing:.18em}
+.mocion{flex:1;min-width:0}
+.mocion .k{font-size:9.5px;letter-spacing:.2em;color:var(--amber)}
+.mocion .v{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reloj{
+  font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.04em;
+  padding:2px 14px;border:1px solid var(--line);border-radius:8px;background:#0a1016;min-width:118px;text-align:center;
+}
+.reloj.corriendo{color:var(--neon);border-color:rgba(0,224,122,.45);box-shadow:0 0 22px rgba(0,224,122,.14) inset}
+.reloj.urgente{color:var(--hot);border-color:rgba(244,63,94,.5);animation:pulso .9s infinite}
+@keyframes pulso{50%{opacity:.45}}
+.ronda-pill{
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;padding:6px 12px;
+  border:1px solid var(--line);border-radius:999px;color:var(--amber);background:#0a1016;white-space:nowrap;
+}
+
+/* ---------- marcador ---------- */
+.marcador{
+  display:grid;grid-template-columns:1fr 260px 1fr;gap:14px;align-items:stretch;
+  padding:11px 18px;border-bottom:1px solid var(--line);background:#0a1016;
+}
+.eq{
+  border:1px solid var(--line);border-radius:10px;padding:9px 13px;background:var(--panel);
+  display:flex;align-items:center;gap:13px;position:relative;overflow:hidden;
+}
+.eq::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--c)}
+.eq .flag{font-size:22px}
+.eq .id{flex:1;min-width:0}
+.eq .id b{display:block;font-size:13px;letter-spacing:.1em;color:var(--c)}
+.eq .id small{color:var(--dim2);font-size:10.5px}
+.cifra{text-align:center;min-width:62px}
+.cifra .n{font-family:var(--mono);font-size:25px;font-weight:700;line-height:1}
+.cifra .l{font-size:8.5px;letter-spacing:.16em;color:var(--dim2);margin-top:3px}
+.cifra.persu .n{color:var(--neon)}
+.cifra.rigor .n{color:var(--amber)}
+.linea{
+  border:1px solid var(--line);border-radius:10px;background:var(--panel);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px;
+}
+.linea .lbl{font-size:8.5px;letter-spacing:.2em;color:var(--dim2)}
+.cuotas{display:flex;gap:8px;font-family:var(--mono)}
+.cuota{padding:3px 10px;border-radius:6px;background:#0a1016;border:1px solid var(--line);font-size:15px;font-weight:700}
+.barra-votos{height:7px;width:100%;border-radius:99px;overflow:hidden;display:flex;background:#0a1016;border:1px solid var(--line)}
+.barra-votos i{display:block;height:100%;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+
+/* ---------- layout ---------- */
+main{display:grid;grid-template-columns:1fr 372px;gap:0;height:calc(100vh - 138px)}
+.col{display:flex;flex-direction:column;min-height:0}
+.col.der{border-left:1px solid var(--line);background:#0b1117}
+.cab{
+  display:flex;align-items:center;gap:9px;padding:9px 16px;border-bottom:1px solid var(--line);
+  font-size:10.5px;letter-spacing:.17em;color:var(--dim);background:#0a1016;flex:0 0 auto;
+}
+.cab .pt{margin-left:auto;color:var(--dim2);letter-spacing:0;font-size:11px}
+
+/* ---------- mesa de escritura ---------- */
+.mesa{padding:12px 16px;border-bottom:1px solid var(--line);background:#0c1219;flex:0 0 auto}
+.pauta{font-size:12px;color:var(--dim);margin-bottom:9px}
+.pauta b{color:var(--amber);letter-spacing:.06em}
+.bancadas{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.banca{border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:9px;position:relative}
+.banca.lista{border-color:var(--neon);box-shadow:0 0 0 1px rgba(0,224,122,.18)}
+.banca .top{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.banca .top b{font-size:11px;letter-spacing:.1em;color:var(--c)}
+.banca select{
+  margin-left:auto;background:#0a1016;color:var(--txt);border:1px solid var(--line);
+  border-radius:6px;padding:3px 7px;font-size:11px;
+}
+.banca textarea{
+  width:100%;height:76px;resize:vertical;background:#080d12;color:var(--txt);
+  border:1px solid var(--line);border-radius:7px;padding:8px 9px;font:inherit;line-height:1.45;
+}
+.banca textarea:focus{outline:none;border-color:var(--c)}
+.banca textarea:disabled{opacity:.4}
+.banca .pie{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:10.5px;color:var(--dim2)}
+.banca .pie .ok{margin-left:auto;color:var(--neon);letter-spacing:.1em;display:none}
+.banca.lista .pie .ok{display:block}
+
+.acciones{display:flex;gap:9px;margin-top:11px;align-items:center}
+.btn{
+  border:1px solid var(--line);background:var(--panel2);color:var(--txt);
+  padding:8px 16px;border-radius:8px;font-size:12px;letter-spacing:.09em;transition:.15s;
+}
+.btn:hover:not(:disabled){border-color:var(--dim);background:#1b2530}
+.btn:disabled{opacity:.32;cursor:not-allowed}
+.btn.pri{background:linear-gradient(180deg,#00e07a,#00b862);color:#04140c;border:none;font-weight:700}
+.btn.pri:hover:not(:disabled){filter:brightness(1.12)}
+.btn.sm{padding:5px 10px;font-size:11px}
+.hint{font-size:11px;color:var(--dim2);margin-left:auto}
+
+/* ---------- feed ---------- */
+.feed{flex:1;overflow-y:auto;padding:14px 16px 40px}
+.turno-sep{
+  display:flex;align-items:center;gap:10px;margin:14px 0 10px;font-family:var(--mono);
+  font-size:10px;letter-spacing:.22em;color:var(--dim2);
+}
+.turno-sep::before,.turno-sep::after{content:"";flex:1;height:1px;background:var(--line)}
+.card{
+  border:1px solid var(--line);border-left:3px solid var(--c);border-radius:9px;
+  background:var(--panel);padding:11px 13px;margin-bottom:11px;
+  animation:entra .45s cubic-bezier(.2,.9,.3,1);
+}
+@keyframes entra{from{opacity:0;transform:translateY(10px)}}
+.card .head{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:11.5px}
+.card .head b{color:var(--c);letter-spacing:.05em}
+.card .head .rol{color:var(--dim2);font-size:10.5px}
+.card .head .delta{
+  margin-left:auto;font-family:var(--mono);font-weight:700;font-size:14px;padding:1px 9px;border-radius:6px;
+}
+.delta.pos{color:var(--neon);background:rgba(0,224,122,.1)}
+.delta.neg{color:var(--hot);background:rgba(244,63,94,.1)}
+.delta.cero{color:var(--dim2);background:#0a1016}
+.card .txt{font-size:13.5px;line-height:1.6;white-space:pre-wrap;margin-bottom:9px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:2.5px 7px;border-radius:5px;
+  background:#0a1016;border:1px solid var(--line);color:var(--dim);
+}
+.chip b{color:var(--txt)}
+.chip.kb{color:var(--amber);border-color:rgba(255,176,32,.28)}
+.chip.bandera{color:var(--hot);border-color:rgba(244,63,94,.35);background:rgba(244,63,94,.07)}
+.chip.total{color:#04140c;background:var(--amber);border-color:var(--amber);font-weight:700}
+
+/* ---------- audiencia ---------- */
+.resumen{
+  display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:#0a1016;flex:0 0 auto;
+}
+.res{flex:1;text-align:center;border:1px solid var(--line);border-radius:8px;padding:6px 4px;background:var(--panel)}
+.res .n{font-family:var(--mono);font-size:19px;font-weight:700}
+.res .l{font-size:8px;letter-spacing:.13em;color:var(--dim2)}
+.gente{flex:1;overflow-y:auto;padding:11px 12px 30px}
+.p{border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:9px 10px;margin-bottom:9px}
+.p .top{display:flex;align-items:center;gap:8px}
+.p .av{font-size:19px;width:26px;text-align:center}
+.p .who{flex:1;min-width:0}
+.p .who b{font-size:12px;display:block}
+.p .who small{font-size:9.5px;color:var(--dim2);letter-spacing:.1em}
+.p .mv{font-family:var(--mono);font-size:12.5px;font-weight:700;min-width:38px;text-align:right}
+.eje{position:relative;height:6px;margin:8px 0 6px;background:#0a1016;border:1px solid var(--line);border-radius:99px}
+.eje .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--dim2)}
+.eje .dot{
+  position:absolute;top:50%;width:11px;height:11px;border-radius:99px;transform:translate(-50%,-50%);
+  background:var(--c);box-shadow:0 0 12px var(--c);transition:left .9s cubic-bezier(.2,.8,.2,1);
+}
+.p .say{font-size:11.5px;color:var(--dim);font-style:italic;line-height:1.45;min-height:16px}
+.p.reacciona{animation:flash .7s}
+@keyframes flash{0%{box-shadow:0 0 0 0 rgba(255,176,32,.5)}100%{box-shadow:0 0 0 9px rgba(255,176,32,0)}}
+
+/* ---------- sala de control ---------- */
+footer{
+  display:flex;align-items:center;gap:8px;padding:8px 18px;border-top:1px solid var(--line);
+  background:#0a1016;font-size:11px;color:var(--dim2);
+}
+footer .sep{width:1px;height:20px;background:var(--line);margin:0 4px}
+.ticker{
+  flex:1;overflow:hidden;white-space:nowrap;font-family:var(--mono);font-size:11px;color:var(--amber);
+}
+select.ev{background:#0d141b;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:11px;max-width:230px}
+
+/* ---------- overlays ---------- */
+.flash-ev{
+  position:fixed;left:50%;top:96px;transform:translateX(-50%);z-index:60;max-width:760px;
+  background:linear-gradient(180deg,#2a1608,#1a0f06);border:1px solid var(--amber);border-radius:11px;
+  padding:13px 20px;box-shadow:0 22px 60px rgba(0,0,0,.7);animation:baja .5s;
+}
+@keyframes baja{from{opacity:0;transform:translate(-50%,-22px)}}
+.flash-ev .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.28em;color:var(--amber)}
+.flash-ev .t{font-size:14px;font-weight:600;margin-top:4px}
+.modal{position:fixed;inset:0;background:rgba(3,6,9,.86);display:flex;align-items:center;justify-content:center;z-index:80;padding:24px}
+.dlg{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px;max-width:640px;width:100%;max-height:86vh;overflow:auto}
+.dlg h2{margin:0 0 4px;font-size:19px;letter-spacing:.05em}
+.dlg h3{margin:20px 0 8px;font-size:11px;letter-spacing:.18em;color:var(--amber)}
+.dlg p{color:var(--dim);font-size:13px}
+.dlg input{width:100%;background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:9px;font:inherit;margin-top:6px}
+.veredicto{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.vcard{border:1px solid var(--line);border-left:3px solid var(--c);border-radius:9px;padding:13px;background:#0a1016}
+.vcard .n{font-family:var(--mono);font-size:31px;font-weight:700;color:var(--c)}
+.vcard .l{font-size:9.5px;letter-spacing:.14em;color:var(--dim2)}
+.vcard .sub{margin-top:8px;font-size:12px;color:var(--dim)}
+table.rank{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+table.rank td,table.rank th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left}
+table.rank th{font-size:9.5px;letter-spacing:.13em;color:var(--dim2);font-weight:400}
+table.rank td.num{font-family:var(--mono);text-align:right}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#1c2732;border-radius:9px}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><b>TRIBUNA</b><span id="semLbl">SEMANA 5</span></div>
+  <div class="mocion">
+    <div class="k">MOCIÓN EN DISPUTA</div>
+    <div class="v" id="mocionTxt"></div>
+  </div>
+  <div class="ronda-pill" id="rondaPill">—</div>
+  <div class="reloj mono" id="reloj">--:--</div>
+</header>
+
+<div class="marcador">
+  <div class="eq" id="eqA" style="--c:var(--A)">
+    <div class="flag" id="flagA"></div>
+    <div class="id"><b id="nomA"></b><small id="lemaA"></small></div>
+    <div class="cifra persu"><div class="n mono" id="persuA">0</div><div class="l">PERSUASIÓN</div></div>
+    <div class="cifra rigor"><div class="n mono" id="rigorA">—</div><div class="l">RIGOR /20</div></div>
+  </div>
+  <div class="linea">
+    <div class="lbl">LÍNEA EN VIVO</div>
+    <div class="cuotas"><span class="cuota" id="cuotaA" style="color:var(--A)">—</span><span class="cuota" id="cuotaB" style="color:var(--B)">—</span></div>
+    <div class="barra-votos"><i id="vA" style="background:var(--A);width:50%"></i><i id="vN" style="background:#2c3a48;width:0%"></i><i id="vB" style="background:var(--B);width:50%"></i></div>
+  </div>
+  <div class="eq" id="eqB" style="--c:var(--B)">
+    <div class="flag" id="flagB"></div>
+    <div class="id"><b id="nomB"></b><small id="lemaB"></small></div>
+    <div class="cifra persu"><div class="n mono" id="persuB">0</div><div class="l">PERSUASIÓN</div></div>
+    <div class="cifra rigor"><div class="n mono" id="rigorB">—</div><div class="l">RIGOR /20</div></div>
+  </div>
+</div>
+
+<main>
+  <section class="col">
+    <div class="cab">MESA <span class="pt" id="modoLbl"></span></div>
+
+    <div class="mesa">
+      <div class="pauta" id="pauta"></div>
+      <div class="bancadas">
+        <div class="banca" id="bancaA" style="--c:var(--A)">
+          <div class="top"><span id="bfA"></span><b id="btA"></b><select id="selA"></select></div>
+          <textarea id="txA" placeholder="Escribe la intervención…" disabled></textarea>
+          <div class="pie"><span id="wcA">0 palabras</span><span class="ok">✓ ENTREGADO</span></div>
+        </div>
+        <div class="banca" id="bancaB" style="--c:var(--B)">
+          <div class="top"><span id="bfB"></span><b id="btB"></b><select id="selB"></select></div>
+          <textarea id="txB" placeholder="Escribe la intervención…" disabled></textarea>
+          <div class="pie"><span id="wcB">0 palabras</span><span class="ok">✓ ENTREGADO</span></div>
+        </div>
+      </div>
+      <div class="acciones">
+        <button class="btn pri" id="btnPrincipal">ABRIR RONDA</button>
+        <button class="btn sm" id="btnEjemplo">✎ rellenar con ejemplo</button>
+        <span class="hint" id="hint"></span>
+      </div>
+    </div>
+
+    <div class="feed" id="feed"></div>
+  </section>
+
+  <aside class="col der">
+    <div class="cab">LA AUDIENCIA <span class="pt">27 votos en la sala</span></div>
+    <div class="resumen">
+      <div class="res"><div class="n mono" id="rA" style="color:var(--A)">0</div><div class="l">A FAVOR</div></div>
+      <div class="res"><div class="n mono" id="rN" style="color:var(--dim)">0</div><div class="l">INDECISOS</div></div>
+      <div class="res"><div class="n mono" id="rB" style="color:var(--B)">0</div><div class="l">EN CONTRA</div></div>
+    </div>
+    <div class="gente" id="gente"></div>
+  </aside>
+</main>
+
+<footer>
+  <span style="letter-spacing:.16em;color:var(--dim)">SALA DE CONTROL</span>
+  <select class="ev" id="selEvento"></select>
+  <button class="btn sm" id="btnEvento">⚡ LANZAR</button>
+  <div class="sep"></div>
+  <button class="btn sm" id="btnCsv">↓ CSV</button>
+  <button class="btn sm" id="btnReset">⟲ REINICIAR</button>
+  <button class="btn sm" id="btnLlm">⚙ MOTOR</button>
+  <div class="sep"></div>
+  <div class="ticker" id="ticker"></div>
+</footer>
+
+<script src="contenido/semana5.js"></script>
+<script src="app.js"></script>
+<!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
+<script type="module" src="online.js"></script>
+</body>
+</html>
