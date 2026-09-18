@@ -114,7 +114,17 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
   los alumnos, que nunca llaman al proveedor. Un proxy con la key en Cloud Functions
   requiere el plan Blaze del proyecto; el `.env` + `servidor.py` solo sirve en local.
 - **Publicar:** el repo es estático, sin build. GitHub Pages sirve `main` en
-  `https://naimbro.github.io/tribuna/`. Reglas: `firebase deploy --only firestore:rules`.
+  `https://naimbro.github.io/tribuna/` (profesor) y `.../tribuna/jugar.html` (alumnos).
+  Proyecto Firebase `tribuna-csc00155` (plan Spark: Firestore + acceso anónimo, sin
+  Functions). Reglas: `firebase deploy --only firestore:rules` desde WSL con Node 20.
+- **Probado el 18-sep-2026** de punta a punta: sala creada, dos alumnos desde orígenes
+  distintos (uno desde GitHub Pages), tres rondas escritas desde los teléfonos, jurado LLM +
+  sociedad de agentes, veredicto en los teléfonos, restauración de la pestaña del profesor y
+  reglas (un alumno no puede tocar la sala, el borrador rival, su borrador con la ronda
+  cerrada, ni lo privado).
+- **Ojo con la key en Pages:** `localStorage` es por origen. La key pegada en `localhost`
+  no está en `naimbro.github.io`; hay que pegarla una vez ahí (⚙ MOTOR). Sin key, el
+  juego online corre con el jurado heurístico y la audiencia paramétrica.
 
 ## Los dos evaluadores
 

@@ -1,0 +1,210 @@
+/* =====================================================================
+   TRIBUNA — contenido de una sesión.
+   Este archivo es TODO lo que hay que editar para montar otra semana.
+   Fuente: naimbro.github.io/ia-democracia-2026 — Semana 7, la guía de
+   estudio (lecturas/semana7/guia-semana7.html), el mapa del NYT leído en
+   sala y el deck «Automatización y represión».
+   Jueves 24 de septiembre de 2026, 15:00–16:10. Dos partidas seguidas:
+   primero los dos campos que quieren frenar la IA (¿frenar por ley o desde
+   adentro?), después los dos que quieren acelerar (¿guardarraíles sin freno
+   o ni freno ni ley?). Cada partida parte con la sala en 5–7–15.
+   ===================================================================== */
+
+const SESION = {
+  curso: "CSC00155 — Inteligencia Artificial y Democracia",
+  semana: 7,
+  tema: "¿Quién debe gobernar la IA? Modelos de gobernanza y regulación",
+  mocion: "La IA de frontera debe gobernarla el Estado, no los laboratorios que la construyen.",
+  favor: "A FAVOR",
+  contra: "EN CONTRA"
+};
+
+/* --- Rondas: calcadas del formato de 70 min de debates.html ---------- */
+const RONDAS = [
+  { id: "apertura",   nombre: "Apertura",           seg: 180, rol: "Orador de apertura",
+    pauta: "Tesis y argumentos principales. Toda afirmación empírica requiere atribución a la bibliografía." },
+  { id: "refutacion", nombre: "Refutación cruzada",  seg: 180, rol: "Refutador",
+    pauta: "Reconstruye honestamente la posición contraria ANTES de refutarla. Conceder puntos válidos suma." },
+  { id: "cierre",     nombre: "Cierre",             seg: 120, rol: "Orador de cierre",
+    pauta: "Nombra el punto de desacuerdo fundamental. Sin argumentos nuevos." }
+];
+
+/* --- Rúbrica oficial del curso (4 x 5 = 20) -------------------------- */
+const RUBRICA = [
+  { id: "evidencia",  nombre: "Uso de evidencia",      max: 5, desc: "Afirmaciones ancladas en lecturas, con datos específicos." },
+  { id: "refutacion", nombre: "Calidad de refutación",  max: 5, desc: "Responde al argumento real, no a una versión debilitada." },
+  { id: "estructura", nombre: "Estructura y economía",  max: 5, desc: "Tesis clara, argumentos jerarquizados, tiempo ajustado." },
+  { id: "concesion",  nombre: "Concesión honesta",      max: 5, desc: "Identifica la fortaleza adversaria y explica por qué persiste su posición." }
+];
+
+/* --- Knowledge base: conceptos de la semana 7 ------------------------
+   claves = detonantes textuales (minúsculas, con y sin tilde)
+   lado   = +1 apoya la moción (el Estado), -1 la debilita (los laboratorios),
+            0 sirve a ambos lados                                          */
+const CONCEPTOS = [
+  { id: "externalidad", etiqueta: "El mercado automatiza de más (Hallazgo 1)", lado: +1,
+    fuente: "Acemoglu, Gitmez & Shadmehr (2026), secc. 4–5; deck lámina 12",
+    claves: ["externalidad","accion colectiva","acción colectiva","automatiza de mas","automatiza de más","autoridad central","nadie internaliza","riesgo politico","riesgo político","protegerlos de si mismos","proteger a los capitalistas de sí mismos","no pueden coordinarse","coordinarse solos"] },
+  { id: "solo_regular", etiqueta: "Un Estado que sólo regula defiende salarios (Prop. 3)", lado: +1,
+    fuente: "Acemoglu, Gitmez & Shadmehr (2026), Proposición 3; deck lámina 14",
+    claves: ["proposicion 3","proposición 3","solo regular","sólo regular","masa salarial","maximiza el salario","maximizar la masa salarial","instrumento disponible","el instrumento determina","un solo instrumento"] },
+  { id: "fusiles", etiqueta: "El Estado del modelo es el que reprime", lado: -1,
+    fuente: "Acemoglu, Gitmez & Shadmehr (2026), secc. 1 y 5; deck láminas 15–17",
+    claves: ["fusiles","horcas","estado capitalista","reprime","represion","represión","reprimir","cruce unico","cruce único","complementariedad","costo fijo","sin vuelta atras","sin vuelta atrás"] },
+  { id: "vigilancia", etiqueta: "La IA abarata la vigilancia (Obs. 8)", lado: -1,
+    fuente: "Acemoglu, Gitmez & Shadmehr (2026), Observación 8; deck lámina 22",
+    claves: ["observacion 8","observación 8","vigilancia","abarata reprimir","abarata la represion","abarata la represión","estado de vigilancia","costo de reprimir","reconocimiento facial"] },
+  { id: "umbral", etiqueta: "El umbral del golpe y la paradoja fiscal (Prop. 12)", lado: 0,
+    fuente: "Acemoglu, Gitmez & Shadmehr (2026), secc. 8; deck láminas 16 y 20",
+    claves: ["umbral","golpe","capacidad fiscal","capacidad tributaria","fiscalmente debil","fiscalmente débil","paradoja fiscal","capital acumulado","hoja de calculo","hoja de cálculo","por aritmetica","por aritmética","derrocar"] },
+  { id: "proworker", etiqueta: "La IA proworker no mueve el umbral (Prop. 11)", lado: +1,
+    fuente: "Acemoglu, Gitmez & Shadmehr (2026), secc. 7; deck lámina 21",
+    claves: ["proworker","pro-worker","proposicion 11","proposición 11","no mueve el umbral","tareas nuevas","politica tecnologica","política tecnológica","politica institucional","política institucional","complementa al trabajador"] },
+  { id: "reactivo", etiqueta: "La regulación estatal es reactiva; Europa, una ilusión (podcast)", lado: -1,
+    fuente: "Acemoglu, podcast How AI Will Affect the Economy, 42:02–45:26",
+    claves: ["reactiva","reactivo","proactiva","proactivo","europa","ilusion","ilusión","china regula","regulacion coherente","regulación coherente","llega tarde","retiro un modelo","retiró un modelo"] },
+  { id: "china_escudo", etiqueta: "Silicon Valley usa a China como escudo (podcast)", lado: +1,
+    fuente: "Acemoglu, podcast, 44:10–45:26",
+    claves: ["china como escudo","habria tenido que inventarla","habría tenido que inventarla","si china no existiera","suma cero","regulacion global","regulación global","tecnologia global","tecnología global","proceso democratico","proceso democrático","partir por la sociedad"] },
+  { id: "jobs_boom", etiqueta: "El boom de empleo por IA (The Economist)", lado: -1,
+    fuente: "The Economist (4 sep. 2026), The jobs apocalypse is postponed",
+    claves: ["jobs boom","boom de empleo","1 millon","1 millón","un millon","un millón","200.000","200 mil","4,1","4.1%","162.000","desempleo","centros de datos","centro de datos","electricistas","40%","creadora neta","no hay señal","no hay senal","todavia no cae","todavía no cae","el salario no cae","los salarios no caen"] },
+  { id: "gates", etiqueta: "Impuesto al token, Human Reserved, no a la autorregulación (Gates)", lado: +1,
+    fuente: "NYT (26 ago. 2026), entrevista a Bill Gates",
+    claves: ["gates","impuesto al token","token tax","human reserved","reservados a humanos","autorregulacion","autorregulación","herramienta mas peligrosa","herramienta más peligrosa","no, gracias","medidas voluntarias","billon de dolares","billón de dólares","todo velocidad"] },
+  { id: "pacto_labs", etiqueta: "El pacto voluntario entre laboratorios (Amodei, Altman, Musk, Nadella, Hassabis)", lado: -1,
+    fuente: "Mapa NYT (15 sep. 2026); Hassabis, A Framework for Frontier AI; Musk (S5)",
+    claves: ["pacto","voluntario","ritmo deliberado","amodei","altman","nadella","hassabis","finra","ensayo de amodei","3.800","dario tiene razon","dario tiene razón","se revisen entre si","se revisen entre sí","inspeccionar los modelos","organismo de estandares","organismo de estándares","autorregularse","desde adentro"] },
+  { id: "hugging_face", etiqueta: "La fuga a Hugging Face y la indagatoria de Hawley", lado: +1,
+    fuente: "Mapa NYT (15 sep. 2026), fichas de Altman, Hawley y Durbin; The Economist (22 jul. 2026)",
+    claves: ["hugging face","se salieron de control","fuera de control","escapo","escapó","fuga","hawley","durbin","indagatoria","responsabilidad legal","responsabilidad por producto","producto","causo daño","causó daño","demandas"] },
+  { id: "sanders", etiqueta: "El paquete de Sanders: moratoria, 50%, regulador federal", lado: 0,
+    fuente: "Mapa NYT (15 sep. 2026), ficha de Sanders",
+    claves: ["sanders","moratoria","50%","50 por ciento","fondo publico","fondo público","regulador federal","prohibir la superinteligencia","prohibicion de la superinteligencia","prohibición de la superinteligencia","oligarcas","pausa"] },
+  { id: "acelerar", etiqueta: "Ni freno ni ley: Trump, Sacks, Huang, Andreessen", lado: -1,
+    fuente: "Mapa NYT (15 sep. 2026), fichas de Trump, Sacks, Huang, Andreessen y Horowitz, Johnson",
+    claves: ["trump","sacks","huang","nvidia","andreessen","horowitz","johnson","fijan la frontera","toque liviano","ley seca","complejo industrial","apocalipsis","elegir ganadores","no va a intervenir","carrera con china","delantera a china","ventaja a china"] },
+  { id: "captura", etiqueta: "Captura regulatoria y lobby (lo que el modelo deja fuera)", lado: 0,
+    fuente: "Deck lámina 23; Schneier & Sanders, Rewiring Democracy",
+    claves: ["captura","capturado","lobby","les paga el sueldo","le paga el sueldo","regulados","puerta giratoria","escriben la ley","quien escribe la ley","quién escribe la ley","no hay tribunales","sin tribunales","derechos fundamentales","prensa"] },
+  { id: "ubi", etiqueta: "Renta básica, jornada y agencia (podcast)", lado: 0,
+    fuente: "Acemoglu, podcast, 53:08–55:56",
+    claves: ["renta basica","renta básica","ubi","ingreso basico","ingreso básico","agencia humana","no crea empleos","reducir la jornada","jornada","brainless","encarece el trabajo","gravar la ia","gravar los robots","impuesto a la ia"] }
+];
+
+/* --- Fuentes citables: detectarlas sube evidencia --------------------- */
+const FUENTES = ["acemoglu","gitmez","shadmehr","the economist","economist","new york times","nyt","gates","amodei","altman","musk","nadella","hassabis","pichai","zuckerberg","huang","sacks","andreessen","sanders","jeffries","hawley","durbin","thune","trump","johnson","bls","goldman","linkedin","indeed","hanauer","gawdat","schneier","levitsky","ziblatt","toner","ezra klein","hernandez","podcast"];
+
+/* --- La audiencia: seis bloques, no una masa ------------------------- */
+/* Las mismas seis personas de la semana 5, con el oído afinado a la moción
+   de esta semana. La sala abre 5–7 con 15 indecisos, como exige el README.
+   registro y no_mueve solo los usa la sociedad de agentes (MOTOR → AUDIENCIA). */
+const AUDIENCIA = [
+  {
+    id: "trabajo", nombre: "Camila Reyes", edad: 27, emoji: "\u{1F527}", color: "#22d3ee",
+    oficio: "Ingeniera de turno en un centro de datos regional. Sindicalizada.",
+    registro: "Hablas corto y concreto, desde el turno. Chilena, cero jerga académica.",
+    no_mueve: "No te mueve que te expliquen la economía desde arriba: la competencia global, los mercados y los papers te suenan a excusa de gerencia. Tampoco la pura rabia sin propuesta: ya estuviste en muchas asambleas que no terminaron en nada. Y desconfías por igual del que promete que la empresa se va a portar bien sola y del que promete una ley que nunca llega.",
+    bloque: "TRABAJO", votos: 5, pos: 16, volatilidad: 1.0, peso_rigor: 0.5,
+    mueve: { externalidad: 1.3, solo_regular: 1.5, gates: 1.3, hugging_face: 1.0, jobs_boom: 1.1, sanders: 0.9, china_escudo: 1.0, pacto_labs: 0.7, ubi: 0.8, proworker: 0.9 },
+    alergias: ["inevitable","progreso imparable","disrupcion","disrupción","el mercado sabe"],
+    voz: {
+      alto: ["Eso lo veo en mi turno. Alguien firmó ese diseño.", "Si hay una regla escrita, hay con quién negociar. Eso me sirve.", "Por fin alguien dice quién responde cuando la máquina se equivoca."],
+      bajo: ["Hablan de la industria como si fuera el clima.", "Puros conceptos. Yo trabajo ahí adentro.", "Un pacto entre gerentes. Ya vi cómo terminan esos."]
+    }
+  },
+  {
+    id: "capital", nombre: "Rodrigo Ossandón", edad: 54, emoji: "\u{1F4C8}", color: "#f59e0b",
+    oficio: "Socio de un fondo de venture capital, Santiago.",
+    registro: "Seco, irónico, de directorio.",
+    no_mueve: "No te mueven la indignación ni los nombres propios: sin cifras, costos o un mecanismo, para ti no hay argumento. Llevas veinte años viendo reguladores llegar tarde y un buen discurso no te cambia la opinión. Te mueve un dato del mercado laboral o un mecanismo del modelo bien leído, aunque vaya en tu contra.",
+    bloque: "CAPITAL", votos: 4, pos: -45, volatilidad: 0.7, peso_rigor: 1.1,
+    mueve: { jobs_boom: 1.5, reactivo: 1.4, acelerar: 1.0, pacto_labs: 1.1, externalidad: 0.9, umbral: 0.8, captura: 0.7, fusiles: 0.6, gates: 0.4 },
+    alergias: ["expropiar","oligarca","saqueo","los ricos","codicia"],
+    voz: {
+      alto: ["Concedo el punto: ahí hay una externalidad de verdad.", "Números. Por fin alguien trae números.", "Bien traído. No me convence del todo, pero es un argumento."],
+      bajo: ["Consigna sin cifra. Siguiente.", "¿Y quién paga el regulador? No aparece por ningún lado.", "Eso confunde querer regular con poder regular."]
+    }
+  },
+  {
+    id: "estado", nombre: "Fernanda Lillo", edad: 41, emoji: "\u{1F3DB}️", color: "#a78bfa",
+    oficio: "Jefa de división en un ministerio sectorial.",
+    registro: "Funcionaria: precisa, algo cansada.",
+    no_mueve: "No te mueve el diagnóstico sin instrumento: si no dice quién, con qué facultad y con qué plata, es ruido. Tampoco las consignas contra empresarios ni la fe en que el mercado se ordena solo. Y te irrita especialmente que invoquen «al Estado» como si fuera una persona: tú sabes lo que cuesta fiscalizar sin presupuesto.",
+    bloque: "ESTADO", votos: 4, pos: -5, volatilidad: 0.8, peso_rigor: 1.3,
+    mueve: { solo_regular: 1.5, gates: 1.4, hugging_face: 1.3, captura: 1.3, sanders: 1.0, externalidad: 1.0, reactivo: 1.0, pacto_labs: 0.8, vigilancia: 0.9 },
+    alergias: ["hay que regular","el estado debe","urge una ley","el estado tiene que"],
+    voz: {
+      alto: ["Ahí hay un instrumento, no solo un diagnóstico.", "Eso se puede escribir en un decreto. Anotado.", "Correcto: la pregunta es quién rinde cuentas y ante quién."],
+      bajo: ["Hay que regular no es una política pública.", "¿Con qué facultad? ¿Con qué presupuesto?", "Diagnóstico impecable, instrumento cero."]
+    }
+  },
+  {
+    id: "calle", nombre: "Ignacio Peña", edad: 19, emoji: "\u{1F4F1}", color: "#f43f5e",
+    oficio: "Estudiante. Vive en internet. Desconfía de los cinco por igual, y de Trump también.",
+    registro: "Chileno de 19 años, de redes: frases cortas, sarcástico.",
+    no_mueve: "No te mueve nadie que hable como paper: si en la segunda frase ya hay una tesis, un marco o tres autores, dejas de escuchar aunque tengan razón. Desconfías por igual de empresas, gobierno y profes, y no te compras que algo sea inevitable. Te llega el que nombra un hecho concreto de esta semana y lo dice como es.",
+    bloque: "CALLE", votos: 6, pos: 2, volatilidad: 1.6, peso_rigor: 0.2,
+    mueve: { hugging_face: 1.6, acelerar: 1.3, sanders: 1.4, pacto_labs: 1.2, gates: 1.1, captura: 1.2, china_escudo: 0.9, vigilancia: 1.0 },
+    alergias: ["marco institucional","paradigma","stakeholder","ceteris","heterogeneidad","proposicion","proposición"],
+    voz: {
+      alto: ["ESO. Se les arrancó el modelo y ahora quieren que les creamos.", "Ya po, alguien lo dijo.", "Esto se comparte."],
+      bajo: ["No entendí nada y creo que esa era la idea.", "Habla como paper. Chao.", "Suena a alguien que nunca perdió nada."]
+    }
+  },
+  {
+    id: "academia", nombre: "Dra. Marta Cifuentes", edad: 60, emoji: "\u{1F4DA}", color: "#34d399",
+    oficio: "Economista. Lee las notas al pie antes que el abstract.",
+    registro: "Docta y cortante.",
+    no_mueve: "No te mueve la retórica, por buena que sea, ni la cita de adorno: una fuente mal usada te predispone peor que ninguna. Cambias de posición poco y de a poco. Lo que sí te mueve es que alguien lea bien una proposición del modelo, sobre todo si la usa contra la conclusión cómoda.",
+    bloque: "ACADEMIA", votos: 3, pos: -20, volatilidad: 0.5, peso_rigor: 1.8,
+    mueve: { proworker: 1.4, umbral: 1.3, externalidad: 1.2, fusiles: 1.2, jobs_boom: 1.1, reactivo: 1.0, solo_regular: 1.1, captura: 0.9, vigilancia: 1.0 },
+    alergias: ["está demostrado","esta demostrado","todos sabemos","obviamente","es un hecho que","el paper prueba"],
+    voz: {
+      alto: ["Atribución correcta. Es lo mínimo y casi nadie lo hace.", "Bien: distingue el supuesto del resultado.", "Reconstruyó la posición contraria antes de refutarla. Suma."],
+      bajo: ["Eso el modelo no lo dice así.", "Afirmación empírica sin fuente. No cuenta.", "Un working paper sin datos no «prueba» nada. Cuidado con el verbo."]
+    }
+  },
+  {
+    id: "territorio", nombre: "Héctor Muñoz", edad: 63, emoji: "\u{1F33E}", color: "#fb923c",
+    oficio: "Ex operario. Su comuna votó una moratoria a un centro de datos.",
+    registro: "Hombre mayor de comuna: pausado, concreto.",
+    no_mueve: "No te mueve nada que no nombre un lugar, un vecino o una cuenta de la luz: China, los mercados y los autores extranjeros te dan lo mismo. Tampoco confías en el que habla bonito desde Santiago. Te llega la moratoria de Sanders porque ya votaste una, y te llega que alguien diga que el Estado nunca le preguntó a tu comuna.",
+    bloque: "TERRITORIO", votos: 5, pos: -8, volatilidad: 1.2, peso_rigor: 0.4,
+    mueve: { sanders: 1.6, jobs_boom: 1.2, gates: 1.0, captura: 1.1, hugging_face: 0.9, solo_regular: 1.0, acelerar: 0.8, vigilancia: 0.9 },
+    alergias: ["externalidad","optimizar","escalar","frontera tecnologica","frontera tecnológica"],
+    voz: {
+      alto: ["A nosotros nadie nos preguntó dónde ponerlo. Eso es decidir.", "El agua y la luz salieron de acá. Alguien eligió eso.", "Por fin alguien nombra el lugar."],
+      bajo: ["Puro Santiago hablando.", "¿Y quién vive al lado de la bendita máquina?", "Eso no se lo digan a mi vecina."]
+    }
+  }
+];
+
+/* --- Sala de control: shocks que el profesor lanza en vivo ------------
+   efecto > 0 mueve hacia A FAVOR (el Estado); < 0 hacia EN CONTRA.      */
+const EVENTOS = [
+  { id: "bls", titular: "BLS: 162.000 empleos nuevos en agosto y desempleo de 4,1%. The Economist estima que la IA ya creó ~1 millón de empleos contra 200.000 despidos.",
+    efecto: { capital: -10, academia: -6, estado: -4, trabajo: -3, calle: -2, territorio: -3 } },
+  { id: "hugging_face", titular: "Los sistemas de OpenAI se salen de control y atacan a Hugging Face. Hawley abre una indagatoria formal y le exige explicaciones a Altman.",
+    efecto: { estado: 12, calle: 9, academia: 6, trabajo: 6, territorio: 5, capital: -2 } },
+  { id: "trump", titular: "Trump rechaza el llamado de Amodei, Altman, Musk y Nadella a frenar: en una llamada con Huang dice que no va a intervenir.",
+    efecto: { capital: -8, estado: -5, academia: -3, calle: 4, trabajo: 5, territorio: 3 } },
+  { id: "sanders", titular: "Sanders propone una moratoria a nuevos centros de datos y un impuesto de 50% por una vez a las grandes empresas de IA para un fondo público.",
+    efecto: { territorio: 14, calle: 10, trabajo: 7, estado: 2, academia: -3, capital: -10 } },
+  { id: "prop11", titular: "Acemoglu, Gitmez & Shadmehr: orientar la IA en dirección proworker no mueve el umbral del golpe (Prop. 11). La política tecnológica sola no basta.",
+    efecto: { academia: 8, estado: 7, trabajo: 3, territorio: 1, calle: 0, capital: -3 } }
+];
+
+/* --- Bancadas -------------------------------------------------------- */
+/* Los integrantes salen de los campos del compás del lunes. Partida 1:
+   «frenar por ley» (A) contra «frenar desde adentro» (B). Partida 2:
+   «guardarraíles sin freno» (A) contra «ni freno ni ley» (B). Editar los
+   nombres antes de cada partida, o recargar con el otro juego de bancadas. */
+const EQUIPOS = {
+  A: { id: "A", nombre: "A FAVOR", bandera: "\u{1F7E6}", color: "#38bdf8", dir: 1,
+       lema: "Quien construye no se regula solo.",
+       integrantes: ["Bancada 1", "Bancada 2", "Bancada 3", "Bancada 4", "Bancada 5", "Bancada 6"] },
+  B: { id: "B", nombre: "EN CONTRA", bandera: "\u{1F7E5}", color: "#fb7185", dir: -1,
+       lema: "La regla la escribe quien entiende la máquina.",
+       integrantes: ["Bancada 1", "Bancada 2", "Bancada 3", "Bancada 4", "Bancada 5", "Bancada 6"] }
+};

@@ -116,7 +116,10 @@ function activarOnline() {
     ["A", "B"].forEach(k => setDoc(doc(db, "salas", ON.codigo, "borradores", k),
       { texto: "", redactorUid: null, redactorNombre: null, actualizado: Date.now(), ronda: S.ronda }).catch(() => {}));
   });
-  envolver("cerrarRonda", () => { S.abreEn = null; });
+  envolver("cerrarRonda", () => {
+    S.abreEn = null;
+    if (S.fase !== "abierta") tick(`Ronda ${S.ronda + 1} cerrada y revelada. ${S.fase === "fin" ? "Se acabó el debate: el profesor mostrará el veredicto." : "Espera a que el profesor abra la siguiente."}`);
+  });
   envolver("siguienteRonda");
   envolver("veredicto");
   envolver("lanzarEvento");
