@@ -474,14 +474,20 @@ function abrirRonda() {
     contarPal(k);
   });
   $("txA").focus();
+  // El reloj se calcula con la hora real, no descontando segundos: Chrome frena los
+  // temporizadores de las pestañas ocultas y el reloj se atrasaba (40 s duraron varios minutos).
+  S.finRonda = Date.now() + RONDAS[S.ronda].seg * 1000;
   S.seg = RONDAS[S.ronda].seg;
   $("reloj").classList.add("corriendo");
-  S.reloj = setInterval(() => {
-    S.seg--;
-    $("reloj").textContent = fmt(Math.max(0, S.seg));
+  const tic = () => {
+    if (S.fase !== "abierta") return;
+    S.seg = Math.max(0, Math.ceil((S.finRonda - Date.now()) / 1000));
+    $("reloj").textContent = fmt(S.seg);
     $("reloj").classList.toggle("urgente", S.seg <= 20);
     if (S.seg <= 0) cerrarRonda();
-  }, 1000);
+  };
+  S.reloj = setInterval(tic, 500);
+  if (!S.relojVisible) { S.relojVisible = true; document.addEventListener("visibilitychange", () => { if (!document.hidden) tic(); }); }
   $("btnPrincipal").textContent = "CERRAR Y REVELAR";
   $("hint").textContent = "Las dos bancadas escriben a la vez. Nadie ve lo del otro hasta el reveal.";
   sonar("campana");
