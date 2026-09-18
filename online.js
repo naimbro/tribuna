@@ -113,7 +113,7 @@ function activarOnline() {
   // Las cajas de la mesa quedan para el profesor: lo que escriba ahí entra como una
   // intervención más de esa bancada (útil si una bancada no tiene teléfono).
   ["A", "B"].forEach(k => {
-    $("tx" + k).placeholder = "Los alumnos escriben desde su teléfono. Lo que escribas aquí entra como una intervención más de esta bancada.";
+    $("tx" + k).placeholder = "Los alumnos escriben desde su teléfono. Lo que escribas aquí entra como una intervención más de esta bancada. Para varias: un párrafo por alumno, empezando con @Nombre:";
     $("sel" + k).innerHTML = `<option>(profesor)</option>`;
   });
   // lo que entregó cada bancada: los alumnos de esa bancada en esta ronda + la caja del profe
@@ -123,9 +123,20 @@ function activarOnline() {
       if (it.ronda === S.ronda && ["A", "B"].includes(it.equipo) && (it.texto || "").trim())
         out[it.equipo].push({ autor: it.nombre || "alumno", email: it.email || "", texto: it.texto.trim().slice(0, 4000) });
     }
+    // La caja del profesor puede traer varias intervenciones: cada párrafo que empieza con
+    // "@Nombre:" es la de un alumno distinto (bancada sin teléfonos, o una transcripción).
     for (const k of ["A", "B"]) {
       const t = $("tx" + k).value.trim();
-      if (t) out[k].push({ autor: "(profesor)", email: ON.email || "", texto: t });
+      if (!t) continue;
+      const partes = t.split(/
+(?=\s*@[^:
+]{1,40}:)/);
+      for (const parte of partes) {
+        const m = parte.trim().match(/^@([^:
+]{1,40}):\s*([\s\S]*)$/);
+        const texto = (m ? m[2] : parte).trim();
+        if (texto) out[k].push({ autor: m ? m[1].trim() : "(profesor)", email: m ? "" : (ON.email || ""), texto: texto.slice(0, 4000) });
+      }
     }
     return out;
   };
