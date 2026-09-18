@@ -246,6 +246,8 @@ function botonCrear() {
 if (HAY_FIREBASE) onAuthStateChanged(auth, async user => {
   $("btnEntrarGoogle")?.remove(); $("btnOnline")?.remove(); $("btnSalir")?.remove();
   if (!user) { botonEntrar(); return; }
+  // sesiones anónimas de la versión anterior: se cierran y se pide Google
+  if (user.isAnonymous || !user.email) { await signOut(auth); return; }
   ON.uid = user.uid; ON.email = user.email;
   const codigo = (params.get("sala") || "").toUpperCase();
   if (codigo && await restaurar(codigo)) activarOnline();

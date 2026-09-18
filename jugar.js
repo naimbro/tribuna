@@ -194,6 +194,7 @@ function alEscribir() {
 /* ---------- arranque ---------- */
 if (!HAY_FIREBASE) $("errEntrar").textContent = "Esta copia de TRIBUNA no tiene configurado el proyecto Firebase (firebase-config.js).";
 else onAuthStateChanged(auth, user => {
+  if (user && (user.isAnonymous || !user.email)) { signOut(auth); return; }   // sesión anónima vieja
   J.uid = user?.uid || null; J.email = user?.email || null;
   if (!user) { $("btnEntrar").textContent = "Entrar con Google"; return; }
   $("btnEntrar").textContent = "Entrar";
