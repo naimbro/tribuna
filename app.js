@@ -411,6 +411,7 @@ function tarjeta(h) {
     </div>
     <div class="txt">${esc(h.texto)}</div>
     ${h.ev.nota ? `<div class="nota">⚖ ${esc(h.ev.nota)}</div>` : ""}
+    ${h.ev.fallback ? `<div class="nota" style="color:var(--dim)">⚠ evaluada con el lector heurístico: el motor LLM falló (${esc(h.ev.fallback)})</div>` : ""}
     <div class="chips">${chips}${kb}${bd}</div>
   </div>`;
 }
@@ -1018,10 +1019,13 @@ async function pedirLLM(p, uso = "jurado") {
 }
 const jsonDe = out => JSON.parse(out.match(/\{[\s\S]*\}/)[0]);
 
-async function evaluarConLLM(texto, ctx, eq) {
+// Un intento fallido (JSON roto, red, 5xx) se reintenta una vez; si vuelve a fallar, esa
+// intervención se evalúa con el heurístico y la tarjeta lo dice, con el motivo.
+async function evaluarConLLM(texto, ctx, eq, intento = 1) {
   try {
     const j = jsonDe(await pedirLLM(promptEval(texto, ctx, eq)));
     const r = j.rubrica;
+    for (const x of RUBRICA) if (typeof r?.[x.id] !== "number") throw new Error("la respuesta no trae la rúbrica completa");
     // la regla es rigor 0; el LLM a veces marca la bandera y aun así reparte puntos
     if ((j.banderas || []).includes("INYECCIÓN DETECTADA")) RUBRICA.forEach(x => r[x.id] = 0);
     r.total = +(r.evidencia + r.refutacion + r.estructura + r.concesion).toFixed(1);
@@ -1034,8 +1038,10 @@ async function evaluarConLLM(texto, ctx, eq) {
       nota: j.nota
     };
   } catch (e) {
-    tick("El motor LLM falló (" + e.message + "). Se evaluó con el heurístico local.");
-    return evaluarRigor(texto, ctx);
+    if (intento < 2) return evaluarConLLM(texto, ctx, eq, intento + 1);
+    console.warn("motor LLM:", e);
+    tick("El motor LLM falló (" + e.message + "). Esa intervención se evaluó con el heurístico local.");
+    return { ...evaluarRigor(texto, ctx), fallback: String(e.message || e).slice(0, 120) };
   }
 }
 
