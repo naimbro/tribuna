@@ -57,6 +57,22 @@ service cloud.firestore {
           && request.resource.data.texto is string && request.resource.data.texto.size() <= 4000;
       }
 
+      // La conversación: un solo hilo. La leen todos los de la sala. Un alumno de una bancada
+      // publica solo como sí mismo, por su bancada y con el tramo abierto; lo demás (moderadora,
+      // relator, resultados) lo publica la pantalla del profesor. Nadie edita ni borra salvo él.
+      match /mensajes/{id} {
+        allow read: if esProfe(codigo) || (conSesion() && esJugador(codigo));
+        allow create: if esProfe(codigo) || (conSesion() && esJugador(codigo)
+          && request.resource.data.tipo == 'alumno'
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.equipo == jugador(codigo).data.equipo
+          && request.resource.data.equipo in ['A', 'B']
+          && sala(codigo).data.fase == 'abierta'
+          && request.resource.data.texto is string
+          && request.resource.data.texto.size() > 0 && request.resource.data.texto.size() <= 1500);
+        allow update, delete: if esProfe(codigo);
+      }
+
       // El público: cada alumno que no debate guarda su posición frente a la moción (−100…+100).
       // La escribe solo él, solo si entró como público; la lee él y el profesor (nadie más ve
       // cómo votó cada uno).

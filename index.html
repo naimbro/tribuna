@@ -118,6 +118,44 @@ main{display:grid;grid-template-columns:1fr 372px;gap:0;flex:1 1 auto;min-height
 /* ---------- mesa de escritura ---------- */
 .mesa{padding:12px 16px;border-top:1px solid var(--line);background:#0c1219;flex:0 0 auto;order:3}
 .feed{order:2}
+/* la conversación, estilo WhatsApp */
+.pauta-bar{padding:8px 16px;font-size:12px;color:var(--dim);border-bottom:1px solid var(--line);background:#0b1117}
+.pauta-bar b{color:var(--amber);letter-spacing:.06em}
+.participantes{display:flex;justify-content:space-between;gap:10px;padding:6px 16px;border-bottom:1px solid var(--line);font-size:11px}
+.participantes .pl{color:var(--dim)}
+.participantes .pl span{display:inline-block;margin:2px 4px 2px 0;padding:1px 8px;border-radius:99px;border:1px solid var(--line);color:var(--c)}
+.participantes .pl span.cero{color:var(--dim2);border-style:dashed}
+.feed.chat{display:flex;flex-direction:column;gap:2px;background:radial-gradient(700px 400px at 50% 0%,#0d1820 0%,transparent 70%)}
+.msg{max-width:66%;margin:5px 4px;padding:8px 12px 9px;border-radius:14px;font-size:13.5px;line-height:1.5;position:relative}
+.msg .who{font-size:11px;font-weight:700;color:var(--c);margin-bottom:2px}
+.msg .hora{float:right;margin-left:10px;font-weight:400;color:var(--dim2);font-size:10px}
+.msg .tx{white-space:pre-wrap}
+.msg.A{align-self:flex-start;background:#0f2536;border:1px solid rgba(56,189,248,.28);border-top-left-radius:4px}
+.msg.B{align-self:flex-end;background:#33131c;border:1px solid rgba(251,113,133,.28);border-top-right-radius:4px}
+.msg.mod{align-self:center;max-width:78%;background:#1b1830;border:1px solid #6d5bd0;--c:#b4a6ff}
+.msg.rel{align-self:center;max-width:86%;background:#221c0c;border:1px solid rgba(255,176,32,.6);--c:var(--amber)}
+.msg.rel ul{margin:3px 0 4px 18px;padding:0}
+.msg.rel .pedido{margin-top:6px;color:var(--neon);font-weight:600}
+.msg.sys{align-self:center;background:none;color:var(--dim2);font-size:11px}
+.msg.res{align-self:stretch;max-width:none;background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--c)}
+.res-head{display:flex;align-items:center;gap:9px;font-size:12px}
+.res-head > b{color:var(--c);letter-spacing:.1em}
+.res-head .rol{color:var(--dim);flex:1}
+.res-head .delta{font-family:var(--mono);font-size:18px;font-weight:700;padding:3px 10px;border-radius:7px;background:#0a1016}
+.res-head .delta.pos{color:var(--neon)} .res-head .delta.neg{color:var(--hot)} .res-head .delta.cero{color:var(--dim)}
+.res-alumnos{margin-top:6px;text-align:left}
+.msg.res .dicen .dice{text-align:left}
+.res-alumnos .ra{font-size:12px;color:var(--dim);padding:3px 0;border-top:1px dashed var(--line)}
+.res-alumnos .ra b{color:var(--txt);margin-right:6px}
+.res-alumnos .rg{font-family:var(--mono);font-weight:700;margin-right:8px}
+.res-alumnos .nt{color:var(--amber)}
+.mencion{color:#c4b5fd}
+.compositor{display:flex;gap:8px;align-items:stretch}
+.compositor .bancas{display:flex;flex-direction:column;gap:4px}
+.compositor .banca-t{opacity:.45;border-color:var(--c);color:var(--c);white-space:nowrap}
+.compositor .banca-t.on{opacity:1;background:#101820;box-shadow:inset 0 0 0 1px var(--c)}
+.compositor textarea{flex:1;background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font:inherit;font-size:13px;resize:none}
+.compositor textarea:focus{outline:none;border-color:var(--dim)}
 .banca textarea{min-height:64px}
 .banca .lista-int{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
 .banca .lista-int span{font-size:10.5px;padding:2px 7px;border-radius:99px;border:1px solid var(--line);color:var(--dim)}
@@ -306,28 +344,22 @@ table.rank td.num{font-family:var(--mono);text-align:right}
 
 <main>
   <section class="col">
-    <div class="cab">EL HILO <span class="pt" id="modoLbl"></span></div>
-    <div class="feed" id="feed"></div>
+    <div class="cab">EL DEBATE <span class="pt" id="modoLbl"></span></div>
+    <div class="pauta-bar" id="pauta"></div>
+    <div class="participantes"><span class="pl" style="--c:var(--A)" id="listaA"></span><span class="pl" style="--c:var(--B)" id="listaB"></span></div>
+    <div class="feed chat" id="feed"></div>
 
     <div class="mesa">
-      <div class="pauta" id="pauta"></div>
-      <div class="bancadas">
-        <div class="banca" id="bancaA" style="--c:var(--A)">
-          <div class="top"><span id="bfA"></span><b id="btA"></b><select id="selA"></select></div>
-          <div class="lista-int" id="listaA"></div>
-          <textarea id="txA" placeholder="Escribe la intervención…" disabled></textarea>
-          <div class="pie"><span id="wcA">0 palabras</span><span class="ok">✓ ENTREGADO</span></div>
-        </div>
-        <div class="banca" id="bancaB" style="--c:var(--B)">
-          <div class="top"><span id="bfB"></span><b id="btB"></b><select id="selB"></select></div>
-          <div class="lista-int" id="listaB"></div>
-          <textarea id="txB" placeholder="Escribe la intervención…" disabled></textarea>
-          <div class="pie"><span id="wcB">0 palabras</span><span class="ok">✓ ENTREGADO</span></div>
-        </div>
+      <div class="compositor">
+        <div class="bancas"><button class="btn sm banca-t" id="chatBancaA" style="--c:var(--A)"></button><button class="btn sm banca-t" id="chatBancaB" style="--c:var(--B)"></button></div>
+        <textarea id="chatTx" rows="2" placeholder="Escribe por la bancada elegida (Enter envía). Para simular a varios alumnos: @Nombre: texto, un párrafo por alumno."></textarea>
+        <button class="btn" id="chatEnviar">Enviar</button>
       </div>
       <div class="acciones">
-        <button class="btn pri" id="btnPrincipal">ABRIR RONDA</button>
-        <button class="btn sm" id="btnEjemplo">✎ rellenar con ejemplo</button>
+        <button class="btn pri" id="btnPrincipal">ABRIR TRAMO</button>
+        <button class="btn sm" id="btnModerar" title="La moderadora interviene ahora">🎙 MODERADORA</button>
+        <button class="btn sm" id="btnMasMin" title="Alargar el tramo un minuto">+1 MIN</button>
+        <button class="btn sm" id="btnEjemplo">✎ ejemplo</button>
         <span class="hint" id="hint"></span>
       </div>
     </div>
@@ -367,10 +399,11 @@ table.rank td.num{font-family:var(--mono);text-align:right}
     document.write('<script src="contenido/semana' + ok + '.js?v=20260919a"><\/script>');
   })();
 </script>
-<script src="app.js?v=20260919i"></script>
+<script src="moderacion.js?v=20260919j"></script>
+<script src="app.js?v=20260919j"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260919i"></script>
+<script type="module" src="online.js?v=20260919j"></script>
 </body>
 </html>

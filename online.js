@@ -4,16 +4,15 @@
    Esta capa solo hace dos cosas:
      1. publica el estado en Firestore (salas/{codigo}) para que los alumnos lo vean en
         su teléfono (jugar.html), y
-     2. recibe de Firestore lo que escribe cada alumno (salas/{codigo}/intervenciones/{uid}):
-        todos los integrantes de una bancada intervienen; la pantalla muestra quién va escribiendo
-        y al cerrar la ronda junta todos los textos de cada bancada (más la caja del profesor).
+     2. comparte la conversación (salas/{codigo}/mensajes): alumnos, moderadora, relator y
+        resultados, en un solo hilo que todos ven en vivo.
    Si la pestaña se cierra, el estado completo está en salas/{codigo}/privado/estado y se
    restaura al volver a abrir index.html?sala=CODIGO.
    Se carga como módulo; los globales de app.js (S, AUDIENCIA, abrirRonda…) son visibles.
    ===================================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection }
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy }
   from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-functions.js";
 import { firebaseConfig } from "./firebase-config.js?v=20260918a";
@@ -117,26 +116,18 @@ function envolver(nombre, despues) {
 }
 
 function activarOnline() {
-  // Las cajas de la mesa quedan para el profesor: lo que escriba ahí entra como una
-  // intervención más de esa bancada (útil si una bancada no tiene teléfono).
-  ["A", "B"].forEach(k => {
-    $("tx" + k).placeholder = "Los alumnos escriben desde su teléfono. Lo que escribas aquí entra como una intervención más de esta bancada. Para varias: un párrafo por alumno, empezando con @Nombre:";
-    $("sel" + k).innerHTML = `<option>(profesor)</option>`;
+  // La conversación vive en salas/{codigo}/mensajes: el profesor publica ahí (moderadora,
+  // relator, resultados y lo que escriba por una bancada) y los alumnos desde el teléfono.
+  window.chatRemoto = m => setDoc(doc(db, "salas", ON.codigo, "mensajes", m.id), limpio(m))
+    .catch(e => tick("No se pudo publicar en la conversación: " + e.code));
+  window.rosterRemoto = () => Object.values(ON.jugadores).filter(j => j.equipo === "A" || j.equipo === "B")
+    .map(j => ({ nombre: j.nombre, equipo: j.equipo }));
+  let primeraCarga = true;
+  onSnapshot(query(collection(db, "salas", ON.codigo, "mensajes"), orderBy("t")), snap => {
+    const lista = []; snap.forEach(d => lista.push({ ...d.data(), id: d.id }));
+    recibirChat(lista, primeraCarga); primeraCarga = false;
   });
-  // lo que entregó cada bancada: los alumnos de esa bancada en esta ronda + la caja del profe
-  window.recogerEntregas = () => {
-    const out = { A: [], B: [] };
-    for (const it of Object.values(ON.intervenciones)) {
-      if (it.ronda === S.ronda && ["A", "B"].includes(it.equipo) && (it.texto || "").trim())
-        out[it.equipo].push({ autor: it.nombre || "alumno", email: it.email || "", texto: it.texto.trim().slice(0, 4000) });
-    }
-    for (const k of ["A", "B"]) {
-      const t = $("tx" + k).value.trim();
-      if (t) out[k].push(...partirCaja(t, "(profesor)", ON.email || ""));
-    }
-    return out;
-  };
-  envolver("abrirRonda", () => { S.abreEn = Date.now(); ON.avisoTodos = null; pintarListas(); fotoPublico(); });
+  envolver("abrirRonda", () => { S.abreEn = Date.now(); fotoPublico(); });
   envolver("cerrarRonda", () => {
     S.abreEn = null;
     if (S.fase !== "abierta") tick(`Ronda ${S.ronda + 1} cerrada y revelada. ${S.fase === "fin" ? "Se acabó el debate: el profesor mostrará el veredicto." : "Espera a que el profesor abra la siguiente."}`);
@@ -149,28 +140,6 @@ function activarOnline() {
   envolver("pintarAudiencia");
   envolver("guardarMotor");
 
-  // Quién va escribiendo en cada bancada (nombre + palabras), en vivo
-  let primera = true;
-  onSnapshot(collection(db, "salas", ON.codigo, "intervenciones"), snap => {
-    const antes = ON.intervenciones;
-    ON.intervenciones = {};
-    snap.forEach(d => ON.intervenciones[d.id] = d.data());
-    // sonido cuando alguien entrega (o su texto supera las 20 palabras por primera vez)
-    if (!primera) for (const [uid, it] of Object.entries(ON.intervenciones)) {
-      const a = antes[uid], n = (it.texto || "").trim().split(/\s+/).length;
-      const nAntes = a && a.ronda === it.ronda ? (a.texto || "").trim().split(/\s+/).length : 0;
-      const recienEntrega = it.entregado && !(a && a.entregado && a.ronda === it.ronda);
-      if (it.ronda === S.ronda && recienEntrega) {
-        sonar("pop");
-        tick(`✓ ${it.nombre || "Alguien"} (${EQUIPOS[it.equipo]?.nombre || it.equipo}) entregó su intervención.`);
-        break;
-      }
-      if (it.ronda === S.ronda && n >= 20 && nAntes < 20) { sonar("pop"); break; }
-    }
-    primera = false;
-    pintarListas();
-  });
-
   // El público: sus posiciones en vivo
   onSnapshot(collection(db, "salas", ON.codigo, "publico"), snap => {
     ON.publico = {};
@@ -182,7 +151,7 @@ function activarOnline() {
   onSnapshot(collectionJugadores(), snap => {
     ON.jugadores = {};
     snap.forEach(d => ON.jugadores[d.id] = d.data());
-    pintarBarraOnline(); pintarListas();
+    pintarBarraOnline(); pintarFeed();
   });
 
   pintarBarraOnline();
@@ -195,60 +164,6 @@ function activarOnline() {
     else selSemana.value = SESION.semana;
   };
   publicar();
-}
-
-// Chips por bancada: cada integrante con sus palabras; verde cuando ya tiene 20+.
-function pintarListas() {
-  let total = 0, listos = 0;
-  for (const k of ["A", "B"]) {
-    const miembros = Object.entries(ON.jugadores).filter(([, j]) => j.equipo === k);
-    $("lista" + k).innerHTML = miembros.map(([uid, j]) => {
-      const it = ON.intervenciones[uid];
-      const deRonda = it && it.ronda === S.ronda;
-      const n = deRonda ? (it.texto.trim().match(/\S+/g) || []).length : 0;
-      const entrego = deRonda && it.entregado;
-      total++; if (entrego) listos++;
-      return `<span class="${entrego ? "ok" : ""}" title="${(j.email || "").replace(/"/g, "")}">${entrego ? "✓ " : ""}${(j.nombre || "?").replace(/</g, "&lt;")} · ${n} palabras${entrego ? "" : n ? " · escribiendo" : ""}</span>`;
-    }).join("") || `<span style="border-style:dashed">nadie en esta bancada</span>`;
-  }
-  // cuando todos los conectados entregaron, el botón lo dice
-  const todos = S.fase === "abierta" && total > 0 && listos === total;
-  $("btnPrincipal").classList.toggle("todos-listos", todos);
-  if (todos && !ON.avisoTodos) { ON.avisoTodos = S.ronda; tick(`Todos entregaron (${listos}). Puedes CERRAR Y REVELAR.`); }
-  if (!todos && ON.avisoTodos === S.ronda && S.fase !== "abierta") ON.avisoTodos = null;
-}
-
-const collectionJugadores = () => collection(db, "salas", ON.codigo, "jugadores");
-
-/* ---------- EL PÚBLICO: alumnos que no debaten marcan su posición (−100…+100) ----------
-   Se toma una foto de las posiciones al abrir cada ronda y al revelar al ganador. Lo que se
-   mueve un votante entre dos fotos es efecto de lo que se reveló entre ellas: si se acerca a
-   A FAVOR suma a A, si se acerca a EN CONTRA suma a B. Misma medida que la sala sintética
-   (voto suave: tanh(pos/12)), así los dos marcadores de votos son comparables. */
-function fotoPublico() {
-  S.publicoSnaps = S.publicoSnaps || [];
-  S.publicoSnaps.push({ t: Date.now(), ronda: S.ronda, pos: Object.fromEntries(Object.entries(ON.publico).map(([u, d]) => [u, d.pos])) });
-  calcPublico();
-}
-function calcPublico() {
-  const fotos = [...(S.publicoSnaps || []), { pos: Object.fromEntries(Object.entries(ON.publico).map(([u, d]) => [u, d.pos])) }];
-  const suave = v => Math.tanh(v / ESCALA_VOTO);
-  let A = 0, B = 0; const aporte = {}, inicial = {}, final = {};
-  for (let i = 0; i + 1 < fotos.length; i++) {
-    for (const [u, pos] of Object.entries(fotos[i + 1].pos)) {
-      const antes = fotos[i].pos[u];
-      if (antes === undefined) continue;                      // entró después: su primera foto es su base
-      if (inicial[u] === undefined) inicial[u] = antes;
-      final[u] = pos;
-      const d = suave(pos) - suave(antes);
-      if (d > 0) A += d; else B -= d;
-      aporte[u] = (aporte[u] || 0) + d;
-    }
-  }
-  const votantes = Object.entries(ON.publico).map(([u, d]) => ({
-    uid: u, nombre: d.nombre, email: d.email, inicial: inicial[u] ?? d.pos, final: final[u] ?? d.pos, aporte: aporte[u] || 0 }));
-  S.publico = { A: decima(A), B: decima(B), n: Object.keys(ON.publico).length, votantes };
-  pintarMarcador();
 }
 
 /* ---------- barra de la sala: código, URL, jugadores ---------- */
@@ -321,8 +236,7 @@ async function restaurar(codigo) {
     S.fase = priv.fase === "abierta" ? "listo" : priv.fase;
     S.abreEn = null;
     pintarRonda(); pintarAudiencia(null); pintarMarcador(); pintarFeed();
-    $("btnPrincipal").textContent = { listo: "ABRIR RONDA", resuelta: "SIGUIENTE RONDA", fin: "VER VEREDICTO" }[S.fase] || "ABRIR RONDA";
-    ["A", "B"].forEach(k => $("tx" + k).disabled = S.fase !== "abierta");
+    $("btnPrincipal").textContent = { listo: "ABRIR TRAMO", resuelta: "SIGUIENTE TRAMO", fin: S.veredictoRevelado ? "VER VEREDICTO" : "🏆 REVELAR GANADOR" }[S.fase] || "ABRIR TRAMO";
     tick(`Sala ${codigo} restaurada: ${S.historial.length} intervenciones, ronda ${S.ronda + 1}.`);
     // partidas guardadas con la versión anterior (un texto por bancada, votos en cada entrada)
     if (!S.turnos.length && S.historial.length) S.turnos = S.historial.map(h => ({
