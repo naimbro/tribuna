@@ -12,43 +12,54 @@ html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-u
 header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0c1319;border-bottom:1px solid var(--line)}
 header b{color:var(--neon);letter-spacing:.18em}
 header .sala{margin-left:auto;color:var(--dim);font-size:12px}
-main{padding:14px;max-width:640px;margin:0 auto}
+main{padding:14px 14px 240px;max-width:640px;margin:0 auto}   /* espacio para la caja fija de abajo */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
 .k{font-size:11px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;margin-bottom:6px}
 h1{font-size:20px;margin:0 0 8px}
 input,textarea,select{width:100%;background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:11px;font:inherit}
-textarea{min-height:200px;resize:vertical;line-height:1.5}
-textarea[readonly]{opacity:.85}
+textarea{min-height:110px;resize:vertical;line-height:1.5}
+textarea[readonly]{opacity:.6}
 .btn{display:inline-block;width:100%;padding:13px;border-radius:9px;border:1px solid var(--line);background:#141d26;color:var(--txt);font:inherit;font-weight:600;cursor:pointer;margin-top:8px}
 .btn.pri{background:var(--neon);color:#062a17;border-color:transparent}
 .btn.A{background:var(--A);color:#fff;border-color:transparent}
 .btn.B{background:var(--B);color:#fff;border-color:transparent}
 .btn:disabled{opacity:.4}
 .fila{display:flex;gap:8px}
-.reloj{font-size:44px;text-align:center;letter-spacing:.06em;margin:4px 0}
+.reloj{font-size:40px;text-align:center;letter-spacing:.06em;margin:2px 0}
 .reloj.urgente{color:var(--B)}
 .pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;border:1px solid var(--line);color:var(--dim)}
+.pill.ok{border-color:var(--neon);color:var(--neon)}
 .marc{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center}
-.marc .n{font-size:26px}
+.marc .n{font-size:24px}
 .marc .l{font-size:10px;letter-spacing:.14em;color:var(--dim)}
 .barra{display:flex;height:8px;border-radius:99px;overflow:hidden;margin:8px 0}
 .barra i{display:block;height:100%}
 .chip{display:inline-block;font-size:11px;padding:2px 7px;border-radius:6px;background:#151f29;color:var(--dim);margin:2px 3px 0 0}
-.chip.total{background:var(--amber);color:#2a1d00;font-weight:700}
 .chip.bandera{background:#3a1220;color:#ff9db0}
-.int{border-left:3px solid var(--c);padding-left:10px;margin:10px 0}
+.sep{font-size:11px;letter-spacing:.16em;color:var(--dim2);text-transform:uppercase;margin:14px 0 6px;text-align:center}
+.turno{border:1px solid var(--line);border-left:3px solid var(--c);border-radius:10px;padding:10px 12px;margin:8px 0 4px;background:#0d151c}
+.turno .th{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim)}
+.int{border-left:3px solid var(--c);padding:6px 0 6px 10px;margin:6px 0 10px 12px}
+.int.mia{background:#0e1a24;border-radius:0 8px 8px 0}
 .int .who{font-weight:700}
 .int .txt{white-space:pre-wrap;color:#c9d3dc;margin:6px 0}
-.int .nota{color:var(--amber);font-size:13px}
+.int .nota{color:var(--amber);font-size:13px;margin:4px 0}
 .dice{font-size:13px;color:var(--dim);margin-top:4px}
 .gente{display:grid;grid-template-columns:1fr;gap:6px}
 .p{display:flex;gap:8px;align-items:center;font-size:13px}
 .p .eje{flex:1;height:4px;background:#1a2430;border-radius:99px;position:relative}
 .p .dot{position:absolute;top:-4px;width:12px;height:12px;border-radius:50%;background:var(--c);transform:translateX(-50%)}
-.ticker{font-size:12px;color:var(--neon);padding:6px 14px;border-top:1px solid var(--line);position:fixed;bottom:0;left:0;right:0;background:#0c1319}
 .oculto{display:none}
 .ver{border:1px solid var(--c);border-radius:10px;padding:10px;margin-top:8px}
 .aviso{color:var(--amber);font-size:13px}
+/* caja de escritura fija abajo, como un chat */
+#composer{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#0c1319;border-top:1px solid var(--line);padding:8px 12px 10px}
+#composer .in{max-width:640px;margin:0 auto}
+#composer .k{margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:none;letter-spacing:0;font-size:12px}
+#composer .pie{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--dim)}
+#composer .pie .btn{width:auto;margin:0 0 0 auto;padding:8px 16px}
+#companeros{font-size:11.5px;color:var(--dim2);margin-top:4px;line-height:1.9}
+.ticker{font-size:11px;color:var(--neon);padding:3px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
 </head>
 <body>
@@ -78,7 +89,7 @@ textarea[readonly]{opacity:.85}
   <p class="aviso">Si tu profe te asignó bancada, respeta esa. Se puede cambiar después con el botón de abajo.</p>
 </section>
 
-<!-- 3. jugar -->
+<!-- 3. jugar: estado, marcador, hilo, audiencia; la caja va fija abajo -->
 <section id="pJuego" class="oculto">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center">
@@ -86,26 +97,17 @@ textarea[readonly]{opacity:.85}
       <span class="pill" id="miBancada"></span>
     </div>
     <div class="reloj mono" id="reloj">--:--</div>
+    <div class="k">Moción</div>
+    <p id="mocion" style="margin:0 0 8px;font-weight:600"></p>
     <div class="k" id="rolLbl"></div>
     <p id="pauta" style="margin:0;color:#c9d3dc"></p>
-  </div>
-
-  <div class="card" id="cajaEscribir">
-    <div class="k" id="quienEscribe">—</div>
-    <textarea id="tx" placeholder="La intervención de tu bancada…" readonly></textarea>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
-      <span class="pill" id="wc">0 palabras</span>
-      <span class="pill" id="estadoTx"></span>
-    </div>
-    <button class="btn" id="btnTeclado">✎ Tomar el teclado</button>
-    <p class="aviso" id="avisoTx"></p>
   </div>
 
   <div class="card">
     <div class="k">Marcador</div>
     <div class="marc">
-      <div><div class="n mono" id="persuA" style="color:var(--A)">0</div><div class="l" id="lblA">PERSUASIÓN</div></div>
-      <div><div class="n mono" id="persuB" style="color:var(--B)">0</div><div class="l" id="lblB">PERSUASIÓN</div></div>
+      <div><div class="n mono" id="persuA" style="color:var(--A)">0</div><div class="l"><span id="lblA"></span> · persuasión</div></div>
+      <div><div class="n mono" id="persuB" style="color:var(--B)">0</div><div class="l"><span id="lblB"></span> · persuasión</div></div>
       <div><div class="n mono" id="rigorA" style="color:var(--A)">—</div><div class="l">RIGOR /20</div></div>
       <div><div class="n mono" id="rigorB" style="color:var(--B)">—</div><div class="l">RIGOR /20</div></div>
     </div>
@@ -121,16 +123,28 @@ textarea[readonly]{opacity:.85}
   </div>
 
   <div class="card">
-    <div class="k">Intervenciones</div>
+    <div class="k">El hilo</div>
     <div id="feed"><p style="color:var(--dim2)">La sala está en silencio.</p></div>
   </div>
 
   <button class="btn" id="btnCambiar" style="font-size:13px">Cambiar de bancada</button>
-  <div style="height:40px"></div>
 </section>
 
 </main>
-<div class="ticker mono" id="ticker">›</div>
-<script type="module" src="jugar.js?v=20260918a"></script>
+
+<div id="composer" class="oculto">
+  <div class="in">
+    <div class="k" id="compTitulo">—</div>
+    <textarea id="tx" placeholder="Espera a que el profesor abra la ronda." readonly></textarea>
+    <div class="pie">
+      <span id="wc">0 palabras</span><span id="estadoTx"></span>
+      <button class="btn pri" id="btnEntregar" disabled>Entregar</button>
+    </div>
+    <div id="companeros"></div>
+    <p class="aviso" id="avisoTx" style="margin:2px 0 0"></p>
+    <div class="ticker mono" id="ticker">›</div>
+  </div>
+</div>
+<script type="module" src="jugar.js?v=20260919a"></script>
 </body>
 </html>

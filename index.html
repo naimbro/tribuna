@@ -91,7 +91,29 @@ main{display:grid;grid-template-columns:1fr 372px;gap:0;height:calc(100vh - 138p
 .cab .pt{margin-left:auto;color:var(--dim2);letter-spacing:0;font-size:11px}
 
 /* ---------- mesa de escritura ---------- */
-.mesa{padding:12px 16px;border-bottom:1px solid var(--line);background:#0c1219;flex:0 0 auto}
+.mesa{padding:12px 16px;border-top:1px solid var(--line);background:#0c1219;flex:0 0 auto;order:3}
+.feed{order:2}
+.banca textarea{min-height:64px}
+.banca .lista-int{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.banca .lista-int span{font-size:10.5px;padding:2px 7px;border-radius:99px;border:1px solid var(--line);color:var(--dim)}
+.banca .lista-int span.ok{border-color:rgba(0,224,122,.5);color:var(--neon)}
+/* turno: cabecera de lo que hizo una bancada en la ronda */
+.turno{margin:10px 14px 4px;border:1px solid var(--line);border-left:3px solid var(--c);border-radius:9px;background:var(--panel2);padding:9px 12px}
+.turno-head{display:flex;align-items:center;gap:9px;font-size:12px}
+.turno-head .bandera{font-size:16px}
+.turno-head > b{color:var(--c);letter-spacing:.1em;font-size:12px}
+.turno-head .rol{color:var(--dim);flex:1;min-width:0}
+.turno-head .delta{font-family:var(--mono);font-size:18px;font-weight:700;padding:3px 10px;border-radius:7px;background:#0a1016}
+.turno-head .delta.pos{color:var(--neon)}
+.turno-head .delta.neg{color:var(--hot)}
+.turno-head .delta.cero{color:var(--dim)}
+.dicen{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
+.dicen .dice{font-size:11.5px;color:var(--dim);background:#0a1016;border-radius:7px;padding:6px 8px;line-height:1.35}
+.dicen .dice b{color:var(--txt);margin:0 4px}
+.dicen .dice i{display:block;color:#c9d3dc;margin-top:2px}
+.card .rigor-big{margin-left:auto;font-family:var(--mono);font-size:20px;font-weight:700}
+.card .rigor-big small{font-size:10px;color:var(--dim2);margin-left:2px}
+.card .nota{color:var(--amber);font-size:12.5px;margin:6px 0 2px;line-height:1.4}
 .pauta{font-size:12px;color:var(--dim);margin-bottom:9px}
 .pauta b{color:var(--amber);letter-spacing:.06em}
 .bancadas{display:grid;grid-template-columns:1fr 1fr;gap:11px}
@@ -257,18 +279,21 @@ table.rank td.num{font-family:var(--mono);text-align:right}
 
 <main>
   <section class="col">
-    <div class="cab">MESA <span class="pt" id="modoLbl"></span></div>
+    <div class="cab">EL HILO <span class="pt" id="modoLbl"></span></div>
+    <div class="feed" id="feed"></div>
 
     <div class="mesa">
       <div class="pauta" id="pauta"></div>
       <div class="bancadas">
         <div class="banca" id="bancaA" style="--c:var(--A)">
           <div class="top"><span id="bfA"></span><b id="btA"></b><select id="selA"></select></div>
+          <div class="lista-int" id="listaA"></div>
           <textarea id="txA" placeholder="Escribe la intervención…" disabled></textarea>
           <div class="pie"><span id="wcA">0 palabras</span><span class="ok">✓ ENTREGADO</span></div>
         </div>
         <div class="banca" id="bancaB" style="--c:var(--B)">
           <div class="top"><span id="bfB"></span><b id="btB"></b><select id="selB"></select></div>
+          <div class="lista-int" id="listaB"></div>
           <textarea id="txB" placeholder="Escribe la intervención…" disabled></textarea>
           <div class="pie"><span id="wcB">0 palabras</span><span class="ok">✓ ENTREGADO</span></div>
         </div>
@@ -279,8 +304,6 @@ table.rank td.num{font-family:var(--mono);text-align:right}
         <span class="hint" id="hint"></span>
       </div>
     </div>
-
-    <div class="feed" id="feed"></div>
   </section>
 
   <aside class="col der">
@@ -302,24 +325,25 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   <button class="btn sm" id="btnCsv">↓ CSV</button>
   <button class="btn sm" id="btnReset">⟲ REINICIAR</button>
   <button class="btn sm" id="btnLlm">⚙ MOTOR</button>
+  <button class="btn sm" id="btnSonido" title="Sonidos al revelar">🔊</button>
   <div class="sep"></div>
   <div class="ticker" id="ticker"></div>
 </footer>
 
-<script src="contenido/sesiones.js?v=20260918c"></script>
+<script src="contenido/sesiones.js?v=20260919a"></script>
 <script>
   // La sesión se elige con ?semana=N (por defecto la primera del manifiesto). document.write
   // para que el archivo cargue de forma síncrona antes de app.js, que espera sus globales.
   (function () {
     const pedida = +new URLSearchParams(location.search).get("semana");
     const ok = SESIONES.some(x => x.semana === pedida) ? pedida : SESIONES[0].semana;
-    document.write('<script src="contenido/semana' + ok + '.js?v=20260918c"><\/script>');
+    document.write('<script src="contenido/semana' + ok + '.js?v=20260919a"><\/script>');
   })();
 </script>
-<script src="app.js?v=20260918c"></script>
+<script src="app.js?v=20260919a"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260918f"></script>
+<script type="module" src="online.js?v=20260919a"></script>
 </body>
 </html>

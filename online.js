@@ -4,8 +4,9 @@
    Esta capa solo hace dos cosas:
      1. publica el estado en Firestore (salas/{codigo}) para que los alumnos lo vean en
         su teléfono (jugar.html), y
-     2. recibe de Firestore lo que escriben las bancadas (salas/{codigo}/borradores/{A|B})
-        y lo espeja en las cajas de texto, que en modo online son de solo lectura.
+     2. recibe de Firestore lo que escribe cada alumno (salas/{codigo}/intervenciones/{uid}):
+        todos los integrantes de una bancada intervienen; la pantalla muestra quién va escribiendo
+        y al cerrar la ronda junta todos los textos de cada bancada (más la caja del profesor).
    Si la pestaña se cierra, el estado completo está en salas/{codigo}/privado/estado y se
    restaura al volver a abrir index.html?sala=CODIGO.
    Se carga como módulo; los globales de app.js (S, AUDIENCIA, abrirRonda…) son visibles.
@@ -23,7 +24,7 @@ const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
 const db = HAY_FIREBASE ? getFirestore(app) : null;
 
-const ON = { codigo: null, uid: null, email: null, jugadores: {}, borradores: {}, timer: null, pendiente: false };
+const ON = { codigo: null, uid: null, email: null, jugadores: {}, intervenciones: {}, timer: null, pendiente: false };
 const CODIGO_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const nuevoCodigo = () => Array.from({ length: 4 }, () => CODIGO_CHARS[Math.floor(Math.random() * CODIGO_CHARS.length)]).join("");
 const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, "")}jugar.html?sala=${ON.codigo}`;
@@ -46,11 +47,16 @@ function estadoPublico() {
     },
     audiencia: AUDIENCIA.map(p => ({ id: p.id, nombre: p.nombre, bloque: p.bloque, emoji: p.emoji, color: p.color,
                                      votos: p.votos, pos: Math.round(p.pos), ultimo: p.ultimo || "" })),
+    turnos: S.turnos.map(t => ({
+      orden: t.orden, equipo: t.equipo, ronda: t.ronda, rondaNombre: t.rondaNombre, n: t.n,
+      autores: t.autores, rigorMedio: +t.rigorMedio.toFixed(1), deltaVotos: t.deltaVotos,
+      dicen: (t.reacciones || []).filter(r => r.comentario).map(r => ({ id: r.id, delta: +r.delta.toFixed(1), comentario: r.comentario }))
+    })),
     feed: S.historial.map(h => ({
-      equipo: h.equipo, autor: h.autor, ronda: h.ronda, rondaNombre: h.rondaNombre, rolNombre: h.rolNombre,
+      orden: h.orden, turnoOrden: h.turnoOrden,
+      equipo: h.equipo, autor: h.autor, autorEmail: h.autorEmail || "", ronda: h.ronda, rondaNombre: h.rondaNombre, rolNombre: h.rolNombre,
       texto: h.texto, rubrica: h.ev.rubrica, banderas: h.ev.banderas, nota: h.ev.nota || null,
-      conceptos: h.ev.conceptos.map(c => c.etiqueta), deltaVotos: h.deltaVotos,
-      dicen: h.reacciones.filter(r => r.comentario).map(r => ({ id: r.id, delta: +r.delta.toFixed(1), comentario: r.comentario }))
+      conceptos: h.ev.conceptos.map(c => c.etiqueta)
     })),
     shocks: S.shocks.map(x => ({ titular: x.titular, ronda: x.ronda, swing: x.swing })),
     veredicto: S.fase === "fin" ? resumenVeredicto() : null,
@@ -60,8 +66,7 @@ function estadoPublico() {
 
 function resumenVeredicto() {
   const movA = persuasion("A"), movB = persuasion("B");
-  const rig = k => { const h = S.historial.filter(x => x.equipo === k); return h.length ? h.reduce((s, x) => s + x.ev.rubrica.total, 0) / h.length : 0; };
-  const rA = rig("A"), rB = rig("B");
+  const rA = rigorMedio("A") || 0, rB = rigorMedio("B") || 0;
   return {
     movA, movB, rA: +rA.toFixed(1), rB: +rB.toFixed(1),
     ganaP: empatanEnVotos(movA, movB) ? "EMPATE" : movA > movB ? EQUIPOS.A.nombre : EQUIPOS.B.nombre,
@@ -73,7 +78,7 @@ function resumenVeredicto() {
 function estadoPrivado() {
   return {
     ronda: S.ronda, fase: S.fase, seq: S.seq, votoInicial: S.votoInicial, iniPos: S.iniPos,
-    historial: S.historial, shocks: S.shocks, abreEn: S.abreEn || null,
+    historial: S.historial, turnos: S.turnos, shocks: S.shocks, abreEn: S.abreEn || null,
     audiencia: Object.fromEntries(AUDIENCIA.map(p => [p.id, { pos: p.pos, memoria: p.memoria || [], ultimo: p.ultimo || "" }]))
   };
 }
@@ -105,23 +110,28 @@ function envolver(nombre, despues) {
 }
 
 function activarOnline() {
-  // Las cajas espejan lo que escriben las bancadas desde Firestore. Si nadie ha tomado el
-  // teclado por una bancada, el profesor puede escribir por ella (una bancada sin teléfono,
-  // o una prueba con una sola persona).
+  // Las cajas de la mesa quedan para el profesor: lo que escriba ahí entra como una
+  // intervención más de esa bancada (útil si una bancada no tiene teléfono).
   ["A", "B"].forEach(k => {
-    $("tx" + k).placeholder = "Esperando a la bancada… (escriben desde su teléfono). Si nadie toma el teclado, puedes escribir tú aquí.";
+    $("tx" + k).placeholder = "Los alumnos escriben desde su teléfono. Lo que escribas aquí entra como una intervención más de esta bancada.";
+    $("sel" + k).innerHTML = `<option>(profesor)</option>`;
   });
-  envolver("abrirRonda", () => {
-    S.abreEn = Date.now();
-    // el borrador de la ronda anterior no se arrastra
-    ["A", "B"].forEach(k => setDoc(doc(db, "salas", ON.codigo, "borradores", k),
-      { texto: "", redactorUid: null, redactorNombre: null, actualizado: Date.now(), ronda: S.ronda }).catch(() => {}));
-  });
+  // lo que entregó cada bancada: los alumnos de esa bancada en esta ronda + la caja del profe
+  window.recogerEntregas = () => {
+    const out = { A: [], B: [] };
+    for (const it of Object.values(ON.intervenciones)) {
+      if (it.ronda === S.ronda && ["A", "B"].includes(it.equipo) && (it.texto || "").trim())
+        out[it.equipo].push({ autor: it.nombre || "alumno", email: it.email || "", texto: it.texto.trim().slice(0, 4000) });
+    }
+    for (const k of ["A", "B"]) {
+      const t = $("tx" + k).value.trim();
+      if (t) out[k].push({ autor: "(profesor)", email: ON.email || "", texto: t });
+    }
+    return out;
+  };
+  envolver("abrirRonda", () => { S.abreEn = Date.now(); });
   envolver("cerrarRonda", () => {
     S.abreEn = null;
-    // el correo del redactor viaja al historial (y de ahí al CSV); el nombre ya va en `autor`
-    for (const h of S.historial) if (h.ronda === RONDAS[S.ronda].id && !h.autorEmail)
-      h.autorEmail = ON.borradores[h.equipo]?.redactorEmail || (ON.borradores[h.equipo]?.redactorUid ? "" : ON.email);
     if (S.fase !== "abierta") tick(`Ronda ${S.ronda + 1} cerrada y revelada. ${S.fase === "fin" ? "Se acabó el debate: el profesor mostrará el veredicto." : "Espera a que el profesor abra la siguiente."}`);
   });
   envolver("siguienteRonda");
@@ -131,25 +141,18 @@ function activarOnline() {
   envolver("pintarAudiencia");
   envolver("guardarMotor");
 
-  // Lo que escriben las bancadas → cajas (solo lectura) y selector de autor
-  ["A", "B"].forEach(k => onSnapshot(doc(db, "salas", ON.codigo, "borradores", k), snap => {
-    const b = snap.data() || {};
-    ON.borradores[k] = b;
-    const alguien = !!b.redactorUid;                      // un alumno tiene el teclado
-    $("tx" + k).readOnly = alguien;
-    if (alguien && (S.fase === "abierta" || S.fase === "listo")) {
-      $("tx" + k).value = b.texto || "";
-      contarPal(k);
-    }
-    const quien = b.redactorNombre || "(profesor)";
-    $("sel" + k).innerHTML = `<option>${quien.replace(/</g, "&lt;")}</option>`;
-  }));
+  // Quién va escribiendo en cada bancada (nombre + palabras), en vivo
+  onSnapshot(collection(db, "salas", ON.codigo, "intervenciones"), snap => {
+    ON.intervenciones = {};
+    snap.forEach(d => ON.intervenciones[d.id] = d.data());
+    pintarListas();
+  });
 
   // Quiénes están en la sala
   onSnapshot(collectionJugadores(), snap => {
     ON.jugadores = {};
     snap.forEach(d => ON.jugadores[d.id] = d.data());
-    pintarBarraOnline();
+    pintarBarraOnline(); pintarListas();
   });
 
   pintarBarraOnline();
@@ -162,6 +165,18 @@ function activarOnline() {
     else selSemana.value = SESION.semana;
   };
   publicar();
+}
+
+// Chips por bancada: cada integrante con sus palabras; verde cuando ya tiene 20+.
+function pintarListas() {
+  for (const k of ["A", "B"]) {
+    const miembros = Object.entries(ON.jugadores).filter(([, j]) => j.equipo === k);
+    $("lista" + k).innerHTML = miembros.map(([uid, j]) => {
+      const it = ON.intervenciones[uid];
+      const n = it && it.ronda === S.ronda ? (it.texto.trim().match(/\S+/g) || []).length : 0;
+      return `<span class="${n >= 20 ? "ok" : ""}" title="${(j.email || "").replace(/"/g, "")}">${(j.nombre || "?").replace(/</g, "&lt;")} · ${n}</span>`;
+    }).join("") || `<span style="border-style:dashed">nadie en esta bancada</span>`;
+  }
 }
 
 const collectionJugadores = () => collection(db, "salas", ON.codigo, "jugadores");
@@ -229,7 +244,7 @@ async function restaurar(codigo) {
   ON.codigo = codigo;
   if (priv && priv.historial) {
     S.ronda = priv.ronda; S.seq = priv.seq || 0; S.shocks = priv.shocks || [];
-    S.historial = priv.historial; S.votoInicial = priv.votoInicial || S.votoInicial; S.iniPos = priv.iniPos || S.iniPos;
+    S.historial = priv.historial; S.turnos = priv.turnos || []; S.votoInicial = priv.votoInicial || S.votoInicial; S.iniPos = priv.iniPos || S.iniPos;
     for (const p of AUDIENCIA) { const a = priv.audiencia?.[p.id]; if (a) { p.pos = a.pos; p.memoria = a.memoria || []; p.ultimo = a.ultimo || ""; } }
     // una ronda que estaba abierta cuando se cerró la pestaña se vuelve a abrir a mano
     S.fase = priv.fase === "abierta" ? "listo" : priv.fase;
@@ -238,6 +253,11 @@ async function restaurar(codigo) {
     $("btnPrincipal").textContent = { listo: "ABRIR RONDA", resuelta: "SIGUIENTE RONDA", fin: "VER VEREDICTO" }[S.fase] || "ABRIR RONDA";
     ["A", "B"].forEach(k => $("tx" + k).disabled = S.fase !== "abierta");
     tick(`Sala ${codigo} restaurada: ${S.historial.length} intervenciones, ronda ${S.ronda + 1}.`);
+    // partidas guardadas con la versión anterior (un texto por bancada, votos en cada entrada)
+    if (!S.turnos.length && S.historial.length) S.turnos = S.historial.map(h => ({
+      orden: h.orden - 0.5, equipo: h.equipo, ronda: h.ronda, rondaNombre: h.rondaNombre, n: 1,
+      autores: [h.autor], rigorMedio: h.ev.rubrica.total, deltaVotos: h.deltaVotos || 0, reacciones: h.reacciones || []
+    }));
   }
   return true;
 }

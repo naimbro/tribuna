@@ -86,8 +86,9 @@ real cada alumno estaría en su teléfono; acá las dos cajas están en la misma
   la promesa de abundancia de Musk). Mueve a la audiencia en vivo y sirve de control de ritmo. Lo que
   mueve queda registrado (ticker, veredicto y una fila `SALA DE CONTROL` en el CSV, intercalada en orden cronológico y con la dirección en `banderas`) y fuera
   del marcador de PERSUASIÓN.
-- **↓ CSV** exporta una fila por intervención, con autor, los cuatro criterios, el total,
-  los conceptos del knowledge base efectivamente usados y las banderas. Eso es lo que
+- **↓ CSV** exporta una fila por intervención (una por alumno), con autor y correo, los
+  cuatro criterios, el total, los conceptos del knowledge base efectivamente usados y las
+  banderas. `delta_votos` es lo que movió LA BANCADA en esa ronda, repetido en cada fila suya. Eso es lo que
   convierte esto en instrumento de evaluación y no en veinte minutos entretenidos.
 - **⚙ MOTOR** cambia el evaluador (ver abajo).
 
@@ -101,14 +102,18 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
   solo lectura: espejan lo que escribe cada bancada. Abrir, cerrar, shocks, veredicto y CSV
   funcionan igual que en local. Si la pestaña se cierra, `index.html?sala=CODIGO` restaura
   la partida (queda en `salas/{codigo}/privado/estado`), siempre desde el mismo navegador.
-- **Alumnos:** `jugar.html?sala=CODIGO` con su nombre y su bancada. Una bancada escribe UN
-  texto por ronda: quien pulsa **Tomar el teclado** escribe y el resto lo ve crecer en vivo;
-  si deja de teclear un minuto y medio, el teclado se libera. En el teléfono ven el reloj,
-  el marcador, la audiencia, las intervenciones reveladas con rúbrica y devolución, y el
-  veredicto.
+- **Alumnos:** `jugar.html?sala=CODIGO` con su nombre y su bancada. **Todos intervienen:**
+  cada integrante escribe su propia intervención en cada ronda (la caja fija abajo, como un
+  chat; se guarda sola mientras escribe). Al cerrar la ronda, el jurado puntúa a cada uno por
+  separado (rúbrica individual, en paralelo) y la sala oye a la bancada como bloque: se mueve
+  una vez por bancada y ronda, con el promedio de lo que le haría cada texto (paramétrica) o
+  leyendo el conjunto (sociedad de agentes). Así una bancada grande no pesa más por tamaño.
+  En el hilo del teléfono cada uno ve su nota marcada como «(tú)». Los borradores solo los ve
+  la propia bancada, no la rival.
 - **Datos:** `salas/{codigo}` (público para quien tenga el código; solo el creador escribe),
-  `jugadores/{uid}` (cada uno el suyo), `borradores/{A|B}` (solo la bancada dueña, solo con
-  la ronda abierta, máximo 4000 caracteres) y `privado/estado` (solo el profesor). Reglas en
+  `jugadores/{uid}` (cada uno el suyo), `intervenciones/{uid}` (una por alumno y ronda; solo
+  por su bancada, con la ronda abierta, máximo 4000 caracteres; la lee su bancada y el
+  profesor) y `privado/estado` (solo el profesor). Reglas en
   `firestore.rules`. Todos entran **con su cuenta Google** (igual que en `ml2-master-game`):
   el uid es estable, así que el mismo alumno queda identificado de clase a clase y el CSV
   lleva `autor_email`. Salas solo las crea `naim.bro@gmail.com` o un correo listado en la
@@ -128,6 +133,15 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
 - **Ojo con la key en Pages:** `localStorage` es por origen. La key pegada en `localhost`
   no está en `naimbro.github.io`; hay que pegarla una vez ahí (⚙ MOTOR). Sin key, el
   juego online corre con el jurado heurístico y la audiencia paramétrica.
+
+## Pantalla del profesor
+
+Dos paneles, como el panel de debate de `mapuche_panel`: a la izquierda **el hilo** —una
+cabecera por turno (bancada × ronda) con los votos que movió y lo que murmuró la audiencia, y
+debajo cada intervención con su rigor en grande y la devolución del jurado— y la mesa de
+escritura al pie; a la derecha la audiencia. Sonidos sintetizados con WebAudio al revelar
+(aplauso si la bancada ganó votos, abucheo si los perdió, moneda por rigor alto, campana al
+abrir ronda); se apagan con 🔊 en el pie.
 
 ## Los dos evaluadores
 

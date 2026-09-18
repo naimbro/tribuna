@@ -43,16 +43,17 @@ service cloud.firestore {
           && request.resource.data.equipo in ['A', 'B'];
       }
 
-      match /borradores/{equipo} {
-        allow read: if conSesion();
-        // Escribe el profe, o un jugador de ESA bancada mientras la ronda está abierta.
-        // Quién tiene el teclado se coordina en el cliente (redactorUid); acá solo se
-        // garantiza que nadie escriba por la bancada contraria ni fuera de tiempo.
-        allow write: if esProfe(codigo) || (conSesion()
+      // Una intervención por alumno y ronda (se sobreescribe cada ronda). Solo su dueño la
+      // escribe, solo por su bancada y con la ronda abierta. La leen su bancada y el profesor:
+      // la bancada rival no ve los borradores (se escribe a ciegas).
+      match /intervenciones/{uid} {
+        allow read: if esProfe(codigo) || (conSesion() && esJugador(codigo)
+          && jugador(codigo).data.equipo == resource.data.equipo);
+        allow write: if conSesion() && uid == request.auth.uid
           && esJugador(codigo)
-          && jugador(codigo).data.equipo == equipo
+          && request.resource.data.equipo == jugador(codigo).data.equipo
           && sala(codigo).data.fase == 'abierta'
-          && request.resource.data.texto is string && request.resource.data.texto.size() <= 4000);
+          && request.resource.data.texto is string && request.resource.data.texto.size() <= 4000;
       }
     }
   }

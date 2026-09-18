@@ -1,12 +1,13 @@
 /* =====================================================================
    TRIBUNA — el teléfono del alumno.
-   Lee salas/{codigo} (lo publica la pantalla del profesor) y escribe el borrador de su
-   bancada en salas/{codigo}/borradores/{A|B}. Una bancada = un texto por ronda: quien
-   pulsa "Tomar el teclado" escribe; el resto ve el borrador crecer en vivo.
+   Lee salas/{codigo} (lo publica la pantalla del profesor) y escribe la intervención propia en
+   salas/{codigo}/intervenciones/{uid}. Todos los integrantes de una bancada intervienen: cada uno
+   escribe la suya en cada ronda; el jurado puntúa a cada uno y la sala oye a la bancada entera.
+   El hilo del debate va arriba; la caja de escritura queda fija abajo, como un chat.
    ===================================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js?v=20260918a";
 
 const $ = id => document.getElementById(id);
@@ -16,9 +17,10 @@ const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
 const db = HAY_FIREBASE ? getFirestore(app) : null;
 
-const J = { uid: null, email: null, codigo: null, nombre: "", equipo: null, sala: null, borrador: null, reloj: null, escribiendo: null };
+const J = { uid: null, email: null, codigo: null, nombre: "", equipo: null, sala: null, mia: null, companeros: {}, reloj: null, escribiendo: null, rondaVista: null };
 const google = new GoogleAuthProvider();
-const TECLADO_VENCE = 90_000;      // ms sin escribir tras los cuales otro puede tomar el teclado
+const palabras = t => (t.trim().match(/\S+/g) || []).length;
+const colorRigor = t => t >= 14 ? "var(--neon)" : t >= 9 ? "var(--amber)" : "var(--B)";
 
 /* ---------- entrar ---------- */
 const guardado = JSON.parse(localStorage.getItem("tribuna_jugador") || "{}");
@@ -49,7 +51,7 @@ $("btnEntrar").onclick = async () => {
 };
 
 function mostrarBancadas() {
-  $("pEntrar").classList.add("oculto"); $("pJuego").classList.add("oculto");
+  $("pEntrar").classList.add("oculto"); $("pJuego").classList.add("oculto"); $("composer").classList.add("oculto");
   $("pBancada").classList.remove("oculto");
   $("mocion1").textContent = J.sala.mocion;
   $("btnA").textContent = `${J.sala.equipos.A.bandera} ${J.sala.equipos.A.nombre}`;
@@ -65,22 +67,24 @@ async function elegir(k) {
 }
 
 /* ---------- jugar ---------- */
+let subs = [];
 async function entrarAlJuego() {
+  subs.forEach(u => u()); subs = [];
   $("pEntrar").classList.add("oculto"); $("pBancada").classList.add("oculto");
-  $("pJuego").classList.remove("oculto");
+  $("pJuego").classList.remove("oculto"); $("composer").classList.remove("oculto");
   $("salaLbl").textContent = `sala ${J.codigo} · ${J.nombre}`;
   $("salaLbl").title = J.email || "";
-  onSnapshot(doc(db, "salas", J.codigo), snap => { J.sala = snap.data(); pintarSala(); });
-  onSnapshot(doc(db, "salas", J.codigo, "borradores", J.equipo), snap => { J.borrador = snap.data() || {}; pintarBorrador(); });
+  subs.push(onSnapshot(doc(db, "salas", J.codigo), snap => { J.sala = snap.data(); pintarSala(); }));
+  subs.push(onSnapshot(doc(db, "salas", J.codigo, "intervenciones", J.uid), snap => { J.mia = snap.data() || null; pintarComposer(); }));
+  // los de mi bancada (las reglas no dejan leer a la rival): nombre y palabras, en vivo
+  subs.push(onSnapshot(query(collection(db, "salas", J.codigo, "intervenciones"), where("equipo", "==", J.equipo)), snap => {
+    J.companeros = {}; snap.forEach(d => J.companeros[d.id] = d.data()); pintarCompaneros();
+  }));
   $("btnCambiar").onclick = mostrarBancadas;
-  $("btnTeclado").onclick = tomarTeclado;
   $("tx").addEventListener("input", alEscribir);
+  $("btnEntregar").onclick = entregar;
   clearInterval(J.reloj); J.reloj = setInterval(pintarReloj, 500);
 }
-
-const soyRedactor = () => J.borrador && J.borrador.redactorUid === J.uid;
-const tecladoLibre = () => !J.borrador || !J.borrador.redactorUid || soyRedactor()
-  || (Date.now() - (J.borrador.actualizado || 0)) > TECLADO_VENCE;
 
 function pintarSala() {
   const s = J.sala; if (!s) return;
@@ -91,7 +95,8 @@ function pintarSala() {
   $("rondaPill").textContent = `Ronda ${s.ronda + 1}/${s.totalRondas} · ${s.rondaNombre}`;
   $("rolLbl").textContent = s.rol;
   $("pauta").textContent = s.pauta;
-  $("lblA").textContent = `${s.equipos.A.nombre} · persuasión`; $("lblB").textContent = `${s.equipos.B.nombre} · persuasión`;
+  $("mocion").textContent = s.mocion;
+  $("lblA").textContent = `${s.equipos.A.nombre}`; $("lblB").textContent = `${s.equipos.B.nombre}`;
   $("persuA").textContent = s.marcador.persuA; $("persuB").textContent = s.marcador.persuB;
   $("rigorA").textContent = s.marcador.rigorA; $("rigorB").textContent = s.marcador.rigorB;
   const c = s.marcador.conteo, t = c.total || 1;
@@ -104,22 +109,37 @@ function pintarSala() {
     <div class="eje"><div class="dot" style="left:${(p.pos + 100) / 2}%"></div></div></div>
     ${p.ultimo ? `<div class="dice" style="margin:-2px 0 4px 34px">“${esc(p.ultimo)}”</div>` : ""}`).join("");
 
-  const feed = s.feed.slice().reverse();
-  $("feed").innerHTML = feed.length ? feed.map(h => {
-    const e = s.equipos[h.equipo], r = h.rubrica;
-    return `<div class="int" style="--c:${e.color}">
-      <div class="who">${e.bandera} ${esc(h.autor)} <small style="color:var(--dim)">· ${e.nombre} · ${esc(h.rolNombre)}</small>
-        <span class="pill" style="float:right;color:${h.deltaVotos > 0 ? "var(--neon)" : h.deltaVotos < 0 ? "var(--B)" : "var(--dim)"}">${h.deltaVotos > 0 ? "+" : ""}${h.deltaVotos.toFixed(1)} votos</span></div>
-      <div class="txt">${esc(h.texto)}</div>
-      ${h.nota ? `<div class="nota">⚖ ${esc(h.nota)}</div>` : ""}
-      <div><span class="chip total">RIGOR ${r.total.toFixed(1)}/20</span>
-        <span class="chip">EVIDENCIA ${r.evidencia.toFixed(1)}</span><span class="chip">REFUTACIÓN ${r.refutacion.toFixed(1)}</span>
-        <span class="chip">ESTRUCTURA ${r.estructura.toFixed(1)}</span><span class="chip">CONCESIÓN ${r.concesion.toFixed(1)}</span>
-        ${h.conceptos.map(c => `<span class="chip">${esc(c)}</span>`).join("")}
-        ${h.banderas.map(b => `<span class="chip bandera">⚑ ${esc(b)}</span>`).join("")}</div>
-      ${h.dicen.map(d => { const p = s.audiencia.find(x => x.id === d.id); return `<div class="dice">${p ? p.emoji + " " + esc(p.nombre.split(" ")[0]) : ""} (${d.delta > 0 ? "+" : ""}${d.delta}): “${esc(d.comentario)}”</div>`; }).join("")}
+  // hilo: turnos (bancada × ronda) con sus intervenciones debajo, en orden; lo más nuevo al final
+  const turnos = (s.turnos || []).slice().sort((a, b) => a.orden - b.orden);
+  const feed = s.feed || [];
+  let html = "", ronda = null;
+  for (const t of turnos) {
+    if (t.ronda !== ronda) { ronda = t.ronda; html += `<div class="sep">${esc(t.rondaNombre)}</div>`; }
+    const e = s.equipos[t.equipo];
+    html += `<div class="turno" style="--c:${e.color}">
+      <div class="th"><b style="color:${e.color}">${e.bandera} ${e.nombre}</b>
+        <span>${t.n} intervenci${t.n === 1 ? "ón" : "ones"} · rigor <b style="color:${colorRigor(t.rigorMedio)}">${t.rigorMedio.toFixed(1)}</b></span>
+        <span class="pill" style="margin-left:auto;font-size:15px;color:${t.deltaVotos > 0 ? "var(--neon)" : t.deltaVotos < 0 ? "var(--B)" : "var(--dim)"}">${t.deltaVotos > 0 ? "+" : ""}${t.deltaVotos.toFixed(1)} votos</span></div>
+      ${(t.dicen || []).map(d => { const p = s.audiencia.find(x => x.id === d.id); return `<div class="dice">${p ? p.emoji + " " + esc(p.nombre.split(" ")[0]) : ""} (${d.delta > 0 ? "+" : ""}${d.delta}): “${esc(d.comentario)}”</div>`; }).join("")}
     </div>`;
-  }).join("") : `<p style="color:var(--dim2)">La sala está en silencio.</p>`;
+    for (const h of feed.filter(h => h.turnoOrden === t.orden).sort((a, b) => a.orden - b.orden)) {
+      const r = h.rubrica, mia = h.autorEmail && h.autorEmail === J.email;
+      html += `<div class="int ${mia ? "mia" : ""}" style="--c:${e.color}">
+        <div class="who">${esc(h.autor)}${mia ? " (tú)" : ""}<span class="pill" style="float:right;color:${colorRigor(r.total)}">rigor ${r.total.toFixed(1)}/20</span></div>
+        <div class="txt">${esc(h.texto)}</div>
+        ${h.nota ? `<div class="nota">⚖ ${esc(h.nota)}</div>` : ""}
+        <div><span class="chip">EVIDENCIA ${r.evidencia.toFixed(1)}</span><span class="chip">REFUTACIÓN ${r.refutacion.toFixed(1)}</span>
+          <span class="chip">ESTRUCTURA ${r.estructura.toFixed(1)}</span><span class="chip">CONCESIÓN ${r.concesion.toFixed(1)}</span>
+          ${h.conceptos.map(c => `<span class="chip">${esc(c)}</span>`).join("")}
+          ${h.banderas.map(b => `<span class="chip bandera">⚑ ${esc(b)}</span>`).join("")}</div>
+      </div>`;
+    }
+  }
+  const f = $("feed");
+  const alFinal = f.scrollHeight - f.scrollTop - f.clientHeight < 80;
+  f.innerHTML = html || `<p style="color:var(--dim2);padding:20px 0">La sala está en silencio. Cuando el profesor abra la ronda, escribe abajo.</p>`;
+  if (alFinal || turnos.length !== J.rondaVista) window.scrollTo(0, document.body.scrollHeight);
+  J.rondaVista = turnos.length;
 
   const v = s.veredicto, cv = $("cardVeredicto");
   if (v) {
@@ -131,7 +151,7 @@ function pintarSala() {
         <div style="color:var(--dim);font-size:13px">rúbrica: <span style="color:var(--A)">${v.rA}</span> / <span style="color:var(--B)">${v.rB}</span> sobre 20</div></div>`;
   } else cv.classList.add("oculto");
 
-  pintarBorrador(); pintarReloj();
+  pintarComposer(); pintarReloj();
 }
 
 function pintarReloj() {
@@ -147,48 +167,55 @@ function pintarReloj() {
   }
 }
 
-function pintarBorrador() {
-  const s = J.sala, b = J.borrador || {}; if (!s) return;
+/* ---------- mi intervención (caja fija abajo) ---------- */
+const miaDeEstaRonda = () => J.mia && J.sala && J.mia.ronda === J.sala.ronda;
+
+function pintarComposer() {
+  const s = J.sala; if (!s) return;
   const abierta = s.fase === "abierta";
   const tx = $("tx");
-  if (!soyRedactor() || !abierta) {
-    if (document.activeElement !== tx || !soyRedactor()) tx.value = b.texto || "";
-  }
-  tx.readOnly = !(abierta && soyRedactor());
-  const n = (tx.value.trim().match(/\S+/g) || []).length;
+  // al cambiar de ronda la caja parte vacía; mientras la ronda está abierta no piso lo que escribe
+  if (!abierta || document.activeElement !== tx) tx.value = miaDeEstaRonda() ? (J.mia.texto || "") : (abierta ? tx.value : "");
+  if (abierta && J.mia && J.mia.ronda !== s.ronda && document.activeElement !== tx) tx.value = "";
+  tx.readOnly = !abierta;
+  const n = palabras(tx.value);
   $("wc").textContent = n + " palabras";
-  $("quienEscribe").textContent = !abierta ? "Ronda cerrada"
-    : soyRedactor() ? "Tú tienes el teclado: escribe la intervención de tu bancada"
-    : b.redactorNombre ? `Escribe ${b.redactorNombre} — lo ves en vivo` : "Nadie ha tomado el teclado todavía";
-  $("estadoTx").textContent = n >= 20 ? "✓ lista" : "";
-  const bt = $("btnTeclado");
-  bt.style.display = abierta ? "" : "none";
-  bt.disabled = !tecladoLibre();
-  bt.textContent = soyRedactor() ? "✋ Soltar el teclado" : tecladoLibre() ? "✎ Tomar el teclado" : `✎ Lo tiene ${b.redactorNombre || "otro"}`;
-  $("avisoTx").textContent = abierta && !soyRedactor() && b.redactorUid && !tecladoLibre()
-    ? "Si quien escribe deja de teclear por un minuto y medio, el teclado se libera." : "";
+  const entregada = miaDeEstaRonda() && J.mia.entregado;
+  $("estadoTx").textContent = !abierta ? (miaDeEstaRonda() ? "enviada" : "") : entregada ? "✓ entregada" : n >= 20 ? "se guarda sola" : "";
+  $("compTitulo").textContent = !abierta ? "Ronda cerrada" : `${s.rol} · ${s.pauta}`;
+  $("btnEntregar").style.display = abierta ? "" : "none";
+  $("btnEntregar").disabled = n < 5 || entregada;
+  $("btnEntregar").textContent = entregada ? "✓ Entregada" : "Entregar";
+  tx.placeholder = abierta ? "Escribe tu intervención. Se guarda mientras escribes; al cerrar la ronda entra lo que haya." : "Espera a que el profesor abra la ronda.";
 }
 
-async function tomarTeclado() {
+function pintarCompaneros() {
+  const s = J.sala; if (!s) return;
+  const otros = Object.entries(J.companeros).filter(([uid]) => uid !== J.uid && J.companeros[uid].ronda === s.ronda);
+  $("companeros").innerHTML = otros.length
+    ? "Tu bancada: " + otros.map(([, c]) => `<span class="pill ${c.entregado ? "ok" : ""}">${esc(c.nombre)} · ${palabras(c.texto || "")}</span>`).join(" ")
+    : "";
+}
+
+async function guardar(entregado) {
   if (!J.sala || J.sala.fase !== "abierta") return;
-  if (soyRedactor()) {
-    await setDoc(doc(db, "salas", J.codigo, "borradores", J.equipo), { ...J.borrador, redactorUid: null, redactorNombre: null, actualizado: Date.now() });
-    return;
-  }
-  if (!tecladoLibre()) return;
-  await setDoc(doc(db, "salas", J.codigo, "borradores", J.equipo),
-    { texto: J.borrador?.texto || "", redactorUid: J.uid, redactorNombre: J.nombre, redactorEmail: J.email, actualizado: Date.now(), ronda: J.sala.ronda });
-  $("tx").focus();
+  const texto = $("tx").value.slice(0, 4000);
+  await setDoc(doc(db, "salas", J.codigo, "intervenciones", J.uid),
+    { equipo: J.equipo, ronda: J.sala.ronda, texto, nombre: J.nombre, email: J.email, actualizado: Date.now(), entregado: !!entregado });
 }
 
 // Lo escrito viaja a Firestore con un pequeño retraso para no mandar una escritura por tecla.
 function alEscribir() {
-  if (!soyRedactor()) return;
-  $("wc").textContent = ($("tx").value.trim().match(/\S+/g) || []).length + " palabras";
+  $("wc").textContent = palabras($("tx").value) + " palabras";
+  $("btnEntregar").disabled = palabras($("tx").value) < 5;
   clearTimeout(J.escribiendo);
-  J.escribiendo = setTimeout(() => setDoc(doc(db, "salas", J.codigo, "borradores", J.equipo),
-    { texto: $("tx").value.slice(0, 4000), redactorUid: J.uid, redactorNombre: J.nombre, redactorEmail: J.email, actualizado: Date.now(), ronda: J.sala.ronda })
-    .catch(e => $("avisoTx").textContent = "No se guardó lo último: " + e.message), 350);
+  J.escribiendo = setTimeout(() => guardar(false).catch(e => $("avisoTx").textContent = "No se guardó lo último: " + e.code), 400);
+}
+
+async function entregar() {
+  clearTimeout(J.escribiendo);
+  try { await guardar(true); $("avisoTx").textContent = ""; }
+  catch (e) { $("avisoTx").textContent = "No se pudo entregar: " + e.code; }
 }
 
 /* ---------- arranque ---------- */
