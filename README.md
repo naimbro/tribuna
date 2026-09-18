@@ -72,12 +72,32 @@ audiencia y en 20 de 20 con la sociedad de agentes (`pruebas/RESULTADOS.md`).
 que se arrastra de ronda en ronda, con saturación: a quien ya convenciste no lo
 vuelves a convencer. Sin memoria esto sería un quiz.
 
-## Rondas
+## La conversación y los dos moderadores
 
-Calcadas del formato de 70 minutos de `debates.html`: apertura (3 min), refutación
-cruzada (3 min), cierre (2 min). **Las dos bancadas escriben a la vez** con el reloj
-corriendo y el reveal es simultáneo — nadie espera su turno mirando. En una versión
-real cada alumno estaría en su teléfono; acá las dos cajas están en la misma pantalla.
+El debate es **una sola conversación**, como un grupo de WhatsApp: A FAVOR a la izquierda,
+EN CONTRA a la derecha, los moderadores al centro. Todos leen todo en vivo, en el proyector y en
+los teléfonos. Se juega en **tramos** (apertura, refutación, cierre; nombres, pautas y minutos
+en `RONDAS` de cada semana).
+
+- **🎙 Moderadora (IA).** Durante el tramo lee la conversación e interviene: pide profundizar una
+  afirmación gruesa, pregunta de dónde sale un dato o qué significa un concepto (para comprobar
+  que el alumno sabe, sin soplarle nunca la respuesta), le pasa la palabra a quien no ha hablado
+  y pone a una bancada frente al argumento del otro lado que no ha respondido. Nombra con
+  @Nombre; en el teléfono de esa persona el mensaje se destaca y vibra. Interviene sola cada
+  25–45 s según cómo avance la conversación, o cuando el profesor pulsa 🎙 MODERADORA.
+- **⚖ Relator (IA).** Al pulsar ⚖ PEDIR VOTACIÓN (o al acabarse el reloj) resume con
+  neutralidad la posición de cada bancada en el tramo, nombra el punto en disputa, dice qué
+  revisar (cosas concretas que se dijeron) y con qué criterios votar, y pide el voto. Sus
+  indicaciones llegan a los tres jueces: al **público** (aviso en el teléfono para mover su
+  posición), al **jurado** y a la **audiencia sintética** (van en sus prompts).
+- **La votación.** El jurado puntúa a cada participante por todos sus mensajes del tramo
+  (rúbrica individual, con la conversación del tramo como contexto). La audiencia sintética oye
+  a cada bancada como bloque. El resultado aparece en la conversación como una tarjeta: votos de
+  la bancada, nota y devolución de cada participante, murmullos de la audiencia.
+
+Los moderadores corren en la pantalla del profesor con el mismo motor que el jurado
+(`moderacion.js`); sin motor LLM hablan con plantillas simples. En la pantalla, el compositor
+de abajo sirve para escribir por una bancada o simular alumnos con `@Nombre: texto`.
 
 ## Sala de control
 
