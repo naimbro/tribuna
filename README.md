@@ -118,9 +118,15 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
   el uid es estable, así que el mismo alumno queda identificado de clase a clase y el CSV
   lleva `autor_email`. Salas solo las crea `naim.bro@gmail.com` o un correo listado en la
   colección `profesores/{email}` (la edita el admin desde la consola).
-- **La key del LLM** va en el navegador del profesor (⚙ MOTOR, "key pegada"), no en el de
-  los alumnos, que nunca llaman al proveedor. Un proxy con la key en Cloud Functions
-  requiere el plan Blaze del proyecto; el `.env` + `servidor.py` solo sirve en local.
+- **Motor LLM online:** Cloud Function `evaluar` (`functions/src/index.ts`, us-central1). La
+  key de Anthropic vive en Secret Manager (`ANTHROPIC_API_KEY`) y nunca llega a un navegador;
+  la función solo atiende a `naim.bro@gmail.com` o a correos en `profesores`. El profesor
+  entra con Google, abre ⚙ MOTOR, elige Anthropic y deja la key vacía: el rótulo dice
+  `(servidor TRIBUNA)`. Los alumnos nunca llaman al proveedor. El proyecto está en el plan
+  Blaze (cuenta «Firebase Payment») con un presupuesto de alerta de $10.000 CLP/mes. Desplegar:
+  copiar `functions/` a un directorio nativo de WSL y `firebase deploy --only functions`
+  (desde `/mnt/c` falla por lentitud, como en ml2). En local sigue funcionando `servidor.py`
+  con el `.env`.
 - **Publicar:** el repo es estático, sin build. GitHub Pages sirve `main` en
   `https://naimbro.github.io/tribuna/` (profesor) y `.../tribuna/jugar.html` (alumnos).
   Proyecto Firebase `tribuna-csc00155` (plan Spark: Firestore + acceso con Google, sin
