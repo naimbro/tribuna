@@ -166,6 +166,39 @@ function activarOnline() {
   publicar();
 }
 
+const collectionJugadores = () => collection(db, "salas", ON.codigo, "jugadores");
+
+/* ---------- EL PÚBLICO: alumnos que no debaten marcan su posición (−100…+100) ----------
+   Se toma una foto de las posiciones al abrir cada ronda y al revelar al ganador. Lo que se
+   mueve un votante entre dos fotos es efecto de lo que se reveló entre ellas: si se acerca a
+   A FAVOR suma a A, si se acerca a EN CONTRA suma a B. Misma medida que la sala sintética
+   (voto suave: tanh(pos/12)), así los dos marcadores de votos son comparables. */
+function fotoPublico() {
+  S.publicoSnaps = S.publicoSnaps || [];
+  S.publicoSnaps.push({ t: Date.now(), ronda: S.ronda, pos: Object.fromEntries(Object.entries(ON.publico).map(([u, d]) => [u, d.pos])) });
+  calcPublico();
+}
+function calcPublico() {
+  const fotos = [...(S.publicoSnaps || []), { pos: Object.fromEntries(Object.entries(ON.publico).map(([u, d]) => [u, d.pos])) }];
+  const suave = v => Math.tanh(v / ESCALA_VOTO);
+  let A = 0, B = 0; const aporte = {}, inicial = {}, final = {};
+  for (let i = 0; i + 1 < fotos.length; i++) {
+    for (const [u, pos] of Object.entries(fotos[i + 1].pos)) {
+      const antes = fotos[i].pos[u];
+      if (antes === undefined) continue;                      // entró después: su primera foto es su base
+      if (inicial[u] === undefined) inicial[u] = antes;
+      final[u] = pos;
+      const d = suave(pos) - suave(antes);
+      if (d > 0) A += d; else B -= d;
+      aporte[u] = (aporte[u] || 0) + d;
+    }
+  }
+  const votantes = Object.entries(ON.publico).map(([u, d]) => ({
+    uid: u, nombre: d.nombre, email: d.email, inicial: inicial[u] ?? d.pos, final: final[u] ?? d.pos, aporte: aporte[u] || 0 }));
+  S.publico = { A: decima(A), B: decima(B), n: Object.keys(ON.publico).length, votantes };
+  pintarMarcador();
+}
+
 /* ---------- barra de la sala: código, URL, jugadores ---------- */
 function pintarBarraOnline() {
   let bar = $("barraOnline");
