@@ -84,7 +84,7 @@ function estadoPrivado() {
   return {
     ronda: S.ronda, fase: S.fase, seq: S.seq, votoInicial: S.votoInicial, iniPos: S.iniPos,
     historial: S.historial, turnos: S.turnos, shocks: S.shocks, abreEn: S.abreEn || null,
-    publicoSnaps: S.publicoSnaps || [],
+    publicoSnaps: S.publicoSnaps || [], publicoBase: S.publicoBase || {},
     audiencia: Object.fromEntries(AUDIENCIA.map(p => [p.id, { pos: p.pos, memoria: p.memoria || [], ultimo: p.ultimo || "" }]))
   };
 }
@@ -143,7 +143,13 @@ function activarOnline() {
   // El público: sus posiciones en vivo
   onSnapshot(collection(db, "salas", ON.codigo, "publico"), snap => {
     ON.publico = {};
-    snap.forEach(d => { const x = d.data(); if (typeof x.pos === "number") ON.publico[d.id] = x; });
+    S.publicoBase = S.publicoBase || {};
+    snap.forEach(d => {
+      const x = d.data(); if (typeof x.pos !== "number") return;
+      ON.publico[d.id] = x;
+      // la base de cada votante: la que guardó al entrar, o la primera posición que se le vio
+      if (!S.publicoBase[d.id]) S.publicoBase[d.id] = { t: x.desde || Date.now(), pos: typeof x.inicial === "number" ? x.inicial : x.pos };
+    });
     calcPublico(); pintarBarraOnline(); publicar();
   });
 
@@ -179,18 +185,20 @@ function fotoPublico() {
   calcPublico();
 }
 function calcPublico() {
-  const fotos = [...(S.publicoSnaps || []), { pos: Object.fromEntries(Object.entries(ON.publico).map(([u, d]) => [u, d.pos])) }];
   const suave = v => Math.tanh(v / ESCALA_VOTO);
   let A = 0, B = 0; const aporte = {}, inicial = {}, final = {};
-  for (let i = 0; i + 1 < fotos.length; i++) {
-    for (const [u, pos] of Object.entries(fotos[i + 1].pos)) {
-      const antes = fotos[i].pos[u];
-      if (antes === undefined) continue;                      // entró después: su primera foto es su base
-      if (inicial[u] === undefined) inicial[u] = antes;
-      final[u] = pos;
-      const d = suave(pos) - suave(antes);
-      if (d > 0) A += d; else B -= d;
-      aporte[u] = (aporte[u] || 0) + d;
+  // por votante: su base (al entrar) → sus posiciones en cada foto posterior → la de ahora
+  for (const [u, d] of Object.entries(ON.publico)) {
+    const base = S.publicoBase?.[u];
+    const seq = [];
+    if (base) seq.push(base.pos);
+    for (const f of S.publicoSnaps || []) if (f.pos[u] !== undefined && (!base || f.t > base.t)) seq.push(f.pos[u]);
+    seq.push(d.pos);
+    inicial[u] = seq[0]; final[u] = d.pos;
+    for (let i = 0; i + 1 < seq.length; i++) {
+      const dd = suave(seq[i + 1]) - suave(seq[i]);
+      if (dd > 0) A += dd; else B -= dd;
+      aporte[u] = (aporte[u] || 0) + dd;
     }
   }
   const votantes = Object.entries(ON.publico).map(([u, d]) => ({
@@ -262,7 +270,7 @@ async function restaurar(codigo) {
   ON.codigo = codigo;
   if (priv && priv.historial) {
     S.ronda = priv.ronda; S.seq = priv.seq || 0; S.shocks = priv.shocks || [];
-    S.publicoSnaps = priv.publicoSnaps || [];
+    S.publicoSnaps = priv.publicoSnaps || []; S.publicoBase = priv.publicoBase || {};
     S.historial = priv.historial; S.turnos = priv.turnos || []; S.votoInicial = priv.votoInicial || S.votoInicial; S.iniPos = priv.iniPos || S.iniPos;
     for (const p of AUDIENCIA) { const a = priv.audiencia?.[p.id]; if (a) { p.pos = a.pos; p.memoria = a.memoria || []; p.ultimo = a.ultimo || ""; } }
     // una ronda que estaba abierta cuando se cerró la pestaña se vuelve a abrir a mano

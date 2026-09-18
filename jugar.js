@@ -67,7 +67,7 @@ async function elegir(k) {
   await setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { nombre: J.nombre, email: J.email, equipo: k, unido: Date.now() });
   if (k === "P") {
     const yo = await getDoc(doc(db, "salas", J.codigo, "publico", J.uid)).catch(() => null);
-    if (!yo || !yo.exists()) await guardarPos(0);   // el público parte indeciso y queda contado
+    if (!yo || !yo.exists()) await guardarPos(0, true);   // el público parte indeciso: esa es su base
   }
   await entrarAlJuego();
 }
@@ -218,8 +218,12 @@ async function enviar() {
 
 /* ---------- público: posición frente a la moción ---------- */
 const describePos = v => { const a = Math.abs(v); if (a <= 8) return "indeciso"; const lado = v > 0 ? "a favor" : "en contra"; return (a > 60 ? "muy " : a > 25 ? "" : "algo ") + lado; };
-async function guardarPos(v) {
-  await setDoc(doc(db, "salas", J.codigo, "publico", J.uid), { pos: Math.round(v), nombre: J.nombre, email: J.email, actualizado: Date.now() });
+// La primera vez se guarda también la base (inicial + desde): así cuenta lo que se mueva aunque
+// entre con un tramo ya abierto, antes de la próxima foto del profesor.
+async function guardarPos(v, primera = false) {
+  await setDoc(doc(db, "salas", J.codigo, "publico", J.uid),
+    { pos: Math.round(v), nombre: J.nombre, email: J.email, actualizado: Date.now(), ...(primera ? { inicial: Math.round(v), desde: Date.now() } : {}) },
+    { merge: true });
 }
 function prepararVoto() {
   const r = $("rngPos");
