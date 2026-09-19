@@ -172,27 +172,6 @@ main{display:grid;grid-template-columns:1fr 372px;gap:0;flex:1 1 auto;min-height
 #cerG .cer-mini{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;font-size:17px;color:var(--dim);margin-top:12px}
 #cerG .cer-mini b{margin-left:6px}
 /* ---------- columna de los jueces ---------- */
-.jurado{padding:10px 14px 12px;border-bottom:1px solid var(--line)}
-.jurado .vacio{color:var(--dim2);font-size:12px;margin-bottom:8px}
-.jr{margin-bottom:7px}
-.jl{font-size:10px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;text-align:center;margin-bottom:2px}
-.jb{display:grid;grid-template-columns:46px 1fr 1fr 46px;gap:4px;align-items:center}
-.jb .v{font-family:var(--mono);font-size:13px;font-weight:700}
-.jb .v:last-child{text-align:right}
-.bar{height:8px;background:#0a1016;border:1px solid var(--line);display:flex;overflow:hidden}
-.bar i{display:block;height:100%;transition:width .8s cubic-bezier(.2,.8,.2,1)}
-.bar.a{justify-content:flex-end;border-radius:99px 0 0 99px}.bar.a i{background:var(--A)}
-.bar.b{border-radius:0 99px 99px 0}.bar.b i{background:var(--B)}
-.jr.tot{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)}
-.jr.tot .jl{color:var(--amber)}
-.jr.tot .v{font-size:19px}
-.jr.tot .bar{height:11px}
-.jn{font-size:10.5px;color:var(--dim2);text-align:center;margin-top:4px}
-.jult{margin-top:9px;font-size:12px;color:var(--dim);line-height:1.4;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
-.hemi{padding:12px 14px 0;display:flex;justify-content:center}
-.hemi svg{width:100%;max-width:330px;height:auto}
-.hemi circle{transition:fill .8s}
-.hemi-nota{font-size:10.5px;color:var(--dim2);text-align:center;margin:8px 14px 12px}
 .msg.noticia{align-self:center;max-width:92%;background:#1f1508;border:1px solid var(--amber);--c:var(--amber)}
 main .col{position:relative}
 #propuesta{position:absolute;left:14px;right:14px;bottom:88px;z-index:20;background:#0f1822;border:1px solid var(--amber);border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55)}
@@ -234,11 +213,53 @@ main .col{position:relative}
 .rk .sube{color:var(--neon);font-style:normal;font-size:11px;margin-left:4px}.rk .baja{color:var(--hot);font-style:normal;font-size:11px;margin-left:4px}
 .rk .dis{font-size:11px;color:var(--amber);margin-left:6px}
 .top3{padding:8px 14px;border-bottom:1px solid var(--line)}
+.top3 .vacio,.up .vacio{color:var(--dim2);font-size:12px}
 .t3{display:flex;gap:8px;align-items:baseline;padding:3px 0}.t3 span{color:var(--dim);font-family:var(--mono);width:26px}.t3 i{margin-left:auto;font:700 14px var(--mono);font-style:normal;color:var(--neon)}
-.top3 .vacio{color:var(--dim2);font-size:12px}
 .cer-rk{display:flex;flex-direction:column-reverse;gap:8px;min-width:420px}
 .cer-fila{display:flex;gap:16px;align-items:baseline;font-size:26px;opacity:0;transform:translateX(-30px);transition:all .6s}
 .cer-fila.on{opacity:1;transform:none}.cer-fila .n{color:var(--dim);font-family:var(--mono);width:52px}.cer-fila .p{margin-left:auto;font-family:var(--mono);color:var(--neon)}
+.escena{position:fixed;inset:0;z-index:57;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:30px;
+  background:radial-gradient(1000px 520px at 50% 30%,#10202b 0%,rgba(3,6,9,.97) 70%)}
+.es-k{letter-spacing:.3em;color:var(--amber);font-size:15px}
+.es-q{font:700 30px/1.3 Georgia,serif;max-width:1100px;text-align:center}
+.es-pie{color:var(--dim);font-size:18px}
+.es-delib{font-size:34px;color:var(--dim);animation:pulso 1.2s infinite;margin-top:20px}
+.es-ganador{font-size:40px;font-weight:800;letter-spacing:.06em;opacity:0;transform:scale(.7);transition:all .7s cubic-bezier(.2,1.5,.4,1)}
+.es-ganador.on{opacity:1;transform:none}
+.vb{width:min(1100px,90vw);display:flex;flex-direction:column;gap:22px;margin-top:10px}
+.vb-fila{display:grid;grid-template-columns:260px 1fr 80px;gap:16px;align-items:center;transition:opacity .6s}
+.vb-n{color:var(--c);font-weight:800;letter-spacing:.08em;font-size:18px;text-align:right}
+.vb-barra{height:54px;background:#0a1016;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.vb-barra i{display:block;height:100%;width:0;background:var(--c);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.vb-c{font-size:44px;font-weight:800;color:var(--c)}
+.escena.cerrada .vb-fila:not(.gana){opacity:.35}
+.vb-fila.gana .vb-barra{box-shadow:0 0 34px var(--c)}
+.jz-lados{display:flex;gap:28px;font-weight:700;letter-spacing:.1em}
+.jz{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;width:min(1400px,96vw)}
+.jz-col{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 10px;text-align:center;opacity:.25;transition:opacity .5s}
+.jz-col.on{opacity:1}
+.jz-e{font-size:36px}.jz-n{font-weight:800;margin-top:4px}.jz-p{color:var(--dim);font-size:11.5px;min-height:30px}
+.jz-t{display:flex;gap:8px;justify-content:center;margin:10px 0}
+.tj{width:64px;height:84px;border-radius:10px;background:#f5f1e6;color:#0b1117;font:800 38px/84px var(--mono);border-top:6px solid var(--c);
+  transform:rotateY(90deg);transition:transform .5s;position:relative}
+.jz-col.on .tj{transform:none}
+.tj.tachada{opacity:.35}
+.tj.tachada::after{content:"";position:absolute;left:6px;right:6px;top:50%;border-top:4px solid var(--hot);transform:rotate(-20deg)}
+.jz-f{display:flex;flex-direction:column;gap:4px;font-size:12px;min-height:48px}
+.jz-f i{font-style:normal}
+.jz-tot{display:flex;gap:60px;margin-top:6px}
+.jz-tot div{text-align:center;color:var(--c)}
+.jz-tot b{display:block;font-size:64px}
+.jz-sim{color:var(--dim2);font-size:12px}
+.rs-tablas{display:flex;gap:26px;align-items:flex-start}
+.rs-or{min-width:260px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.rs-ork{letter-spacing:.2em;color:#a78bfa;font-size:12px;margin-bottom:8px}
+.rs-or div{display:flex;gap:10px;align-items:baseline;padding:3px 0}.rs-or span{color:var(--dim);width:28px;font-family:var(--mono)}
+.rs-or i{margin-left:auto;font:700 16px var(--mono);font-style:normal;color:#a78bfa}
+.up{padding:8px 14px}
+.up-q{font-size:12.5px;color:var(--dim);margin-bottom:6px}.up-q b{color:var(--txt)}
+.up-j{display:grid;grid-template-columns:24px 1fr 34px 34px;gap:6px;align-items:center;padding:3px 0;font-size:13px}
+.up-j i{font-style:normal;color:var(--dim)}.up-j b{font-family:var(--mono);text-align:right}
 /* ceremonia del ganador */
 #ceremonia{position:fixed;inset:0;z-index:60;background:radial-gradient(900px 500px at 50% 40%,#0f1c26 0%,rgba(3,6,9,.98) 70%);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;text-align:center}
@@ -467,10 +488,10 @@ table.rank td.num{font-family:var(--mono);text-align:right}
     <div class="flag" id="flagA"></div>
     <div class="id"><b id="nomA"></b><small id="lemaA"></small></div>
     <div class="cifra publico" title="Votos que ganó esta bancada en el público: los alumnos que no debaten y marcan su posición"><div class="n mono" id="publicoA">—</div><div class="l">PÚBLICO · votos</div></div>
-    <div class="cifra rigor" title="Promedio de la rúbrica del jurado sobre 20 (gana quien argumenta mejor)"><div class="n mono" id="rigorA">—</div><div class="l">JURADO /20</div></div>
+    <div class="cifra rigor" title="Total del panel de jueces del debate (las tres notas del medio, sobre 30)"><div class="n mono" id="rigorA">—</div><div class="l">JUECES /30</div></div>
   </div>
   <div class="linea">
-    <div class="lbl">EL PÚBLICO AHORA · cuotas</div>
+    <div class="lbl">EL VOTO · cuotas</div>
     <div class="cuotas"><span class="cuota" id="cuotaA" style="color:var(--A)">—</span><span class="cuota" id="cuotaB" style="color:var(--B)">—</span></div>
     <div class="barra-votos"><i id="vA" style="background:var(--A);width:50%"></i><i id="vN" style="background:#2c3a48;width:0%"></i><i id="vB" style="background:var(--B);width:50%"></i></div>
   </div>
@@ -478,7 +499,7 @@ table.rank td.num{font-family:var(--mono);text-align:right}
     <div class="flag" id="flagB"></div>
     <div class="id"><b id="nomB"></b><small id="lemaB"></small></div>
     <div class="cifra publico" title="Votos que ganó esta bancada en el público: los alumnos que no debaten y marcan su posición"><div class="n mono" id="publicoB">—</div><div class="l">PÚBLICO · votos</div></div>
-    <div class="cifra rigor" title="Promedio de la rúbrica del jurado sobre 20 (gana quien argumenta mejor)"><div class="n mono" id="rigorB">—</div><div class="l">JURADO /20</div></div>
+    <div class="cifra rigor" title="Total del panel de jueces del debate (las tres notas del medio, sobre 30)"><div class="n mono" id="rigorB">—</div><div class="l">JUECES /30</div></div>
   </div>
 </div>
 
@@ -507,18 +528,12 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   </section>
 
   <aside class="col der">
-    <div class="cab">EL JURADO <span class="pt">rúbrica del curso · IA</span></div>
-    <div class="jurado" id="jurado"></div>
-    <div class="cab">RANKING <span class="pt">promedio por debate</span></div>
+    <div class="cab">RANKING DE GRUPOS <span class="pt">promedio por debate</span></div>
     <div class="top3" id="top3"></div>
-    <div class="cab">EL PÚBLICO <span class="pt" id="pubN">nadie votando</span></div>
-    <div class="hemi" id="hemiciclo"></div>
-    <div class="resumen">
-      <div class="res"><div class="n mono" id="rA" style="color:var(--A)">0</div><div class="l">A FAVOR</div></div>
-      <div class="res"><div class="n mono" id="rN" style="color:var(--dim)">0</div><div class="l">INDECISOS</div></div>
-      <div class="res"><div class="n mono" id="rB" style="color:var(--B)">0</div><div class="l">EN CONTRA</div></div>
-    </div>
-    <p class="hemi-nota">Cada asiento es un alumno del público, ordenado según su posición. No se muestran nombres.</p>
+    <div class="cab">🔮 ORÁCULOS <span class="pt">quién predice mejor a los jueces</span></div>
+    <div class="top3" id="oraculos"></div>
+    <div class="cab">ÚLTIMO PANEL <span class="pt">las cinco tarjetas</span></div>
+    <div class="up" id="ultimoPanel"></div>
   </aside>
 </main>
 
@@ -548,12 +563,13 @@ table.rank td.num{font-family:var(--mono);text-align:right}
 </script>
 <script src="rotacion.js?v=20260921a"></script>
 <script src="moderacion.js?v=20260921e"></script>
-<script src="app.js?v=20260921e"></script>
-<script src="clase.js?v=20260921e"></script>
-<script src="escenas.js?v=20260921c"></script>
+<script src="app.js?v=20260922c"></script>
+<script src="jueces.js?v=20260922b"></script>
+<script src="clase.js?v=20260922b"></script>
+<script src="escenas.js?v=20260922c"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260921c"></script>
+<script type="module" src="online.js?v=20260922b"></script>
 </body>
 </html>

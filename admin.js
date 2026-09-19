@@ -131,6 +131,13 @@ function cursoHtml(curso, partidas) {
   </section>`;
 }
 
+// Puntaje individual (en el título de cada alumno): su grupo en el ranking y sus puntos de oráculo.
+function puntajeDe(s, j) {
+  if (s.modo !== "rotacion") return "";
+  const g = (s.ranking || []).find(f => f.grupo === j.grupo), o = (s.oraculos || []).find(x => x.uid === j.uid);
+  return `\nGrupo ${j.grupo || "?"}: ${g && g.puntaje !== null && g.puntaje !== undefined ? g.puntaje + " pts" : "sin debatir"}` + (o ? ` · 🔮 ${o.puntos}` : "");
+}
+
 function partidaHtml({ s, jugadores, feedback }) {
   const [est, cls] = estadoDe(s);
   const g = ganadorDe(s);
@@ -145,7 +152,12 @@ function partidaHtml({ s, jugadores, feedback }) {
         <span class="mono" style="margin-left:auto;color:var(--neon)">${f.puntaje ?? "—"}</span></div></div>`).join("")}
       <h3 style="margin-top:12px">DEBATES</h3>
       ${(s.debates || []).map(d => `<div class="com"><div class="q"><b>${d.n}.</b> Grupo ${d.A} vs Grupo ${d.B}
-        <span class="mono" style="margin-left:auto">${d.puntajeA ?? "—"} · ${d.puntajeB ?? "—"}</span></div><p>${esc(d.pregunta)}</p></div>`).join("") || `<p style="color:var(--dim)">Sin debates.</p>`}
+        <span class="mono" style="margin-left:auto">${d.puntajeA ?? "—"} · ${d.puntajeB ?? "—"}</span></div><p>${esc(d.pregunta)}</p>
+        ${(d.jueces || []).length ? `<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin-top:4px">${d.jueces.map(j => `<span title="${esc(j.fraseA)} / ${esc(j.fraseB)}">${j.emoji} ${j.A ?? "—"} · ${j.B ?? "—"}</span>`).join("")}
+          <span>· jueces ${d.totalA ?? "—"} / ${d.totalB ?? "—"} · votos ${d.votosA ?? "—"} / ${d.votosB ?? "—"}</span></div>` : ""}</div>`).join("") || `<p style="color:var(--dim)">Sin debates.</p>`}
+      <h3 style="margin-top:12px">🔮 ORÁCULOS</h3>
+      ${(s.oraculos || []).map(o => `<div class="com"><div class="q"><b>#${o.puesto} ${esc(o.nombre)}</b>
+        <span style="color:var(--dim)">${o.aciertos} de ${o.predicciones} aciertos</span><span class="mono" style="margin-left:auto;color:#a78bfa">${o.puntos}</span></div></div>`).join("") || `<p style="color:var(--dim)">Sin predicciones.</p>`}
     </div>` : "";
   const coms = feedback.filter(f => (f.comentario || "").trim() || typeof f.nota === "number").sort((a, b) => (b.t || 0) - (a.t || 0));
   return `<div class="partida ${V.abiertas.has(s.codigo) ? "abierta" : ""}">
@@ -175,7 +187,8 @@ function partidaHtml({ s, jugadores, feedback }) {
         </div>
         <div class="caja"><h3>QUIÉNES JUGARON</h3>
           <div class="jug">${jugadores.length ? jugadores.sort((a, b) => (a.equipo || "Z").localeCompare(b.equipo || "Z")).map(j =>
-            `<div title="${esc(j.email)}"><span class="av" style="--c:${COL[j.equipo] || "var(--dim2)"}">${j.foto ? `<img src="${esc(j.foto)}" referrerpolicy="no-referrer" alt="">` : iniciales(j.nombre)}</span>${esc(j.nombre)}</div>`).join("")
+            `<div title="${esc(j.email)}${puntajeDe(s, j)}"><span class="av" style="--c:${COL[j.equipo] || "var(--dim2)"}">${j.foto ? `<img src="${esc(j.foto)}" referrerpolicy="no-referrer" alt="">` : iniciales(j.nombre)}</span>${esc(j.nombre)}${s.modo === "rotacion" ? (() => { const g = (s.ranking || []).find(f => f.grupo === j.grupo), o = (s.oraculos || []).find(x => x.uid === j.uid);
+              return ` <small style="color:var(--dim)">${g && g.puntaje != null ? g.puntaje : "—"}${o ? ` · 🔮${o.puntos}` : ""}</small>`; })() : ""}</div>`).join("")
             : `<span style="color:var(--dim)">Nadie entró.</span>`}</div>
         </div>
       </div>

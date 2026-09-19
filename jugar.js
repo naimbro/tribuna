@@ -3,7 +3,7 @@
    Una sola conversación, como un grupo de WhatsApp: A FAVOR a la izquierda, EN CONTRA a la
    derecha, la moderadora (🎙) y el relator (⚖) al centro. Quien debate escribe abajo; si la
    moderadora lo nombra, el teléfono vibra y el mensaje se destaca. El público no escribe:
-   marca su posición con un deslizador y no ve notas ni reacciones hasta el veredicto.
+   lee el debate y, al final, vota quién lo convenció y predice a los jueces.
    Lee salas/{codigo} (estado del juego) y salas/{codigo}/mensajes (la conversación).
    ===================================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
@@ -110,7 +110,7 @@ async function entrarAlJuego() {
     if (!J.primera) avisarNuevos(nuevos);
     J.primera = false;
   }, e => { $("pJuego").innerHTML = `<div class="sep">No se pudo leer la conversación (${esc(e.code)}).</div>`; }));
-  prepararCaja(); prepararVoto();
+  prepararCaja();
   // ¿ya dejó su feedback en esta sala? (o lo saltó en este teléfono)
   J.fbListo = localStorage.getItem("tribuna_fb_" + J.codigo) === "1";
   if (!J.fbListo) getDoc(doc(db, "salas", J.codigo, "feedback", J.uid))
@@ -141,7 +141,7 @@ function avisarNuevos(nuevos) {
     if (m.tipo === "relator" && rolEn(J.sala) === "P") {
       navigator.vibrate?.(150);
       $("voto").classList.add("pide");
-      $("avisoVoto").textContent = "⚖ El relator pide votar: lee su resumen, revisa lo que indica y ajusta tu posición.";
+      $("avisoVoto").textContent = "📣 El relator resumió el debate. Ya puedes votar y predecir.";
     }
   }
 }
@@ -150,7 +150,7 @@ function pintarSala() {
   const s = J.sala; if (!s) return;
   const rol = rolEn(s);
   const colorRol = { A: s.equipos.A.color, B: s.equipos.B.color, P: "#a78bfa" }[rol] || "var(--dim)";
-  $("miBancada").textContent = `Grupo ${J.grupo || "?"}${rol === "A" ? ` · ${s.equipos.A.nombre}` : rol === "B" ? ` · ${s.equipos.B.nombre}` : rol === "P" ? " · votas" : ""}`;
+  $("miBancada").textContent = `Grupo ${J.grupo || "?"}${rol === "A" ? ` · ${s.equipos.A.nombre}` : rol === "B" ? ` · ${s.equipos.B.nombre}` : rol === "P" ? " · votas" : ""}${s.oraculoDe && s.oraculoDe[J.uid] ? ` · 🔮 ${s.oraculoDe[J.uid].puntos}` : ""}`;
   $("miBancada").style.color = colorRol; $("miBancada").style.borderColor = colorRol;
   const d = s.debate;
   $("tramoLbl").textContent = d ? `Debate ${d.n} · ${s.tramo === 1 ? "Réplica" : "Apertura"}.` : "Rotación.";
@@ -158,15 +158,14 @@ function pintarSala() {
   $("marca").innerHTML = "";
   const debatiendo = rol === "A" || rol === "B";
   $("caja").classList.toggle("oculto", !debatiendo);
-  $("voto").classList.toggle("oculto", rol !== "P");
+  $("voto").classList.toggle("oculto", rol !== "P" || s.fase !== "abierta");
   document.body.classList.toggle("es-publico", rol === "P" && !s.veredicto);
-  // cambio de debate: mi grupo fue llamado → aviso; si voto → deslizador al centro
+  // cambio de debate: mi grupo fue llamado → aviso
   if (d && J.debateVisto !== d.n) {
     J.debateVisto = d.n;
     if (debatiendo) { navigator.vibrate?.([120, 60, 120]); $("notaCaja").textContent = `🎙 Tu grupo debate ${s.equipos[rol].nombre}. Escribe cuando se abra el tramo.`; $("notaCaja").classList.add("ati"); }
-    if (rol === "P") { $("rngPos").value = 0; $("lblPos").textContent = "indeciso"; J.votoDe = null; }
   }
-  if (rol === "P" && d && J.votoDe !== d.n && (s.fase === "abierta" || s.fase === "votando")) { J.votoDe = d.n; guardarVoto(0); }
+  pintarVotar(s);
   pintarEntre(s);
   pintarEspera(s);
   pintarFeedback(s);
@@ -185,6 +184,7 @@ function pintarReloj() {
     const resta = Math.max(0, Math.ceil((s.finVoto - Date.now()) / 1000));
     el.textContent = `0:${String(resta).padStart(2, "0")}`;
     el.classList.toggle("urgente", resta <= 10);
+    if ($("vtReloj")) $("vtReloj").textContent = el.textContent;
   } else { el.textContent = ""; el.classList.remove("urgente"); }
 }
 
@@ -297,25 +297,46 @@ async function enviar() {
   pintarCaja();
 }
 
-/* ---------- público: posición frente a la moción ---------- */
-const describePos = v => { const a = Math.abs(v); if (a <= 8) return "indeciso"; const lado = v > 0 ? "a favor" : "en contra"; return (a > 60 ? "muy " : a > 25 ? "" : "algo ") + lado; };
-async function guardarVoto(v) {
-  const s = J.sala; if (!s || !s.debate) return;
-  const n = s.debate.n;
-  await setDoc(doc(db, "salas", J.codigo, "votos", `${n}_${J.uid}`),
-    { uid: J.uid, debate: n, pos: Math.round(v), nombre: J.nombre, email: J.email, grupo: J.grupo, t: Date.now() });
+/* ---------- votar: quién te convenció y a quién elegirá el jurado ---------- */
+const VOTO = {};                        // por debate: { voto, prediccion } de este teléfono
+// Tras recargar el teléfono, el voto guardado se recupera del servidor (si no, el próximo toque
+// borraría la otra respuesta y no se sabría si acertó).
+const cargando = {};
+function cargarVoto(n) {
+  if (VOTO[n] || cargando[n]) return;
+  cargando[n] = true;
+  getDoc(doc(db, "salas", J.codigo, "votos", `${n}_${J.uid}`)).then(d => {
+    const x = d.exists() ? d.data() : {};
+    VOTO[n] = { voto: x.voto ?? null, prediccion: x.prediccion ?? null, ...(VOTO[n] || {}) };
+    pintarSala();
+  }).catch(() => { VOTO[n] = VOTO[n] || { voto: null, prediccion: null }; });
 }
-function prepararVoto() {
-  const r = $("rngPos");
-  const pinta = () => { $("lblPos").textContent = describePos(+r.value); };
-  r.oninput = () => {
-    pinta();
-    clearTimeout(J.guardandoPos);
-    J.guardandoPos = setTimeout(() => guardarVoto(+r.value)
-      .then(() => { $("avisoVoto").textContent = "✓ guardado"; $("voto").classList.remove("pide"); })
-      .catch(e => $("avisoVoto").textContent = "No se guardó: " + e.code), 300);
+function pintarVotar(s) {
+  const el = $("votar"), d = s.debate;
+  const toca = s.modo === "rotacion" && d && s.fase === "votando" && rolEn(s) === "P";
+  el.classList.toggle("oculto", !toca);
+  if (!toca) return;
+  if (J.votarVisto !== d.n) { J.votarVisto = d.n; navigator.vibrate?.([120, 60, 120]); }
+  if (!VOTO[d.n]) { cargarVoto(d.n); el.innerHTML = `<h1>Cargando tu voto…</h1>`; return; }
+  const mio = VOTO[d.n];
+  const boton = (campo, k) => `<button class="vt ${mio[campo] === k ? "on" : ""}" data-c="${campo}" data-k="${k}" style="--c:${s.equipos[k].color}">${esc(s.equipos[k].nombre)}<small>Grupo ${d[k]}</small></button>`;
+  el.innerHTML = `<div class="k">Debate ${d.n} · vota</div>
+    <div class="es-mocion" style="font-size:17px">«${esc(d.pregunta)}»</div>
+    <div class="vt-q">¿Quién te convenció?</div><div class="vt-f">${boton("voto", "A")}${boton("voto", "B")}</div>
+    <div class="vt-q">¿A quién elegirá el jurado?</div><div class="vt-f">${boton("prediccion", "A")}${boton("prediccion", "B")}</div>
+    <div class="vt-pie"><span>${mio.voto && mio.prediccion ? "✓ Listo" : ""}</span><span class="mono" id="vtReloj"></span></div>
+    <div class="aviso" id="vtError"></div>`;
+  el.onclick = async e => {
+    const b = e.target.closest("button.vt"); if (!b) return;
+    mio[b.dataset.c] = b.dataset.k;
+    navigator.vibrate?.(30);
+    pintarVotar(J.sala);
+    try {
+      await setDoc(doc(db, "salas", J.codigo, "votos", `${d.n}_${J.uid}`),
+        { uid: J.uid, debate: d.n, voto: mio.voto, prediccion: mio.prediccion, nombre: J.nombre, email: J.email, grupo: J.grupo, t: Date.now() }, { merge: true });
+    } catch (err) { if ($("vtError")) $("vtError").textContent = "No se guardó: " + err.code; }
   };
-  pinta();
+  pintarReloj();
 }
 
 /* ---------- espera: portada e intro ---------- */
@@ -332,7 +353,7 @@ function pintarEspera(s) {
   if (el.dataset.clave === clave) return;           // no repintar en cada cambio de la sala
   el.dataset.clave = clave;
   const av = `<div class="av" style="--c:${r.color};--t:92px">${J.foto ? `<img src="${esc(J.foto)}" referrerpolicy="no-referrer" alt="">` : `<span>${iniciales(J.nombre)}</span>`}</div>`;
-  const papel = `Estás en el <b>Grupo ${J.grupo}</b>. Cuando la moderadora lo llame, tu grupo debate A FAVOR o EN CONTRA de la pregunta: escribe en la conversación y responde lo que te pregunten, con argumentos y lecturas del curso. Mientras debaten otros, lees y mueves tu deslizador cuando algo te convenza.`;
+  const papel = `Estás en el <b>Grupo ${J.grupo}</b>. Cuando la moderadora lo llame, tu grupo debate A FAVOR o EN CONTRA de la pregunta: escribe en la conversación y responde lo que te pregunten, con argumentos y lecturas del curso. Mientras debaten otros, lees con atención y al final votas quién te convenció y predices a los jueces.`;
   el.innerHTML = s.etapa === "portada"
     ? `${av}<h1 style="margin-top:14px">¡Estás dentro, ${esc(J.nombre.split(" ")[0])}!</h1>
        <span class="chip" style="--c:${r.color}">${r.bandera} ${esc(r.nombre)}</span>
@@ -391,19 +412,46 @@ function listoFeedback() {
 // Entre dos debates: la moderadora prepara la pregunta, o el resultado del que terminó.
 function pintarEntre(s) {
   const el = $("entre");
-  const toca = s.modo === "rotacion" && s.etapa == null && (s.fase === "propuesta" || s.fase === "resultado" || s.fase === "cerrando");
+  const rol = rolEn(s), d = s.debate;
+  const fases = ["propuesta", "resultado", "veredictoPublico", "veredictoJueces", "votando"];
+  const toca = s.modo === "rotacion" && s.etapa == null && fases.includes(s.fase) && !(s.fase === "votando" && rol === "P");
   el.classList.toggle("oculto", !toca);
   if (!toca) return;
-  const u = s.ultimo, mio = (s.ranking || []).find(f => f.grupo === J.grupo);
-  const res = (g, r) => `<div style="--c:${g === u.A ? s.equipos.A.color : s.equipos.B.color}"><b>Grupo ${g}</b>${r.puntaje} pts<br><small>jurado ${r.jurado} · público ${r.publico ?? "—"}</small></div>`;
-  el.innerHTML = (u && s.fase !== "propuesta" ? `
-      <div class="k">Debate ${u.n} · resultado</div>
+  const orac = s.oraculoDe && s.oraculoDe[J.uid];
+  const pie = (J.grupo ? (() => { const mio = (s.ranking || []).find(f => f.grupo === J.grupo);
+      return mio && mio.puesto ? `<div class="es-papel">Tu grupo va <b>#${mio.puesto}</b> con ${mio.puntaje} puntos.</div>` : ""; })() : "")
+    + (orac ? `<div class="es-papel">🔮 Tus predicciones: <b>${orac.puntos}</b> punto${orac.puntos === 1 ? "" : "s"} · #${orac.puesto} entre los oráculos</div>` : "");
+  if (s.fase === "votando") {
+    const c = s.conteoVotos || {};
+    el.innerHTML = `<div class="k">Debate ${d.n}</div><h1>La sala está votando tu debate</h1>
+      <p style="color:var(--dim)">${(c.A || 0) + (c.B || 0)} de ${c.elegibles || "?"} votaron.</p>` + pie;
+    return;
+  }
+  if (s.fase === "veredictoPublico" || s.fase === "veredictoJueces") {
+    if (d && rol === "P" && !VOTO[d.n]) cargarVoto(d.n);
+    const mio = d && VOTO[d.n];
+    el.innerHTML = `<div class="k">Debate ${d.n}</div><h1>Mira la pantalla</h1>
+      ${mio && mio.prediccion ? `<p style="color:var(--dim)">Tu predicción: los jueces eligen al <b>Grupo ${d[mio.prediccion]}</b>.</p>` : ""}` + pie;
+    return;
+  }
+  const u = s.ultimo;
+  if (u && s.fase === "resultado") {
+    if (rol === "P" && !VOTO[u.n]) cargarVoto(u.n);
+    const mio = VOTO[u.n];
+    let acierto = "";
+    if (mio && mio.prediccion && u.panel) {
+      const ok = u.panel.ganador && mio.prediccion === u.panel.ganador;
+      acierto = !u.panel.ganador ? `<h1>Los jueces empataron</h1>` : ok ? `<h1 style="color:var(--neon)">¡Acertaste! +1 🔮</h1>` : `<h1>Esta vez no</h1>`;
+      if (J.aciertoVisto !== u.n) { J.aciertoVisto = u.n; navigator.vibrate?.(ok ? [60, 40, 60, 40, 200] : 150); }
+    }
+    const res = (g, r) => `<div style="--c:${g === u.A ? s.equipos.A.color : s.equipos.B.color}"><b>Grupo ${g}</b>${r.puntaje ?? "—"} pts<br><small>jueces ${r.jurado ?? "—"} · público ${r.publico ?? "—"}</small></div>`;
+    el.innerHTML = `<div class="k">Debate ${u.n} · resultado</div>${acierto}
       <div class="es-mocion" style="font-size:17px">«${esc(u.pregunta)}»</div>
       <div class="es-lados">${res(u.A, u.resA)}${res(u.B, u.resB)}</div>
-      <h1 style="margin-top:14px">${u.ganador ? `Gana el Grupo ${u.ganador === "A" ? u.A : u.B}` : "Empate"}</h1>`
-    : `<div class="k">Rotación</div><h1>La moderadora prepara la próxima pregunta…</h1>`) +
-    (mio && mio.puesto ? `<div class="es-papel">Tu grupo va <b>#${mio.puesto}</b> con ${mio.puntaje} puntos.</div>`
-      : J.grupo ? `<div class="es-papel">Tu grupo todavía no debate.</div>` : "");
+      <h2 style="margin-top:12px">${u.ganador ? `Gana el Grupo ${u.ganador === "A" ? u.A : u.B}` : "Empate"}</h2>` + pie;
+    return;
+  }
+  el.innerHTML = `<div class="k">Rotación</div><h1>La moderadora prepara la próxima pregunta…</h1>` + pie;
 }
 
 /* ---------- el ganador, en grande ---------- */
@@ -415,7 +463,8 @@ function ceremonia(s, v) {
   el.innerHTML = `<div class="k" style="color:var(--amber);font-size:14px">EL RANKING DE LA CLASE</div>
     <div class="cb" id="cG"><div class="cg" style="color:var(--amber)">${v.campeon ? `🏆 Grupo ${v.campeon}` : "Sin debates"}</div>
       <div class="cs">${mio && mio.puesto ? `Tu grupo terminó #${mio.puesto} con ${mio.puntaje} puntos` : "Tu grupo no alcanzó a debatir"}</div>
-      ${v.mejor ? `<div class="cmini">Mejor intervención: <b>${esc(v.mejor.autor)}</b> · Grupo ${v.mejor.grupo} · ${v.mejor.total}/20</div>` : ""}</div>
+      ${v.oraculos && v.oraculos.length ? `<div class="cmini">🔮 Oráculos: ${v.oraculos.map(o => `<b>${esc(o.nombre)}</b> (${o.puntos})`).join(" · ")}</div>` : ""}
+      ${s.oraculoDe && s.oraculoDe[J.uid] ? `<div class="cmini">Tus predicciones: ${s.oraculoDe[J.uid].puntos} punto(s), #${s.oraculoDe[J.uid].puesto}</div>` : ""}</div>
     <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>`;
   document.body.appendChild(el);
   setTimeout(() => { $("cG")?.classList.add("on"); navigator.vibrate?.([80, 60, 200]); confeti(["#f5b301", "#ffffff", "#38bdf8"]); }, 1500);

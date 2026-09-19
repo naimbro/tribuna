@@ -119,19 +119,19 @@ service cloud.firestore {
           && request.resource.data.pos >= -100 && request.resource.data.pos <= 100;
       }
 
-      // Rotación: la posición de cada votante en cada debate (id = "{debate}_{uid}"). Vota solo
-      // quien no está debatiendo, en el debate en curso, con el tramo abierto o en votación.
+      // Rotación: el voto binario y la predicción de cada votante en cada debate. Solo en la
+      // ventana de votación y solo quien no está debatiendo.
       match /votos/{id} {
         allow read: if esProfe(codigo) || (conSesion() && id.matches('^[0-9]+_' + request.auth.uid + '$'));
         allow write: if conSesion() && esJugador(codigo)
           && id == string(request.resource.data.debate) + '_' + request.auth.uid
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.debate == sala(codigo).data.debate.n
-          && sala(codigo).data.fase in ['abierta', 'votando']
+          && sala(codigo).data.fase == 'votando'
           && jugador(codigo).data.grupo != sala(codigo).data.debate.A
           && jugador(codigo).data.grupo != sala(codigo).data.debate.B
-          && request.resource.data.pos is number
-          && request.resource.data.pos >= -100 && request.resource.data.pos <= 100;
+          && (request.resource.data.voto == null || request.resource.data.voto in ['A', 'B'])
+          && (request.resource.data.prediccion == null || request.resource.data.prediccion in ['A', 'B']);
       }
     }
   }

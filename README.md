@@ -34,8 +34,8 @@ Juzgan dos, y pueden apuntar a lados distintos. Ahí está la clase:
 
 | Marcador | Qué mide | Quién juzga |
 |---|---|---|
-| **EL JURADO** | promedio de la rúbrica sobre 20: evidencia, refutación, estructura, concesión | una IA que conoce las lecturas de la semana y lee cada intervención por separado |
-| **EL PÚBLICO** | votos que ganó cada bancada entre los alumnos que no debaten, en **voto suave** | los alumnos que entran como PÚBLICO y mueven su deslizador |
+| **LOS JUECES** | panel de cinco jueces de IA independientes (académica, jurista, economista, periodista, activista): tarjetas de 0 a 10 por grupo, se tachan la más alta y la más baja, suman las tres del medio sobre 30 | `jueces.js`; cada semana puede traer los suyos |
+| **EL PÚBLICO** | votos que ganó cada bancada entre los alumnos que no debaten, en **voto suave** | los alumnos de los grupos que no debaten, que al final votan quién los convenció |
 
 Si los dos coinciden, gana esa bancada. Si no coinciden, es empate: una argumentó mejor y la
 otra convenció más, y esa brecha es el pie para la síntesis docente. Sin público decide el
@@ -138,19 +138,18 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
   no está en `naimbro.github.io`; hay que pegarla una vez ahí (⚙ MOTOR). Sin key, el
   juego online corre con el jurado heurístico y la audiencia paramétrica.
 
-## El público real
+## El público y los oráculos
 
-Los alumnos que no debaten entran como **PÚBLICO** (`jugar.html`, tercer botón). No escriben:
-marcan con un deslizador dónde están frente a la moción (−100 en contra … +100 a favor) y lo
-mueven cuando algo los convence. Mientras dura el debate no ven las notas del jurado: leen
-los textos y votan con criterio propio; al final ven todo.
+En cada debate, los alumnos de los grupos que no debaten son el público. Durante el debate leen
+sin votar. Al terminar, su teléfono se cubre con dos preguntas: «¿Quién te convenció?» y «¿A
+quién elegirá el jurado?». Pueden cambiar sus respuestas hasta que se cierra la votación. Nadie
+vota en el debate de su propio grupo, y el servidor lo hace cumplir.
 
-El profesor toma una foto de las posiciones al abrir cada ronda y al revelar al ganador; lo
-que se mueve cada alumno entre dos fotos se le anota a la bancada hacia la que se movió, con
-voto suave: `tanh(pos / 12)`, así un voto se gana de a poco alrededor del centro y empujar a
-un convencido casi no suma. La ceremonia revela primero al jurado y después al público. En el CSV, una fila por alumno del
-público con su posición inicial, final y los votos que aportó (`delta_votos`, + hacia A FAVOR).
-Las posiciones individuales solo las ve el profesor.
+La primera pregunta es el voto del público: el grupo que convence a más gana ese veredicto, y su
+parte de los votos es la mitad de su puntaje. La segunda es el juego de los **oráculos**: quien
+acierta al ganador de los jueces suma un punto, y los puntos se acumulan toda la clase. Las
+predicciones nunca se muestran en el proyector. En el CSV hay una fila por votante y por debate,
+con su voto, su predicción y si acertó.
 
 ## Inicio, intro y cierre
 
@@ -182,6 +181,8 @@ defecto. El curso de cada semana está en `contenido/sesiones.js`.
 
 ## La clase en rotación
 
+Quien debate recibe el puntaje de su grupo; quien vota, sus puntos de oráculo (predecir a los jueces).
+
 Una sala es una clase entera. Los alumnos eligen un grupo en la portada (el profesor fija
 cuántos: 2 a 10) y la moderadora los hace debatir de a dos, por turnos:
 
@@ -189,8 +190,15 @@ cuántos: 2 a 10) y la moderadora los hace debatir de a dos, por turnos:
    grupos. El profesor la ve primero: la publica, pide otra, escribe la suya o cambia los
    grupos. Sin acción, sale sola a los 15 segundos.
 2. **Apertura y réplica,** 3 minutos cada una, en la misma conversación.
-3. **Votación,** 1 minuto: el relator resume y los demás grupos votan con su deslizador.
-4. **Resultado:** el puntaje de cada grupo (mitad jurado, mitad público) y el ranking.
+3. **Votación,** 45 segundos: cada votante responde en su teléfono «¿quién te convenció?» y
+   «¿a quién elegirá el jurado?». El proyector muestra las barras en vivo y declara al ganador
+   del público.
+4. **El panel de jueces:** cinco jueces de IA independientes (`jueces.js`; cada semana puede
+   definir los suyos en `JUECES`) levantan una tarjeta de 0 a 10 por grupo. Como en los clavados,
+   se tachan la más alta y la más baja y se suman las tres del medio, sobre 30.
+5. **Resultado:** el puntaje de cada grupo (mitad jueces, mitad público), el ranking de grupos y
+   los **oráculos**: quienes predicen mejor a los jueces suman un punto por acierto durante toda
+   la clase.
 
 La clase sigue hasta «🏁 TERMINAR CLASE». Entonces los teléfonos piden feedback y la
 ceremonia revela el ranking y al campeón. La lógica pura está en `rotacion.js` y se prueba con
