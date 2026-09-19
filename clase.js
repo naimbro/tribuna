@@ -237,6 +237,11 @@ function mostrarPropuesta() {
   const gs = Array.from({ length: S.clase.grupos }, (_, i) => i + 1);
   const sel = (id, v) => `<select id="${id}">${gs.map(g => `<option value="${g}" ${g === v ? "selected" : ""}>Grupo ${g}</option>`).join("")}</select>`;
   const faltan = p.A === null || p.B === null;
+  // sin emparejamiento (menos de dos grupos con gente) los selectores igual proponen dos grupos
+  // distintos: el conectado primero, y el profesor puede simular al otro desde su pantalla
+  const con = gruposDisponibles();
+  const defA = p.A ?? (con[0] || 1);
+  const defB = p.B ?? (gs.find(g => g !== defA) || 2);
   el.innerHTML = `
     <div class="pr-k">PRÓXIMO DEBATE · lo ves solo tú</div>
     ${p.estado === "pensando" ? `<div class="pr-pensando">La moderadora está pensando la próxima pregunta…</div>` : ""}
@@ -245,7 +250,8 @@ function mostrarPropuesta() {
     <textarea id="prTexto" rows="2" maxlength="300" placeholder="Escribe la pregunta del debate">${esc(p.pregunta || "")}</textarea>
     ${p.porQue ? `<div class="pr-porque">${esc(p.porQue)}</div>` : ""}
     ${p.mejorFavor || p.mejorContra ? `<div class="pr-lados"><div style="--c:var(--A)"><b>A favor</b>${esc(p.mejorFavor)}</div><div style="--c:var(--B)"><b>En contra</b>${esc(p.mejorContra)}</div></div>` : ""}
-    <div class="pr-grupos"><span style="color:var(--A)">A FAVOR</span>${sel("prA", p.A)}<span style="color:var(--B)">EN CONTRA</span>${sel("prB", p.B)}</div>
+    <div class="pr-grupos"><span style="color:var(--A)">A FAVOR</span>${sel("prA", defA)}<span style="color:var(--B)">EN CONTRA</span>${sel("prB", defB)}</div>
+    <div class="pr-error" id="prError"></div>
     <div class="pr-acc">
       <button class="btn pri" id="prPublicar">Publicar</button>
       <button class="btn" id="prOtra">Pedir otra</button>
@@ -275,7 +281,8 @@ function publicarPropuestaActual() {
   clearInterval(cuentaPropuesta);
   const pregunta = ($("prTexto")?.value || S.clase.propuesta?.pregunta || "").trim();
   const A = +($("prA")?.value || S.clase.propuesta?.A), B = +($("prB")?.value || S.clase.propuesta?.B);
-  if (!pregunta) { tick("Escribe una pregunta o pide otra a la moderadora."); return; }
-  if (!A || !B || A === B) { tick("Elige dos grupos distintos."); return; }
+  const error = t => { tick(t); if ($("prError")) $("prError").textContent = t; };
+  if (!pregunta) { error("Escribe una pregunta o pide otra a la moderadora."); return; }
+  if (!A || !B || A === B) { error("Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA."); return; }
   publicarDebate({ pregunta, A, B });
 }
