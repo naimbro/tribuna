@@ -47,24 +47,66 @@ function mostrarPortada(url, codigo, alEmpezar) {
           <label>Tema general <input id="poTema" value="${escHtml(S.clase.tema || SESION.tema)}"></label>
           <label>Grupos <select id="poGrupos">${Array.from({ length: ROT.GRUPOS_MAX - ROT.GRUPOS_MIN + 1 }, (_, i) => i + ROT.GRUPOS_MIN)
             .map(g => `<option ${g === S.clase.grupos ? "selected" : ""}>${g}</option>`).join("")}</select></label>
+          ${typeof BRUJULA !== "undefined" ? `<label class="po-sw"><input type="checkbox" id="poBrujula" ${S.clase.brujula && S.clase.brujula.activa ? "checked" : ""}> Usar brújula</label>` : ""}
         </div>
         <div class="po-cuenta" id="poCuenta"></div>
         <div class="po-gente" id="poGente"><div class="po-vacio">Esperando a los primeros…</div></div>
       </div>
     </div>
     <div class="po-pie">
-      <span>Entren con su cuenta de Google y elijan un grupo. Cada grupo debate y vota por turnos.</span>
+      <span id="poPie">Entren con su cuenta de Google y elijan un grupo. Cada grupo debate y vota por turnos.</span>
       <button class="btn pri" id="poEmpezar">EMPEZAR ▶</button>
     </div>`;
   document.body.appendChild(el);
-  $("poEmpezar").onclick = alEmpezar;
+  // con la brújula encendida, primero se forman los grupos (o se apaga y eligen a mano)
+  $("poEmpezar").onclick = () => {
+    if (S.clase.brujula && S.clase.brujula.activa && S.clase.brujula.fase === "responder") {
+      const a = $("poFormarAviso");
+      if (a) a.textContent = "Primero FORMAR GRUPOS (o apaga la brújula para que elijan a mano).";
+      return;
+    }
+    alEmpezar();
+  };
+  if ($("poBrujula")) $("poBrujula").onchange = ev => {
+    S.clase.brujula = { activa: ev.target.checked, fase: ev.target.checked ? "responder" : null };
+    S.clase.gruposInfo = [];
+    window.publicarEstado?.();
+    actualizarPortada(window.jugadoresSala?.() || {});
+  };
   $("poTema").onchange = e => { S.clase.tema = e.target.value.trim().slice(0, 200) || SESION.tema; window.publicarEstado?.(); };
   $("poGrupos").onchange = e => { S.clase.grupos = +e.target.value; window.publicarEstado?.(); actualizarPortada(window.jugadoresSala?.() || {}); };
   PORTADA.primera = true;
 }
 
+// Brújula encendida y grupos sin formar: el mapa anónimo de la clase y FORMAR GRUPOS.
+function actualizarMapaPortada() {
+  const g = $("poGente");
+  if (!g || !S.clase.brujula || !S.clase.brujula.activa || S.clase.brujula.fase !== "responder" || typeof BRUJULA === "undefined") return;
+  const { puntos } = window.datosMapa ? window.datosMapa() : { puntos: [] };
+  const color = id => (BRUJULA.campos.find(c => c.id === id) || {}).color || "#7d8fa1";
+  const n = Object.keys(window.jugadoresSala ? window.jugadoresSala() : {}).length;
+  $("poCuenta").innerHTML = `<span><b>${puntos.length}</b> de ${n} respondieron la brújula</span>
+    ${BRUJULA.campos.map(c => `<span style="color:${c.color}">● ${escHtml(c.nombre)} ${puntos.filter(p => p.campo === c.id).length}</span>`).join("")}`;
+  const aviso = $("poFormarAviso") ? $("poFormarAviso").textContent : "";
+  g.innerHTML = `<div class="po-mapa">${mapaSvg({ puntos: puntos.map(p => ({ ...p, color: color(p.campo) })), campos: BRUJULA.campos, ejes: BRUJULA.ejes, tam: 460 })}
+    <div class="po-formar"><button class="btn pri" id="poFormar">FORMAR GRUPOS</button><div class="aviso" id="poFormarAviso">${escHtml(aviso)}</div></div></div>`;
+  $("poFormar").onclick = async () => {
+    const r = await window.formarGruposBrujula();
+    if (!r.ok) { $("poFormarAviso").textContent = r.motivo; return; }
+    sonar("fanfarria");
+    actualizarPortada(window.jugadoresSala());
+  };
+}
+
 function actualizarPortada(jugadores) {
   const g = $("poGente"); if (!g) return;
+  const conBrujula = S.clase.brujula && S.clase.brujula.activa && typeof BRUJULA !== "undefined";
+  if ($("poGrupos")) $("poGrupos").closest("label").style.display = conBrujula ? "none" : "";
+  if ($("poBrujula")) $("poBrujula").closest("label").style.display = conBrujula && S.clase.brujula.fase !== "responder" ? "none" : "";
+  if ($("poPie")) $("poPie").textContent = conBrujula
+    ? "Entren con su cuenta de Google y respondan la brújula (un minuto). Los grupos se forman por posición."
+    : "Entren con su cuenta de Google y elijan un grupo. Cada grupo debate y vota por turnos.";
+  if (conBrujula && S.clase.brujula.fase === "responder") { actualizarMapaPortada(); return; }
   const lista = Object.entries(jugadores).map(([uid, j]) => ({ uid, ...j })).sort((a, b) => (a.unido || 0) - (b.unido || 0));
   const N = S.clase.grupos;
   const enGrupo = g => lista.filter(j => j.grupo === g);
@@ -77,7 +119,7 @@ function actualizarPortada(jugadores) {
     return `<div class="po-j ${nuevo && !PORTADA.primera ? "llega" : ""}" data-uid="${j.uid}" title="Clic para mover de grupo">${avatarHtml({ ...j, equipo: "" }, 50)}<div class="po-n">${escHtml(j.nombre)}</div></div>`;
   };
   g.innerHTML = `<div class="po-grupos">${Array.from({ length: N }, (_, i) => i + 1).map(k =>
-      `<div class="po-g"><div class="po-gk">GRUPO ${k} <span>${enGrupo(k).length}</span></div>${enGrupo(k).map(cara).join("")}</div>`).join("")}</div>
+      `<div class="po-g"><div class="po-gk">GRUPO ${k}${(S.clase.gruposInfo || []).find(x => x.n === k) ? ` · ${escHtml(S.clase.gruposInfo.find(x => x.n === k).nombre)}` : ""} <span>${enGrupo(k).length}</span></div>${enGrupo(k).map(cara).join("")}</div>`).join("")}</div>
     ${sinGrupo.length ? `<div class="po-sin">${sinGrupo.map(cara).join("")}</div>` : ""}`;
   g.querySelectorAll(".po-j").forEach(el => el.onclick = () => {
     const destino = +prompt(`¿A qué grupo mueves a ${el.textContent.trim()}? (1 a ${N})`);

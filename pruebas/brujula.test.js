@@ -95,3 +95,9 @@ test("mapaSvg: un círculo por campo y por punto, flecha si hay «desde»", () =
   assert.equal((s.match(/<circle/g) || []).length, 6);
   assert.equal((s.match(/<line class="mv"/g) || []).length, 1);
 });
+
+test("mapaSvg: puntos en la misma posición se dibujan separados", () => {
+  const s = B.mapaSvg({ puntos: [{ x: 1, y: 1, color: "#fff" }, { x: 1, y: 1, color: "#fff" }, { x: 1, y: 1, color: "#fff" }], campos: [], ejes: null });
+  const cs = [...s.matchAll(/<circle class="pt" cx="([\d.]+)" cy="([\d.]+)"/g)].map(m => m[1] + "," + m[2]);
+  assert.equal(new Set(cs).size, 3);
+});

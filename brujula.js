@@ -139,9 +139,14 @@ function mapaSvg({ puntos = [], campos = [], ejes = null, tam = 420, chico = fal
     s += `<text x="${m}" y="${H / 2 - 6}" fill="#7d8fa1" font-size="11">${e(ejes.x.min)}</text><text x="${W - m}" y="${H / 2 - 6}" fill="#7d8fa1" font-size="11" text-anchor="end">${e(ejes.x.max)}</text>`;
     s += `<text x="${W / 2 + 6}" y="${m + 12}" fill="#7d8fa1" font-size="11">${e(ejes.y.max)}</text><text x="${W / 2 + 6}" y="${H - m - 4}" fill="#7d8fa1" font-size="11">${e(ejes.y.min)}</text>`;
   }
+  // varias personas con las mismas respuestas caen en el mismo punto: se abren en espiral
+  const vistos = {}, radio = chico ? 5 : 11;
   for (const p of puntos) {
-    if (p.desde) s += `<line class="mv" x1="${X(p.desde.x).toFixed(1)}" y1="${Y(p.desde.y).toFixed(1)}" x2="${X(p.x).toFixed(1)}" y2="${Y(p.y).toFixed(1)}" stroke="${p.color}" stroke-width="2" opacity=".75" marker-end="url(#fl)"/>`;
-    s += `<circle class="pt" cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="${p.yo ? (chico ? 6 : 9) : (chico ? 3.5 : 6)}" fill="${p.color}" stroke="${p.yo ? "#ffffff" : "none"}" stroke-width="2"/>`;
+    const k = p.x.toFixed(1) + "," + p.y.toFixed(1), i = vistos[k] = (vistos[k] ?? -1) + 1;
+    const r = i ? radio * Math.sqrt(i) : 0, dx = r * Math.cos(i * 2.4), dy = r * Math.sin(i * 2.4);
+    const px = (X(p.x) + dx).toFixed(1), py = (Y(p.y) + dy).toFixed(1);
+    if (p.desde) s += `<line class="mv" x1="${X(p.desde.x).toFixed(1)}" y1="${Y(p.desde.y).toFixed(1)}" x2="${px}" y2="${py}" stroke="${p.color}" stroke-width="2" opacity=".75" marker-end="url(#fl)"/>`;
+    s += `<circle class="pt" cx="${px}" cy="${py}" r="${p.yo ? (chico ? 6 : 9) : (chico ? 3.5 : 6)}" fill="${p.color}" stroke="${p.yo ? "#ffffff" : "none"}" stroke-width="2"/>`;
   }
   return s + "</svg>";
 }
