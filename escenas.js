@@ -188,17 +188,22 @@ function tablaRanking(filas, antes = []) {
     }).join("")}</table>`;
 }
 
-function mostrarResultadoDebate(u, antes, despues, alTerminar) {
+function mostrarResultadoDebate(u, antes, despues, alTerminar, oraculos = []) {
+  cerrarEscena();
   $("resultado")?.remove();
   const r = u.res, gana = r.ganador ? u[r.ganador] : null;
-  const lado = (k, c) => `<div class="rs-lado" style="--c:${c}"><div class="rs-g">GRUPO ${u[k]}</div><div class="rs-p">${r[k].puntaje.toFixed(1)}</div>
-    <div class="rs-d">jurado ${r[k].jurado.toFixed(1)} · público ${r[k].publico === null ? "—" : r[k].publico.toFixed(1)}</div></div>`;
+  const f1 = v => (v === null || v === undefined ? "—" : v.toFixed(1));
+  const lado = (k, c) => `<div class="rs-lado" style="--c:${c}"><div class="rs-g">GRUPO ${u[k]}</div><div class="rs-p">${f1(r[k].puntaje)}</div>
+    <div class="rs-d">jueces ${u.panel && u.panel[k].total !== null ? f1(u.panel[k].total) + "/30" : "—"} · público ${u.publico && u.publico.n ? u.publico[k] + " votos" : "—"}</div></div>`;
+  const top = (oraculos || []).filter(o => o.predicciones).slice(0, 5);
   const el = document.createElement("div");
   el.id = "resultado";
   el.innerHTML = `<div class="rs-k">DEBATE ${u.n} · RESULTADO</div>
     <div class="rs-q">«${escHtml(u.pregunta)}»</div>
     <div class="rs-vs">${lado("A", EQUIPOS.A.color)}<div class="rs-x">${gana ? `GANA GRUPO ${gana}` : "EMPATE"}</div>${lado("B", EQUIPOS.B.color)}</div>
-    ${tablaRanking(despues, antes)}
+    <div class="rs-tablas">${tablaRanking(despues, antes)}
+      <div class="rs-or"><div class="rs-ork">🔮 ORÁCULOS</div>${top.length ? top.map(o => `<div><span>#${o.puesto}</span><b>${escHtml(o.nombre)}</b><i>${o.puntos}</i></div>`).join("")
+        : `<div class="vacio">Nadie ha acertado todavía.</div>`}</div></div>
     <div class="rs-pie"><button class="btn pri" id="rsSeguir">SEGUIR ▶</button></div>`;
   document.body.appendChild(el);
   let hecho = false;
@@ -210,14 +215,14 @@ function mostrarResultadoDebate(u, antes, despues, alTerminar) {
 function ceremoniaRanking() {
   S.veredictoRevelado = true;
   const filas = (S.clase.ranking || []).filter(f => f.debates > 0);
-  const mejor = mejorIntervencion(S.historial.map(h => ({ autor: h.autor, grupo: h.grupo, debate: h.debate, total: h.ev.rubrica.total })));
+  const ors = rankingOraculos(S.clase.oraculos || {}).filter(o => o.predicciones).slice(0, 3);
   $("ceremonia")?.remove();
   const el = document.createElement("div");
   el.id = "ceremonia";
   el.innerHTML = `<div class="cer-k" id="cer0">EL RANKING DE LA CLASE</div>
     <div class="cer-rk">${[...filas].reverse().map((f, i) => `<div class="cer-fila" id="cf${i}"><span class="n">#${f.puesto}</span><b>GRUPO ${f.grupo}</b><span class="p">${f.puntaje.toFixed(1)}</span></div>`).join("")}</div>
     <div class="cer-bloque" id="cerG"><div class="cer-k">CAMPEÓN</div><div class="cer-g" style="color:var(--amber)">${filas[0] ? `🏆 GRUPO ${filas[0].grupo}` : "SIN DEBATES"}</div></div>
-    ${mejor ? `<div class="cer-lect" id="cerM">Mejor intervención del día: <b>${escHtml(mejor.autor)}</b>, Grupo ${mejor.grupo}, debate ${mejor.debate} · ${mejor.total.toFixed(1)}/20</div>` : ""}
+    ${ors.length ? `<div class="cer-lect" id="cerM">🔮 Oráculos: ${ors.map(o => `<b>${escHtml(o.nombre)}</b> (${o.puntos})`).join(" · ")}</div>` : ""}
     <div class="cer-lect" id="cer3"><button class="btn" id="cerCerrar">Cerrar</button></div>`;
   document.body.appendChild(el);
   sonar("redoble");
@@ -228,4 +233,126 @@ function ceremoniaRanking() {
   setTimeout(() => { $("cerM")?.classList.add("on"); $("cer3")?.classList.add("on"); }, tG + 2000);
   $("cerCerrar").onclick = () => el.remove();
   window.publicarEstado?.();
+}
+
+/* ------------------------ 5. VEREDICTOS ------------------------ */
+// Cada escena ocupa la pantalla completa (#escena). Las esperas se pueden saltar con el botón
+// principal: saltarEscena() termina la espera en curso y las siguientes pasan de inmediato.
+const ESC = { rapido: false, resolver: null };
+function esperar(ms) {
+  if (ESC.rapido) return Promise.resolve();
+  return new Promise(r => {
+    const t = setTimeout(() => { ESC.resolver = null; r(); }, ms);
+    ESC.resolver = () => { clearTimeout(t); ESC.resolver = null; r(); };
+  });
+}
+function saltarEscena() { ESC.rapido = true; if (ESC.resolver) ESC.resolver(); }
+function escena(clase) {
+  $("escena")?.remove();
+  ESC.rapido = false;
+  const el = document.createElement("div");
+  el.id = "escena"; el.className = "escena " + clase;
+  document.body.appendChild(el);
+  return el;
+}
+function cerrarEscena() { $("escena")?.remove(); }
+const fmtNota = v => (v === null || v === undefined ? "—" : Number.isInteger(v) ? String(v) : v.toFixed(1));
+
+// Contador animado con setTimeout (requestAnimationFrame se detiene en pestañas en segundo plano)
+function contar(el, hasta) {
+  if (hasta === null || hasta === undefined) { el.textContent = "—"; return Promise.resolve(); }
+  if (ESC.rapido) { el.textContent = hasta.toFixed(1); return Promise.resolve(); }
+  return new Promise(r => {
+    const t0 = Date.now(), dur = 1600;
+    const paso = () => {
+      const p = Math.min(1, (Date.now() - t0) / dur);
+      el.textContent = (hasta * p).toFixed(1);
+      if (p < 1 && !ESC.rapido) setTimeout(paso, 40); else { el.textContent = hasta.toFixed(1); r(); }
+    };
+    paso();
+  });
+}
+
+function mostrarVotacion(d) {
+  const el = escena("votacion");
+  el.innerHTML = `<div class="es-k">EL PÚBLICO VOTA · ¿quién convenció?</div>
+    <div class="es-q">«${escHtml(d.pregunta)}»</div>
+    <div class="vb">${["A", "B"].map(k => `<div class="vb-fila" id="vbf${k}" style="--c:${EQUIPOS[k].color}">
+        <div class="vb-n">${EQUIPOS[k].nombre} · GRUPO ${d[k]}</div>
+        <div class="vb-barra"><i id="vb${k}"></i></div><div class="vb-c mono" id="vbc${k}">0</div></div>`).join("")}</div>
+    <div class="es-pie mono" id="vbPie"></div>`;
+  actualizarVotacion();
+}
+
+function actualizarVotacion() {
+  if (!$("vbA")) return;
+  const P = S.publico || {}, a = P.A || 0, b = P.B || 0;
+  const tope = Math.max(1, a, b, Math.ceil((P.elegibles || 0) / 2));
+  $("vbA").style.width = (100 * a / tope) + "%";
+  $("vbB").style.width = (100 * b / tope) + "%";
+  $("vbcA").textContent = a; $("vbcB").textContent = b;
+  if (S.fase === "votando") {
+    const resta = S.finVoto ? Math.max(0, Math.ceil((S.finVoto - Date.now()) / 1000)) : 0;
+    $("vbPie").textContent = `${a + b} de ${P.elegibles || "?"} votaron · 0:${String(resta).padStart(2, "0")}`;
+  }
+}
+
+async function mostrarVeredictoPublico(d, pub) {
+  if (!$("vbA")) mostrarVotacion(d);
+  ESC.rapido = false;
+  actualizarVotacion();
+  $("vbPie").textContent = "VOTACIÓN CERRADA";
+  sonar("redoble");
+  await esperar(1800);
+  const g = pub.ganador;
+  $("escena").classList.add("cerrada");
+  if (g) $("vbf" + g).classList.add("gana");
+  const b = document.createElement("div");
+  b.className = "es-ganador on";
+  b.innerHTML = !pub.n ? "Nadie votó en este debate"
+    : g ? `GANA EL PÚBLICO: <b style="color:${EQUIPOS[g].color}">GRUPO ${d[g]}</b> · ${Math.round(g === "A" ? pub.parteA : pub.parteB)} %`
+    : "EMPATE EN EL PÚBLICO";
+  $("escena").appendChild(b);
+  sonar(g ? "fanfarria" : "whoosh");
+  await esperar(ROT.SEG_VEREDICTO_PUBLICO * 1000);
+}
+
+function mostrarDeliberando(d) {
+  const el = escena("deliberan");
+  el.innerHTML = `<div class="es-k">EL PANEL DE JUECES</div><div class="es-q">«${escHtml(d.pregunta)}»</div>
+    <div class="es-delib">Los jueces deliberan…</div>`;
+}
+
+async function mostrarVeredictoJueces(d, jueces, panel) {
+  const el = escena("jueces");
+  const tarjeta = (j, k) => `<div class="tj" id="tj-${j.id}-${k}" style="--c:${EQUIPOS[k].color}">${fmtNota(j[k])}</div>`;
+  el.innerHTML = `<div class="es-k">EL PANEL DE JUECES</div>
+    <div class="es-q">«${escHtml(d.pregunta)}»</div>
+    <div class="jz-lados"><span style="color:${EQUIPOS.A.color}">■ GRUPO ${d.A} · A FAVOR</span><span style="color:${EQUIPOS.B.color}">■ GRUPO ${d.B} · EN CONTRA</span></div>
+    <div class="jz">${jueces.map(j => `<div class="jz-col" id="jz-${j.id}">
+        <div class="jz-e">${j.emoji}</div><div class="jz-n">${escHtml(j.nombre)}</div><div class="jz-p">${escHtml(j.valora)}</div>
+        <div class="jz-t">${tarjeta(j, "A")}${tarjeta(j, "B")}</div>
+        <div class="jz-f"><i style="color:${EQUIPOS.A.color}">${escHtml(j.fraseA || "")}</i><i style="color:${EQUIPOS.B.color}">${escHtml(j.fraseB || "")}</i></div>
+      </div>`).join("")}</div>
+    <div class="jz-tot">${["A", "B"].map(k => `<div style="--c:${EQUIPOS[k].color}"><small>GRUPO ${d[k]}</small><b class="mono" id="jzt${k}">0.0</b><small>/30</small></div>`).join("")}</div>
+    <div class="es-ganador" id="jzG"></div>
+    ${jueces.some(j => j.simulado) ? `<div class="jz-sim">jueces simulados (sin motor)</div>` : ""}`;
+  sonar("redoble");
+  await esperar(1200);
+  for (const j of jueces) {
+    $("jz-" + j.id).classList.add("on");
+    sonar(j.A === null && j.B === null ? "whoosh" : "nota", 12);
+    await esperar(ROT.SEG_JUEZ * 1000);
+  }
+  for (const k of ["A", "B"]) for (const id of panel[k].descartadas) $(`tj-${id}-${k}`)?.classList.add("tachada");
+  sonar("whoosh");
+  await esperar(1500);
+  await Promise.all(["A", "B"].map(k => contar($("jzt" + k), panel[k].total)));
+  const g = panel.ganador;
+  $("jzG").innerHTML = panel.A.total === null ? "Los jueces no alcanzaron a votar"
+    : g ? `GANAN LOS JUECES: <b style="color:${EQUIPOS[g].color}">GRUPO ${d[g]}</b>` : "EMPATE ENTRE LOS JUECES";
+  $("jzG").classList.add("on");
+  sonar(g ? "fanfarria" : "whoosh");
+  if (g) confeti([EQUIPOS[g].color, "#ffffff", "#ffb020"], 3000);
+  await esperar(ROT.SEG_TOTALES * 1000);
 }
