@@ -63,7 +63,11 @@ $("btnEntrar").onclick = async () => {
     }
     if (!yo.exists()) await setDoc(doc(db, "salas", codigo, "jugadores", J.uid),
       { nombre, email: J.email, foto: J.foto || "", grupo: 0, equipo: "", unido: Date.now() });
-    mostrarBancadas();
+    // con brújula, el grupo lo forma el profesor según la posición; sin ella, se elige a mano
+    if (J.sala.brujula && J.sala.brujula.activa) {
+      await cargarBrujula();
+      if (BJ.mio) await entrarAlJuego(); else mostrarBrujula("inicio");
+    } else mostrarBancadas();
   } catch (e) { $("errEntrar").textContent = "No se pudo entrar: " + e.message; }
 };
 
@@ -117,6 +121,7 @@ async function entrarAlJuego() {
     J.primera = false;
   }, e => { $("pJuego").innerHTML = `<div class="sep">No se pudo leer la conversación (${esc(e.code)}).</div>`; }));
   prepararCaja();
+  cargarBrujula().then(() => pintarSala());
   // ¿ya dejó su feedback en esta sala? (o lo saltó en este teléfono)
   J.fbListo = localStorage.getItem("tribuna_fb_" + J.codigo) === "1";
   if (!J.fbListo) getDoc(doc(db, "salas", J.codigo, "feedback", J.uid))
@@ -171,6 +176,11 @@ function pintarSala() {
     J.debateVisto = d.n;
     if (debatiendo) { navigator.vibrate?.([120, 60, 120]); $("notaCaja").textContent = `🎙 Tu grupo debate ${s.equipos[rol].nombre}. Escribe cuando se abra el tramo.`; $("notaCaja").classList.add("ati"); }
   }
+  // brújula: la repetición del cierre; y si el profesor la apaga, quien no tiene grupo elige a mano
+  const bj = s.brujula;
+  if (bj && bj.activa && bj.fase === "repetir" && BJ.mio && !BJ.mio.repeticion && $("brujula").classList.contains("oculto")) mostrarBrujula("repetir");
+  if (!J.grupo && !$("pBancada").classList.contains("oculto")) return;          // eligiendo grupo a mano
+  if (!J.grupo && s.etapa === "portada" && !(bj && bj.activa)) { mostrarBancadas(); return; }
   pintarVotar(s);
   pintarEntre(s);
   pintarEspera(s);
@@ -415,6 +425,62 @@ function pintarVotar(s) {
   pintarReloj();
 }
 
+/* ---------- brújula corta ----------
+   Una pregunta por pantalla. Al terminar: el campo, la frase del campo y el mini-mapa con el punto
+   propio. Se guarda en salas/{codigo}/brujula/{uid}; en la repetición del cierre, en «repeticion». */
+const BJ = { respuestas: {}, i: 0, modo: "inicio", mio: null, cargada: false };
+async function cargarBrujula() {
+  if (BJ.cargada) return;
+  BJ.cargada = true;
+  const d = await getDoc(doc(db, "salas", J.codigo, "brujula", J.uid)).catch(() => null);
+  if (d && d.exists()) BJ.mio = d.data();
+}
+function mostrarBrujula(modo = "inicio") {
+  const b = J.sala && J.sala.brujula;
+  if (!b || !b.preguntas) return;
+  if (BJ.modo !== modo) { BJ.modo = modo; BJ.respuestas = {}; BJ.i = 0; }
+  const el = $("brujula");
+  el.classList.remove("oculto");
+  const p = b.preguntas[BJ.i];
+  el.innerHTML = `<div class="k">${modo === "repetir" ? "Brújula · otra vez, al final" : "Brújula · antes de debatir"}</div>
+    <div class="bj-prog">${b.preguntas.map((_, k) => `<i class="${k <= BJ.i ? "on" : ""}"></i>`).join("")}</div>
+    <div class="bj-q">${esc(p.texto)}</div>
+    ${p.opciones.map((o, k) => `<button class="bj-op" data-k="${k}">${esc(o.texto)}</button>`).join("")}
+    ${BJ.i > 0 ? `<button class="link" id="bjAtras">‹ volver</button>` : ""}`;
+  el.onclick = e => {
+    if (e.target.id === "bjAtras") { BJ.i--; mostrarBrujula(modo); return; }
+    const op = e.target.closest(".bj-op");
+    if (!op) return;
+    BJ.respuestas[p.id] = +op.dataset.k;
+    navigator.vibrate?.(20);
+    if (BJ.i < b.preguntas.length - 1) { BJ.i++; mostrarBrujula(modo); } else guardarBrujula(modo);
+  };
+}
+async function guardarBrujula(modo) {
+  const b = J.sala.brujula;
+  const pos = posicion(BJ.respuestas, b.preguntas);
+  const campo = campoDe(pos, b.campos);
+  const dato = { respuestas: { ...BJ.respuestas }, pos: { x: +pos.x.toFixed(2), y: +pos.y.toFixed(2) }, campo, t: Date.now() };
+  try {
+    if (modo === "repetir") await setDoc(doc(db, "salas", J.codigo, "brujula", J.uid), { uid: J.uid, ...BJ.mio, repeticion: dato }, { merge: true });
+    else await setDoc(doc(db, "salas", J.codigo, "brujula", J.uid), { uid: J.uid, ...dato });
+    BJ.mio = modo === "repetir" ? { ...BJ.mio, repeticion: dato } : { uid: J.uid, ...dato };
+    $("brujula").classList.add("oculto");
+    $("espera").dataset.clave = "";
+    if (modo === "inicio" && !J.grupo && $("pJuego").classList.contains("oculto")) await entrarAlJuego();
+    else pintarSala();
+  } catch (e) { $("brujula").insertAdjacentHTML("beforeend", `<p class="aviso">No se guardó: ${esc(e.code || e.message)}</p>`); }
+}
+function resultadoBrujula(s) {
+  const b = s.brujula, mio = BJ.mio;
+  if (!b || !mio) return "";
+  const c = b.campos.find(x => x.id === mio.campo) || {};
+  return `<div class="k">Tu campo</div><div class="bj-campo" style="color:${c.color}">${esc(c.nombre || mio.campo)}</div>
+    <p style="color:var(--dim);max-width:340px">${esc(c.afirma || "")}</p>
+    ${mapaSvg({ puntos: [...(s.mapa || []).map(p => ({ ...p, color: (b.campos.find(x => x.id === p.campo) || {}).color || "#7d8fa1" })),
+      { ...mio.pos, color: c.color || "#fff", yo: true }], campos: b.campos, ejes: b.ejes, tam: 320, chico: true })}`;
+}
+
 /* ---------- espera: portada e intro ---------- */
 const iniciales = n => String(n || "?").trim().split(/\s+/).slice(0, 2).map(x => x[0] || "").join("").toUpperCase();
 function miRol(s) {
@@ -424,17 +490,29 @@ function pintarEspera(s) {
   const el = $("espera");
   if (s.etapa !== "portada" && s.etapa !== "intro") { el.classList.add("oculto"); el.dataset.clave = ""; return; }
   el.classList.remove("oculto");
+  if (!J.grupo && s.brujula && s.brujula.activa) {
+    const clave2 = "bj|" + (BJ.mio ? BJ.mio.campo : "") + "|" + (s.mapa || []).length + "|" + s.brujula.fase;
+    if (el.dataset.clave === clave2) return;
+    el.dataset.clave = clave2;
+    el.innerHTML = BJ.mio ? resultadoBrujula(s) + `<p style="color:var(--dim)">Espera: el profesor va a formar los grupos.</p>
+        ${s.brujula.fase === "responder" ? `<button class="link" id="bjRehacer">rehacer la brújula</button>` : ""}`
+      : `<h1>Falta tu brújula</h1><button class="btn pri" id="bjHacer">Responder (1 minuto)</button>`;
+    const r = $("bjRehacer") || $("bjHacer");
+    if (r) r.onclick = () => { BJ.modo = ""; mostrarBrujula("inicio"); };
+    return;
+  }
   const r = miRol(s);
-  const clave = s.etapa + "|" + J.grupo;
+  const gi = (s.gruposInfo || []).find(g => g.n === J.grupo);
+  const clave = s.etapa + "|" + J.grupo + "|" + (gi ? gi.nombre : "");
   if (el.dataset.clave === clave) return;           // no repintar en cada cambio de la sala
   el.dataset.clave = clave;
   const av = `<div class="av" style="--c:${r.color};--t:92px">${J.foto ? `<img src="${esc(J.foto)}" referrerpolicy="no-referrer" alt="">` : `<span>${iniciales(J.nombre)}</span>`}</div>`;
   const papel = `Estás en el <b>Grupo ${J.grupo}</b>. Cuando la moderadora lo llame, tu grupo debate A FAVOR o EN CONTRA de la pregunta: escribe en la conversación y responde lo que te pregunten, con argumentos y lecturas del curso. Mientras debaten otros, lees con atención y al final votas quién te convenció y predices a los jueces.`;
   el.innerHTML = s.etapa === "portada"
     ? `${av}<h1 style="margin-top:14px">¡Estás dentro, ${esc(J.nombre.split(" ")[0])}!</h1>
-       <span class="chip" style="--c:${r.color}">${r.bandera} ${esc(r.nombre)}</span>
+       <span class="chip" style="--c:${r.color}">${r.bandera} ${esc(r.nombre)}${gi ? " · " + esc(gi.nombre) : ""}</span>
        <p style="color:var(--dim);margin-top:18px;max-width:340px">Mira la pantalla del curso. El debate empieza cuando el profesor lo diga.</p>
-       <button class="link" id="esCambiar">cambiar de rol</button>`
+       ${gi ? "" : `<button class="link" id="esCambiar">cambiar de rol</button>`}`
     : `<div class="k">Semana ${s.semana} · tema general</div>
        <div class="es-mocion">«${esc(s.temaGeneral || s.tema)}»</div>
        <div class="es-lados">

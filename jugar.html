@@ -109,6 +109,13 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 .vt small{display:block;font-weight:600;font-size:12px;color:var(--dim);margin-top:2px}
 .vt.on{background:var(--c);color:#06121a}.vt.on small{color:#06121a}
 .vt-pie{display:flex;justify-content:space-between;width:100%;max-width:460px;margin-top:16px;color:var(--neon);font-weight:700}
+#brujula{justify-content:flex-start;padding-top:28px;z-index:16}
+.bj-prog{display:flex;gap:6px;margin-bottom:14px}.bj-prog i{width:34px;height:5px;border-radius:9px;background:var(--line)}.bj-prog i.on{background:var(--neon)}
+.bj-q{font-size:16.5px;line-height:1.4;max-width:520px;text-align:left;margin-bottom:12px}
+.bj-op{display:block;width:100%;max-width:520px;text-align:left;padding:13px 14px;margin:6px 0;border-radius:12px;border:1px solid var(--line);background:#141d26;color:var(--txt);font:inherit;font-size:14.5px;line-height:1.35;cursor:pointer}
+.bj-op:active{background:#1b2733}
+.bj-campo{font-size:28px;font-weight:800;margin:6px 0}
+.mapa{width:min(78vw,320px);height:auto}
 #ceremonia{position:fixed;inset:0;z-index:20;background:rgba(5,9,13,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center;padding:20px}
 #ceremonia .cb{opacity:0;transform:scale(.7);transition:all .7s cubic-bezier(.2,1.5,.4,1)}
 #ceremonia .on{opacity:1;transform:scale(1)}
@@ -188,7 +195,10 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 
 <!-- votación: pantalla completa con las dos preguntas -->
 <div id="votar" class="capa oculto"></div>
+<!-- brújula corta: una pregunta por pantalla (al entrar y, si el profesor la repite, al cierre) -->
+<div id="brujula" class="capa oculto"></div>
 
-<script type="module" src="jugar.js?v=20260923a"></script>
+<script src="brujula.js?v=20260924a"></script>
+<script type="module" src="jugar.js?v=20260924a"></script>
 </body>
 </html>
