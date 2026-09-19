@@ -88,7 +88,11 @@ function actualizarMapaPortada() {
   $("poCuenta").innerHTML = `<span><b>${puntos.length}</b> de ${n} respondieron la brújula</span>
     ${BRUJULA.campos.map(c => `<span style="color:${c.color}">● ${escHtml(c.nombre)} ${puntos.filter(p => p.campo === c.id).length}</span>`).join("")}`;
   const aviso = $("poFormarAviso") ? $("poFormarAviso").textContent : "";
-  g.innerHTML = `<div class="po-mapa">${mapaSvg({ puntos: puntos.map(p => ({ ...p, color: color(p.campo) })), campos: BRUJULA.campos, ejes: BRUJULA.ejes, tam: 460 })}
+  // solo el punto de quien acaba de responder entra con animación
+  const primera = !PORTADA.bjVistos;
+  PORTADA.bjVistos = PORTADA.bjVistos || new Set();
+  const conNuevo = puntos.map(p => { const nuevo = !primera && !PORTADA.bjVistos.has(p.uid); PORTADA.bjVistos.add(p.uid); return { ...p, nuevo, color: color(p.campo) }; });
+  g.innerHTML = `<div class="po-mapa">${mapaSvg({ puntos: conNuevo, campos: BRUJULA.campos, ejes: BRUJULA.ejes, tam: 460 })}
     <div class="po-formar"><button class="btn pri" id="poFormar">FORMAR GRUPOS</button><div class="aviso" id="poFormarAviso">${escHtml(aviso)}</div></div></div>`;
   $("poFormar").onclick = async () => {
     const r = await window.formarGruposBrujula();

@@ -214,7 +214,9 @@ suman al grupo más cercano). Quien llega tarde responde la brújula y entra al 
 su campo. En cada debate se enfrentan los dos grupos más lejanos entre los que menos han debatido,
 y la moderadora escribe la moción sobre lo que los separa: el grupo cuya posición afirma queda A
 FAVOR (el profesor puede intercambiar los lados con **⇄ lados**). Al final, **🧭 REPETIR
-BRÚJULA** muestra una flecha por alumno con cuánto se movió. Apagada, los alumnos eligen grupo a
+BRÚJULA** muestra una flecha por alumno con cuánto se movió. Las preguntas escritas a mano en `PREGUNTAS` no
+miran los campos: si la moderadora no dice qué grupo afirma la moción, A FAVOR va al grupo que
+menos veces lo ha sido. Apagada, los alumnos eligen grupo a
 mano. La lógica está en `brujula.js` y se prueba con `node --test pruebas/`.
 
 ## Pantalla del profesor

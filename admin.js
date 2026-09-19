@@ -61,13 +61,15 @@ async function cargar(uid) {
   const salas = []; snap.forEach(d => salas.push({ codigo: d.id, ...d.data() }));
   // jugadores y feedback de cada sala, en paralelo (son pocos por sala)
   V.partidas = await Promise.all(salas.map(async s => {
-    const [js, fb, tl] = await Promise.all([
+    const [js, fb, tl, bj] = await Promise.all([
       getDocs(collection(db, "salas", s.codigo, "jugadores")).catch(() => null),
       getDocs(collection(db, "salas", s.codigo, "feedback")).catch(() => null),
-      getDocs(collection(db, "salas", s.codigo, "telemetria")).catch(() => null)
+      getDocs(collection(db, "salas", s.codigo, "telemetria")).catch(() => null),
+      getDocs(collection(db, "salas", s.codigo, "brujula")).catch(() => null)
     ]);
+    const brujula = {}; bj?.forEach(d => brujula[d.id] = d.data());
     const telemetria = []; tl?.forEach(d => telemetria.push(d.data()));
-    const jugadores = []; js?.forEach(d => jugadores.push({ uid: d.id, ...d.data() }));
+    const jugadores = []; js?.forEach(d => jugadores.push({ uid: d.id, ...d.data(), brujula: brujula[d.id] || null }));
     const feedback = []; fb?.forEach(d => feedback.push({ uid: d.id, ...d.data() }));
     return { s, jugadores, feedback, telemetria };
   }));
@@ -155,6 +157,15 @@ function telemetriaHtml(telemetria) {
   </div>`;
 }
 
+// El campo de la brújula de cada alumno (y adónde llegó si la repitió), con su grupo.
+function campoAlumno(s, j) {
+  const b = j.brujula, cs = (s.brujula && s.brujula.campos) || [];
+  if (!b || !b.campo) return "";
+  const c = id => cs.find(x => x.id === id) || { nombre: id, color: "var(--dim)" };
+  const antes = c(b.campo), despues = b.repeticion && b.repeticion.campo ? c(b.repeticion.campo) : null;
+  return `<small style="display:block;margin-left:34px">G${j.grupo || "?"} · <b style="color:${antes.color}">${esc(antes.nombre)}</b>${despues ? ` → <b style="color:${despues.color}">${esc(despues.nombre)}</b>` : ""}</small>`;
+}
+
 function partidaHtml({ s, jugadores, feedback, telemetria }) {
   const [est, cls] = estadoDe(s);
   const g = ganadorDe(s);
@@ -212,7 +223,7 @@ function partidaHtml({ s, jugadores, feedback, telemetria }) {
         <div class="caja"><h3>QUIÉNES JUGARON</h3>
           <div class="jug">${jugadores.length ? jugadores.sort((a, b) => (a.equipo || "Z").localeCompare(b.equipo || "Z")).map(j =>
             `<div title="${esc(j.email)}${puntajeDe(s, j)}"><span class="av" style="--c:${COL[j.equipo] || "var(--dim2)"}">${j.foto ? `<img src="${esc(j.foto)}" referrerpolicy="no-referrer" alt="">` : iniciales(j.nombre)}</span>${esc(j.nombre)}${s.modo === "rotacion" ? (() => { const g = (s.ranking || []).find(f => f.grupo === j.grupo), o = (s.oraculos || []).find(x => x.uid === j.uid);
-              return ` <small style="color:var(--dim)">${g && g.puntaje != null ? g.puntaje : "—"}${o ? ` · 🔮${o.puntos}` : ""}</small>`; })() : ""}</div>`).join("")
+              return ` <small style="color:var(--dim)">${g && g.puntaje != null ? g.puntaje : "—"}${o ? ` · 🔮${o.puntos}` : ""}</small>`; })() : ""}${campoAlumno(s, j)}</div>`).join("")
             : `<span style="color:var(--dim)">Nadie entró.</span>`}</div>
         </div>
       </div>

@@ -41,7 +41,17 @@ function repartir(xs, k) {
   return out.filter(g => g.length);
 }
 
+// La regla de Firestore admite grupos 1..10: con más de 50 alumnos los grupos crecen.
+const MAX_GRUPOS = 10;
 function formarGrupos(alumnos, campos, tam = TAM_GRUPO) {
+  const n = (alumnos || []).filter(a => a && a.pos).length;
+  for (let t = Math.max(tam, Math.ceil(n / MAX_GRUPOS)); ; t++) {
+    const r = armarGrupos(alumnos, campos, t);
+    if (r.grupos.length <= MAX_GRUPOS) return r;
+  }
+}
+
+function armarGrupos(alumnos, campos, tam) {
   const conPos = (alumnos || []).filter(a => a && a.pos);
   const orden = (campos || []).map(c => c.id);
   let grupos = [];
@@ -69,6 +79,8 @@ function formarGrupos(alumnos, campos, tam = TAM_GRUPO) {
       g.miembros.push(a);
     }
   }
+  // sumar a los de campos chicos puede pasar del tamaño: esos grupos se parten parejo
+  grupos = grupos.flatMap(g => g.miembros.length > tam ? repartir(g.miembros, Math.ceil(g.miembros.length / tam)).map(m => ({ campo: g.campo, miembros: m })) : [g]);
   // para debatir hacen falta dos grupos: si hay uno solo con al menos 2 personas, se parte en dos
   if (grupos.length === 1 && grupos[0].miembros.length >= 2) grupos = repartir(grupos[0].miembros, 2).map(m => ({ campo: grupos[0].campo, miembros: m }));
   const primero = g => g.miembros.map(m => String(m.uid)).sort()[0];
@@ -113,12 +125,9 @@ function emparejarLejanos(disponibles, debates, posDe) {
   const cand = nuevos.length ? nuevos : pares;
   cand.sort((p, q) => distancia(posDe[q[0]], posDe[q[1]]) - distancia(posDe[p[0]], posDe[p[1]])
     || (ult(p[0]) + ult(p[1])) - (ult(q[0]) + ult(q[1])) || p[0] - q[0] || p[1] - q[1]);
-  return { A: cand[0][0], B: cand[0][1] };
-}
-
-function movimiento(antes, despues) {
-  return Object.keys(despues || {}).filter(u => antes && antes[u])
-    .map(u => ({ uid: u, de: antes[u], a: despues[u], d: distancia(antes[u], despues[u]) }));
+  // A FAVOR, al que menos veces lo ha sido (como emparejar); la moderadora puede darlo vuelta
+  const [x, y] = cand[0], vecesA = g => debates.filter(d => d.A === g).length;
+  return vecesA(x) <= vecesA(y) ? { A: x, B: y } : { A: y, B: x };
 }
 
 // El mapa: un plano de −10 a 10 con los centros de los campos como círculos tenues y un punto por
@@ -146,7 +155,7 @@ function mapaSvg({ puntos = [], campos = [], ejes = null, tam = 420, chico = fal
     const r = i ? radio * Math.sqrt(i) : 0, dx = r * Math.cos(i * 2.4), dy = r * Math.sin(i * 2.4);
     const px = (X(p.x) + dx).toFixed(1), py = (Y(p.y) + dy).toFixed(1);
     if (p.desde) s += `<line class="mv" x1="${X(p.desde.x).toFixed(1)}" y1="${Y(p.desde.y).toFixed(1)}" x2="${px}" y2="${py}" stroke="${p.color}" stroke-width="2" opacity=".75" marker-end="url(#fl)"/>`;
-    s += `<circle class="pt" cx="${px}" cy="${py}" r="${p.yo ? (chico ? 6 : 9) : (chico ? 3.5 : 6)}" fill="${p.color}" stroke="${p.yo ? "#ffffff" : "none"}" stroke-width="2"/>`;
+    s += `<circle class="${p.nuevo ? "pt nuevo" : "pt"}" cx="${px}" cy="${py}" r="${p.yo ? (chico ? 6 : 9) : (chico ? 3.5 : 6)}" fill="${p.color}" stroke="${p.yo ? "#ffffff" : "none"}" stroke-width="2"/>`;
   }
   return s + "</svg>";
 }
@@ -168,4 +177,4 @@ function ofrecerBrujula(bj, tieneMio) {
   return !!(bj && bj.activa && !tieneMio && ["responder", "grupos"].includes(bj.fase));
 }
 
-if (typeof module !== "undefined") module.exports = { TAM_GRUPO, posicion, campoDe, formarGrupos, asignarTarde, emparejarLejanos, movimiento, mapaSvg, accionBrujula, ofrecerBrujula };
+if (typeof module !== "undefined") module.exports = { TAM_GRUPO, posicion, campoDe, formarGrupos, asignarTarde, emparejarLejanos, mapaSvg, accionBrujula, ofrecerBrujula };

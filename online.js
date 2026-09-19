@@ -160,7 +160,7 @@ function activarOnline() {
     .filter(j => j.grupo === S.debate.A || j.grupo === S.debate.B)
     .map(j => ({ nombre: j.nombre, equipo: j.grupo === S.debate.A ? "A" : "B", grupo: j.grupo }));
   window.moverAlumno = (uid, grupo) => setDoc(doc(db, "salas", ON.codigo, "jugadores", uid), { grupo }, { merge: true })
-    .catch(e => tick("No se pudo mover al alumno: " + e.code));
+    .then(() => true).catch(e => { tick("No se pudo mover al alumno: " + e.code); return false; });
   window.alCambiarDebate = n => suscribirVotos(n);
   envolver("lanzarEvento");
   envolver("pintarMarcador");
@@ -196,6 +196,8 @@ function activarOnline() {
   // Las escenas: portada (QR y quién va entrando) → intro → debate
   $("btnIntro").onclick = () => irA("intro");
   if (S.etapa === "portada") irA("portada");
+  // recargó la pestaña durante la repetición: la escena vuelve (y LISTO ▶ la cierra)
+  if (S.clase.brujula && S.clase.brujula.fase === "repetir" && typeof mostrarMovimiento === "function") mostrarMovimiento();
   else if (S.etapa === "intro") irA("intro");
   else if (S.fase === "propuesta") mostrarPropuesta();     // se recargó con una propuesta pendiente
   else if (S.fase === "votando" && S.debate) mostrarVotacion(S.debate);   // se recargó a mitad de la votación
@@ -280,9 +282,9 @@ function pintarBarraOnline() {
 const barajar = xs => xs.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
 const conBrujulaActiva = () => !!(S.clase.brujula && S.clase.brujula.activa && typeof BRUJULA !== "undefined");
 window.datosMapa = () => {
-  const r = Object.entries(ON.brujula || {}).filter(([uid, b]) => b.pos && ON.jugadores && ON.jugadores[uid]).map(([, b]) => b);
+  const r = Object.entries(ON.brujula || {}).filter(([uid, b]) => b.pos && ON.jugadores && ON.jugadores[uid]).map(([uid, b]) => ({ ...b, uid }));
   return {
-    puntos: r.map(b => ({ x: b.pos.x, y: b.pos.y, campo: b.campo })),
+    puntos: r.map(b => ({ uid: b.uid, x: b.pos.x, y: b.pos.y, campo: b.campo })),   // uid solo en la pantalla del profesor
     movimiento: r.filter(b => b.repeticion && b.repeticion.pos).map(b => ({ x: b.repeticion.pos.x, y: b.repeticion.pos.y, desde: b.pos, campoAntes: b.campo, campo: b.repeticion.campo }))
   };
 };
@@ -310,17 +312,24 @@ window.formarGruposBrujula = async () => {
 function asignarRezagados() {
   if (!S.clase.brujula || S.clase.brujula.fase === "responder" || !S.clase.brujula.activa || !(S.clase.gruposInfo || []).length) return;
   ON.asignando = ON.asignando || {};
+  // el tamaño de cada grupo se cuenta en vivo (incluye movimientos a mano y asignaciones en curso)
+  const tamDe = n => Object.entries(ON.jugadores || {}).filter(([u, j]) => j.grupo === n || ON.asignando[u] === n).length;
+  const antes = S.clase.gruposInfo.map(g => g.tam).join();
+  S.clase.gruposInfo.forEach(g => { g.tam = tamDe(g.n); });
   for (const [uid, j] of Object.entries(ON.jugadores || {})) {
-    if (j.grupo > 0 || ON.asignando[uid]) continue;
+    if (j.grupo > 0) { delete ON.asignando[uid]; continue; }
+    if (ON.asignando[uid]) continue;
     const b = ON.brujula && ON.brujula[uid];
     const tarde = (j.unido || 0) > (S.clase.brujula.formadoEn || 0);
     if (!(b && b.pos) && tarde && Date.now() - (j.unido || 0) < 90000) continue;
     const n = asignarTarde(b && b.pos, b && b.campo, S.clase.gruposInfo);
     if (!n) continue;
-    ON.asignando[uid] = true;
+    ON.asignando[uid] = n;
     S.clase.gruposInfo.find(g => g.n === n).tam++;
-    window.moverAlumno(uid, n);
+    // si la escritura falla, el próximo repaso (≤ 10 s) lo vuelve a intentar
+    window.moverAlumno(uid, n).then(ok => { if (!ok) delete ON.asignando[uid]; });
   }
+  if (S.clase.gruposInfo.map(g => g.tam).join() !== antes) publicar();
 }
 window.repetirBrujula = () => { S.clase.brujula.fase = "repetir"; publicar(); };
 window.cerrarRepeticion = () => { S.clase.brujula.fase = "cerrada"; publicar(); };

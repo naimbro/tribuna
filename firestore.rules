@@ -137,7 +137,13 @@ service cloud.firestore {
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.pos.x is number && request.resource.data.pos.x >= -10 && request.resource.data.pos.x <= 10
           && request.resource.data.pos.y is number && request.resource.data.pos.y >= -10 && request.resource.data.pos.y <= 10
-          && request.resource.data.campo is string && request.resource.data.campo.size() <= 40;
+          && request.resource.data.campo is string && request.resource.data.campo.size() <= 40
+          && request.resource.data.respuestas is map && request.resource.data.respuestas.size() <= 12
+          && (!('repeticion' in request.resource.data)
+              || (request.resource.data.repeticion.pos.x is number && request.resource.data.repeticion.pos.x >= -10 && request.resource.data.repeticion.pos.x <= 10
+                  && request.resource.data.repeticion.pos.y is number && request.resource.data.repeticion.pos.y >= -10 && request.resource.data.repeticion.pos.y <= 10
+                  && request.resource.data.repeticion.campo is string && request.resource.data.repeticion.campo.size() <= 40
+                  && request.resource.data.repeticion.respuestas is map && request.resource.data.repeticion.respuestas.size() <= 12));
       }
 
       // Rotación: el voto binario y la predicción de cada votante en cada debate. Solo en la
