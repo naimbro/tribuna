@@ -249,10 +249,11 @@ function prepararCompositor() {
   const enviar = () => {
     const t = $("chatTx").value.trim();
     if (!t) return;
-    if (S.fase !== "abierta") { tick("Abre el tramo para que la conversación cuente."); return; }
-    // "@Nombre: texto" simula a un alumno; si no, escribe el profesor por esa bancada
+    if (S.fase !== "abierta") { tick("Publica una pregunta y abre el tramo para que la conversación cuente."); return; }
+    // "@Nombre: texto" simula a un alumno del grupo que está en el lado elegido
+    const grupo = S.debate ? S.debate[banca] : null;
     for (const p of partirCaja(t, "(profesor)"))
-      postChat({ tipo: "alumno", nombre: p.autor, equipo: banca, uid: "sim:" + p.autor, texto: p.texto });
+      postChat({ tipo: "alumno", nombre: p.autor, equipo: banca, grupo, uid: "sim:" + p.autor, texto: p.texto });
     $("chatTx").value = "";
   };
   $("chatEnviar").onclick = enviar;

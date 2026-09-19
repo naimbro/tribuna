@@ -28,13 +28,18 @@ function estadoDe(s) {
   if (s.etapa === "portada") return ["en portada", "vivo"];
   if (s.etapa === "intro") return ["intro", "vivo"];
   if (s.fase === "fin") return s.veredicto ? ["terminada", "fin"] : ["por revelar", "vivo"];
+  if (s.modo === "rotacion") {
+    if (s.fase === "fin") return [s.veredicto ? "terminada" : "por revelar", s.veredicto ? "fin" : "vivo"];
+    return [s.debate ? `debate ${s.debate.n}` : "sin empezar", s.debate ? "vivo" : ""];
+  }
   if (s.fase === "abierta") return [`tramo ${s.ronda + 1} abierto`, "vivo"];
   if (!s.turnos?.length && s.ronda === 0 && s.fase === "listo") return ["sin empezar", ""];
   return [`tramo ${s.ronda + 1}/${s.totalRondas || 3}`, ""];
 }
 
-// Salas anteriores a la declaración final no traen `ganaG`: se calcula con los marcadores.
+// Rotación: el campeón (o quien va primero). Salas antiguas: se calcula con sus marcadores.
 function ganadorDe(s) {
+  if (s.modo === "rotacion") return s.veredicto && s.veredicto.campeon ? `Grupo ${s.veredicto.campeon}` : (s.ranking && s.ranking[0] && s.ranking[0].debates ? `Grupo ${s.ranking[0].grupo} (va primero)` : null);
   const v = s.veredicto; if (!v) return null;
   if (v.ganaG) return v.ganaG;
   const noms = [v.ganaP, v.pubN ? v.ganaU : null, v.ganaR].filter(x => x != null);
@@ -133,6 +138,15 @@ function partidaHtml({ s, jugadores, feedback }) {
   const { prom, n: nNotas, total } = promedio(feedback);
   const v = s.veredicto, mk = s.marcador || {};
   const A = s.equipos?.A || { nombre: "A FAVOR", color: "var(--A)" }, B = s.equipos?.B || { nombre: "EN CONTRA", color: "var(--B)" };
+  const rot = s.modo === "rotacion";
+  const rotHtml = rot ? `<div class="caja" style="margin-bottom:12px"><h3>RANKING</h3>
+      ${(s.ranking || []).map(f => `<div class="com"><div class="q"><b>${f.puesto ? "#" + f.puesto : "·"} Grupo ${f.grupo}</b>
+        <span style="color:var(--dim)">${f.debates} debate${f.debates === 1 ? "" : "s"} · jurado ${f.jurado ?? "—"} · público ${f.publico ?? "—"}</span>
+        <span class="mono" style="margin-left:auto;color:var(--neon)">${f.puntaje ?? "—"}</span></div></div>`).join("")}
+      <h3 style="margin-top:12px">DEBATES</h3>
+      ${(s.debates || []).map(d => `<div class="com"><div class="q"><b>${d.n}.</b> Grupo ${d.A} vs Grupo ${d.B}
+        <span class="mono" style="margin-left:auto">${d.puntajeA ?? "—"} · ${d.puntajeB ?? "—"}</span></div><p>${esc(d.pregunta)}</p></div>`).join("") || `<p style="color:var(--dim)">Sin debates.</p>`}
+    </div>` : "";
   const coms = feedback.filter(f => (f.comentario || "").trim() || typeof f.nota === "number").sort((a, b) => (b.t || 0) - (a.t || 0));
   return `<div class="partida ${V.abiertas.has(s.codigo) ? "abierta" : ""}">
     <div class="fila" data-cod="${s.codigo}">
@@ -140,17 +154,17 @@ function partidaHtml({ s, jugadores, feedback }) {
       <span class="cod">${s.codigo}</span>
       <span class="tema"><div>Semana ${s.semana} · ${esc(s.tema)}</div><small>${esc(s.mocion)}</small></span>
       <span class="gana" style="color:${g ? colorEquipo(s, g) : "var(--dim2)"}">${g ? (g === "EMPATE" ? "empate" : "🏆 " + esc(g)) : "—"}</span>
-      <span class="gente"><i style="color:${A.color}">${n("A")}</i> · <i style="color:${B.color}">${n("B")}</i> · <i style="color:var(--P)">${n("P")}</i> <span style="color:var(--dim2)">(${jugadores.length})</span></span>
+      <span class="gente">${rot ? `${jugadores.length} alumno${jugadores.length === 1 ? "" : "s"}` : `<i style="color:${A.color}">${n("A")}</i> · <i style="color:${B.color}">${n("B")}</i> · <i style="color:var(--P)">${n("P")}</i> <span style="color:var(--dim2)">(${jugadores.length})</span>`}</span>
       <span class="fbm">${total ? `💬 <b>${prom === null ? "—" : prom.toFixed(1)}</b>${nNotas ? "/7" : ""} <span style="color:var(--dim2)">· ${total}</span>` : `<span style="color:var(--dim2)">sin feedback</span>`}</span>
       <span class="estado ${cls}">${est}</span>
     </div>
     <div class="detalle">
-      <div class="marc">
+      ${rot ? rotHtml : `      <div class="marc">
         ${(v && v.movA != null) || mk.persuA != null ? `<div>LA SALA · votos<b><span style="color:${A.color}">${esc(v ? v.movA : mk.persuA)}</span> · <span style="color:${B.color}">${esc(v ? v.movB : mk.persuB)}</span></b></div>` : ""}
         <div>EL PÚBLICO · votos<b><span style="color:${A.color}">${esc(v ? v.pubA : mk.publicoA ?? "—")}</span> · <span style="color:${B.color}">${esc(v ? v.pubB : mk.publicoB ?? "—")}</span></b></div>
         <div>EL JURADO · /20<b><span style="color:${A.color}">${esc(v ? v.rA : mk.rigorA ?? "—")}</span> · <span style="color:${B.color}">${esc(v ? v.rB : mk.rigorB ?? "—")}</span></b></div>
         <div>INTERVENCIONES<b>${(s.feed || []).length}</b></div>
-      </div>
+      </div>`}
       <div class="cols">
         <div class="caja"><h3>QUÉ DIJO EL CURSO DEL JUEGO</h3>
           ${coms.length ? coms.map(f => `<div class="com"><div class="q"><b>${esc(f.nombre)}</b>

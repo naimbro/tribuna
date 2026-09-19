@@ -180,6 +180,22 @@ para volver a la pantalla, descargar la conversación en `.txt` o archivarla. De
 de cada curso se crea una partida nueva. Las salas vacías y las archivadas se ocultan por
 defecto. El curso de cada semana está en `contenido/sesiones.js`.
 
+## La clase en rotación
+
+Una sala es una clase entera. Los alumnos eligen un grupo en la portada (el profesor fija
+cuántos: 2 a 10) y la moderadora los hace debatir de a dos, por turnos:
+
+1. **Propuesta.** La moderadora propone una pregunta dentro del tema general y llama a dos
+   grupos. El profesor la ve primero: la publica, pide otra, escribe la suya o cambia los
+   grupos. Sin acción, sale sola a los 15 segundos.
+2. **Apertura y réplica,** 3 minutos cada una, en la misma conversación.
+3. **Votación,** 1 minuto: el relator resume y los demás grupos votan con su deslizador.
+4. **Resultado:** el puntaje de cada grupo (mitad jurado, mitad público) y el ranking.
+
+La clase sigue hasta «🏁 TERMINAR CLASE». Entonces los teléfonos piden feedback y la
+ceremonia revela el ranking y al campeón. La lógica pura está en `rotacion.js` y se prueba con
+`node --test pruebas/`. El ciclo está en `clase.js`.
+
 ## Pantalla del profesor
 
 Dos paneles, como el panel de debate de `mapuche_panel`: a la izquierda **el hilo** —una

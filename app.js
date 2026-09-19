@@ -365,6 +365,7 @@ function pintarMarcador() {
   for (const k of ["A", "B"]) {
     $("nom" + k).textContent = S.debate ? `GRUPO ${S.debate[k]}` : EQUIPOS[k].nombre;
     $("lema" + k).textContent = S.debate ? EQUIPOS[k].nombre : EQUIPOS[k].lema;
+    $("chatBanca" + k).textContent = S.debate ? `${EQUIPOS[k].nombre} · G${S.debate[k]}` : `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}`;
   }
   const c = conteo();
   $("rA").textContent = c.a; $("rN").textContent = c.n; $("rB").textContent = c.b;
@@ -708,38 +709,34 @@ function sonar(tipo, valor) {
 /* ====================== 8. EXPORTAR ================================= */
 
 function exportarCsv() {
-  // delta_votos solo lo llena el público (votos que movió cada alumno hacia A FAVOR); las
-  // intervenciones llevan la rúbrica individual del jurado.
-  const cab = ["ronda", "equipo", "autor", "autor_email", "palabras", "evidencia", "refutacion", "estructura",
+  // Una fila por intervención (rúbrica individual del jurado, con debate, grupo y lado), una por
+  // noticia de la sala de control y una por votante de cada debate (delta_votos = su posición
+  // final: + hacia A FAVOR, − hacia EN CONTRA; cada votante parte en 0).
+  const cab = ["ronda", "debate", "grupo", "lado", "autor", "autor_email", "palabras", "evidencia", "refutacion", "estructura",
     "concesion", "rigor_total", "delta_votos", "conceptos", "banderas", "texto"];
-  const dvDe = () => "";
   const filas = S.historial.map(h => [h.orden,
-    h.rondaNombre, EQUIPOS[h.equipo].nombre, h.autor, h.autorEmail || "", h.ev.palabras || palabras(h.texto),
+    h.rondaNombre, h.debate || "", h.grupo || "", EQUIPOS[h.equipo].nombre, h.autor, h.autorEmail || "", h.ev.palabras || palabras(h.texto),
     h.ev.rubrica.evidencia, h.ev.rubrica.refutacion, h.ev.rubrica.estructura, h.ev.rubrica.concesion,
-    h.ev.rubrica.total, dvDe(h),
+    h.ev.rubrica.total, "",
     h.ev.conceptos.map(c => c.id).join("|"), h.ev.banderas.join("|"),
     h.texto.replace(/"/g, "'")
   ]);
-  const filasShock = S.shocks.map(x => [x.orden,
-    x.ronda, "SALA DE CONTROL", "profesor", "", "", "", "", "", "", "",
-    "", "", "NOTICIA:" + x.id,
-    x.titular.replace(/"/g, "'")
+  const filasNoticia = S.shocks.map(x => [x.orden,
+    x.ronda, "", "", "SALA DE CONTROL", "profesor", "", "", "", "", "", "", "",
+    "", "", "NOTICIA:" + x.id, x.titular.replace(/"/g, "'")
   ]);
-  // el público: una fila por alumno, al final; delta_votos = votos que movió hacia A FAVOR
-  // (negativo = hacia EN CONTRA); la posición inicial y final van en banderas
-  const filasPublico = (S.publico.votantes || []).map(v => [1e12,
-    "PÚBLICO", "PÚBLICO", v.nombre || "", v.email || "", "", "", "", "", "", "",
-    decima(v.aporte), "", `INICIAL:${Math.round(v.inicial)}|FINAL:${Math.round(v.final)}`, ""]);
-  filasShock.push(...filasPublico);
+  const filasPublico = S.clase.debates.flatMap(d => (d.votantes || []).map(v => [1e12 + d.n,
+    `Debate ${d.n}`, d.n, v.grupo || "", "PÚBLICO", v.nombre || "", v.email || "", "", "", "", "", "", "",
+    Math.round(v.final), "", "", ""]));
   // intercaladas en el orden en que ocurrieron; el índice de orden no se exporta
-  const cuerpo = [...filas, ...filasShock].sort((p, q) => p[0] - q[0])
+  const cuerpo = [...filas, ...filasNoticia, ...filasPublico].sort((p, q) => p[0] - q[0])
     .map(f => f.slice(1).map(v => `"${v}"`).join(","));
-  const csv = "﻿" + [cab.join(","), ...cuerpo].join("\n");
+  const csv = "\ufeff" + [cab.join(","), ...cuerpo].join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   a.download = `tribuna_s${SESION.semana}_${Date.now()}.csv`;
   a.click();
-  tick("CSV exportado: una fila por intervención (rúbrica del jurado), por noticia y por alumno del público.");
+  tick("CSV exportado: una fila por intervención (rúbrica del jurado), por noticia y por votante de cada debate.");
 }
 
 /* ====================== 9. MOTOR LLM (opcional) ===================== */
