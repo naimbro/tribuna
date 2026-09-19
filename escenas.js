@@ -212,27 +212,52 @@ function mostrarResultadoDebate(u, antes, despues, alTerminar, oraculos = []) {
   setTimeout(fin, ROT.SEG_RESULTADO * 1000);
 }
 
+// La ceremonia final tiene dos actos: el podio de los grupos (quién debatió mejor) y el podio de
+// los oráculos (quién predijo mejor a los jueces). El segundo llega solo, o con «VER ORÁCULOS».
 function ceremoniaRanking() {
   S.veredictoRevelado = true;
   const filas = (S.clase.ranking || []).filter(f => f.debates > 0);
-  const ors = rankingOraculos(S.clase.oraculos || {}).filter(o => o.predicciones).slice(0, 3);
   $("ceremonia")?.remove();
   const el = document.createElement("div");
   el.id = "ceremonia";
   el.innerHTML = `<div class="cer-k" id="cer0">EL RANKING DE LA CLASE</div>
     <div class="cer-rk">${[...filas].reverse().map((f, i) => `<div class="cer-fila" id="cf${i}"><span class="n">#${f.puesto}</span><b>GRUPO ${f.grupo}</b><span class="p">${f.puntaje.toFixed(1)}</span></div>`).join("")}</div>
     <div class="cer-bloque" id="cerG"><div class="cer-k">CAMPEÓN</div><div class="cer-g" style="color:var(--amber)">${filas[0] ? `🏆 GRUPO ${filas[0].grupo}` : "SIN DEBATES"}</div></div>
-    ${ors.length ? `<div class="cer-lect" id="cerM">🔮 Oráculos: ${ors.map(o => `<b>${escHtml(conGrupo(o.nombre, o.grupo))}</b> (${o.puntos})`).join(" · ")}</div>` : ""}
-    <div class="cer-lect" id="cer3"><button class="btn" id="cerCerrar">Cerrar</button></div>`;
+    <div class="cer-lect" id="cer3"><button class="btn pri" id="cerOr">VER ORÁCULOS ▶</button> <button class="btn" id="cerCerrar">Cerrar</button></div>`;
   document.body.appendChild(el);
   sonar("redoble");
   const paso = 1100, n = filas.length;
   filas.forEach((_, i) => setTimeout(() => { $("cf" + i)?.classList.add("on"); sonar(i === n - 1 ? "redoble" : "nota", 10 + i); }, 1500 + i * paso));
   const tG = 1500 + n * paso + 1500;
   setTimeout(() => { $("cerG")?.classList.add("on"); sonar("fanfarria"); setTimeout(() => sonar("aplauso"), 500); confeti(["#ffb020", "#ffffff", EQUIPOS.A.color]); }, tG);
-  setTimeout(() => { $("cerM")?.classList.add("on"); $("cer3")?.classList.add("on"); }, tG + 2000);
+  setTimeout(() => $("cer3")?.classList.add("on"), tG + 1500);
+  let segundo = false;
+  const acto2 = () => { if (segundo || !el.isConnected) return; segundo = true; ceremoniaOraculos(el); };
+  setTimeout(acto2, tG + 7000);
+  $("cerOr").onclick = acto2;
   $("cerCerrar").onclick = () => el.remove();
   window.publicarEstado?.();
+}
+
+function ceremoniaOraculos(el) {
+  const ors = rankingOraculos(S.clase.oraculos || {}).slice(0, 5);
+  const top = ors[0];
+  el.innerHTML = `<div class="cer-k" style="color:#a78bfa">🔮 EL ORÁCULO DE LA CLASE</div>
+    <div class="cer-sub">quién predijo mejor a los jueces</div>
+    ${ors.length ? `<div class="cer-rk">${[...ors].reverse().map((o, i) => `<div class="cer-fila" id="co${i}"><span class="n">#${o.puesto}</span>
+        <b>${escHtml(conGrupo(o.nombre, o.grupo))}</b><span class="p" style="color:#a78bfa">${o.aciertos} de ${o.predicciones}</span></div>`).join("")}</div>
+      <div class="cer-bloque" id="coG"><div class="cer-g" style="color:#a78bfa">🔮 ${escHtml(conGrupo(top.nombre, top.grupo))}</div>
+        <div class="cer-s">${top.puntos} punto${top.puntos === 1 ? "" : "s"} · acertó ${top.aciertos} de ${top.predicciones} veredictos</div></div>`
+    : `<div class="cer-bloque on"><div class="cer-g" style="color:var(--dim);font-size:40px">Nadie predijo a los jueces esta clase</div>
+        <div class="cer-s">Solo cuentan los debates donde los jueces eligieron un ganador; los empates no suman.</div></div>`}
+    <div class="cer-lect" id="co3"><button class="btn" id="coCerrar">Cerrar</button></div>`;
+  sonar("redoble");
+  const paso = 1000, n = ors.length;
+  ors.forEach((_, i) => setTimeout(() => { $("co" + i)?.classList.add("on"); sonar("nota", 10 + i); }, 1200 + i * paso));
+  const tG = 1200 + n * paso + 1200;
+  if (n) setTimeout(() => { $("coG")?.classList.add("on"); sonar("fanfarria"); confeti(["#a78bfa", "#ffffff", "#ffb020"]); }, tG);
+  setTimeout(() => $("co3")?.classList.add("on"), n ? tG + 1500 : 800);
+  $("coCerrar").onclick = () => el.remove();
 }
 
 /* ------------------------ 5. VEREDICTOS ------------------------ */
