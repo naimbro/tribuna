@@ -127,6 +127,19 @@ service cloud.firestore {
           && request.resource.data.largoFinal is int && request.resource.data.largoFinal <= 2000;
       }
 
+      // Brújula corta: la respuesta de cada alumno (posición y campo). La escribe el propio alumno
+      // mientras la brújula está abierta (al comienzo, para quien llega tarde, y al repetirla al
+      // cierre). La leen él y el profesor; el mapa público va sin uid.
+      match /brujula/{uid} {
+        allow read: if esProfe(codigo) || (conSesion() && uid == request.auth.uid);
+        allow write: if conSesion() && uid == request.auth.uid && esJugador(codigo)
+          && sala(codigo).data.get('brujula', {}).get('fase', '') in ['responder', 'grupos', 'repetir']
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.pos.x is number && request.resource.data.pos.x >= -10 && request.resource.data.pos.x <= 10
+          && request.resource.data.pos.y is number && request.resource.data.pos.y >= -10 && request.resource.data.pos.y <= 10
+          && request.resource.data.campo is string && request.resource.data.campo.size() <= 40;
+      }
+
       // Rotación: el voto binario y la predicción de cada votante en cada debate. Solo en la
       // ventana de votación y solo quien no está debatiendo.
       match /votos/{id} {

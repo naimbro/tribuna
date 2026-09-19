@@ -235,3 +235,178 @@ const EJEMPLOS_SESION = {
    Si hay, la moderadora las propone primero, en este orden. Después genera
    las suyas a partir del tema general, el material y lo que va pasando. */
 const PREGUNTAS = [];
+
+/* --- Brújula corta (opcional en cada partida) -------------------------
+   5 preguntas del instrumento de la semana 7 de ml2 (ítems 1, 2, 3, 4 y 6). x = velocidad
+   (frenar … acelerar), y = quién pone la regla (industria … Estado). Los campos son los
+   cuatro que ya se usan para formar las partidas. */
+const BRUJULA = {
+  "ejes": {
+    "x": {
+      "id": "velocidad",
+      "etiqueta": "Velocidad",
+      "min": "frenar",
+      "max": "acelerar"
+    },
+    "y": {
+      "id": "regla",
+      "etiqueta": "Quién pone la regla",
+      "min": "la industria se regula sola",
+      "max": "el Estado, con potestades vinculantes"
+    }
+  },
+  "preguntas": [
+    {
+      "id": "p1",
+      "texto": "Sam Altman firmó en 2023 la declaración sobre riesgo de extinción, en 2025 dijo que todo sería gradual y manejable, y este mes, después de que los sistemas de OpenAI se salieran de control y atacaran a Hugging Face, dijo que puede ser hora de ir más lento. ¿Qué es ese giro?",
+      "opciones": [
+        {
+          "texto": "La única respuesta honesta a un sistema que se le escapó a su propio fabricante. Llegó tarde, pero llegó.",
+          "x": -8
+        },
+        {
+          "texto": "Una señal de que los constructores ya no controlan el ritmo, y eso basta para bajar la velocidad mientras se entiende qué pasó.",
+          "x": -4
+        },
+        {
+          "texto": "Un incidente de seguridad, grave pero acotado, que se arregla con ingeniería y no parando la industria.",
+          "x": 4
+        },
+        {
+          "texto": "Teatro. Frenar le conviene al que va adelante: congela la ventaja de OpenAI y Anthropic frente a los que vienen atrás.",
+          "x": 8
+        }
+      ]
+    },
+    {
+      "id": "p2",
+      "texto": "David Sacks, asesor de Trump, contestó el ensayo de Amodei diciendo que los laboratorios fijan la frontera tecnológica ellos mismos. La misma semana, el senador Hawley le exigió a Altman explicaciones por escrito sobre el ataque a Hugging Face y abrió una indagatoria formal. ¿Cuál de los dos tiene el rol correcto?",
+      "opciones": [
+        {
+          "texto": "Sacks. El que construye el sistema es el único que sabe dónde está la frontera; un senador leyendo un informe llega siempre tarde.",
+          "y": -7
+        },
+        {
+          "texto": "Sacks en el fondo, pero con condiciones: que los laboratorios se revisen entre sí antes de lanzar, con el gobierno mirando.",
+          "y": -3
+        },
+        {
+          "texto": "Hawley, siempre que la indagatoria termine en una regla y no en una audiencia televisada.",
+          "y": 3
+        },
+        {
+          "texto": "Hawley. Un sistema que atacó a otra empresa es un producto que causó daño, y eso se responde ante la ley, no ante el directorio.",
+          "y": 7
+        }
+      ]
+    },
+    {
+      "id": "p3",
+      "texto": "Jensen Huang, cuyos chips mueven casi toda la industria, sostiene que ninguna empresa debería estar pidiéndole al gobierno más regulación de la IA, y ha discutido en público con Amodei por sus predicciones de pérdida de empleos. ¿Qué pesa más en esa posición?",
+      "opciones": [
+        {
+          "texto": "Que vende las palas de la fiebre del oro: cada mes de pausa es facturación perdida, y eso desautoriza su opinión sobre el ritmo.",
+          "x": -8
+        },
+        {
+          "texto": "Que el ritmo actual lo fija quien más gana con él, y por eso alguien de afuera tiene que ponerle un freno.",
+          "x": -4
+        },
+        {
+          "texto": "Que tiene razón en algo: pedir regulación es la forma en que los que van adelante levantan la escalera detrás de sí.",
+          "x": 4
+        },
+        {
+          "texto": "Que tiene razón entera: el ritmo lo tiene que fijar la competencia, y frenar en Estados Unidos es regalarle la delantera a China.",
+          "x": 8
+        }
+      ]
+    },
+    {
+      "id": "p4",
+      "texto": "Bernie Sanders propone una moratoria a nuevos centros de datos, un impuesto de 50 por ciento por una sola vez a las grandes empresas de IA para un fondo público, la prohibición permanente de la superinteligencia y una pausa hasta que exista un regulador federal. ¿Qué haces con ese paquete?",
+      "opciones": [
+        {
+          "texto": "Descartarlo entero: es la prueba de que cuando el Estado se mete, se mete con brocha gorda. Mejor que la industria se ordene sola.",
+          "y": -7
+        },
+        {
+          "texto": "Rescatar el fondo público y botar el resto. Lo que se puede regular es el reparto, no la tecnología.",
+          "y": -3
+        },
+        {
+          "texto": "Tomar en serio el regulador federal y la pausa hasta que exista; la moratoria y la prohibición son consignas.",
+          "y": 3
+        },
+        {
+          "texto": "Es el único paquete de la lista que le pone al Estado los cuatro instrumentos a la vez: frenar, gravar, prohibir y supervisar. Por ahí va.",
+          "y": 7
+        }
+      ]
+    },
+    {
+      "id": "p5",
+      "texto": "El líder del Senado, John Thune, quiere una ley bipartidista de «toque liviano» con guardarraíles sólo para los modelos más riesgosos. Hakeem Jeffries dice que el Congreso no puede dejar que los ejecutivos regulen su propia tecnología. Y Satya Nadella ofrece un «ritmo deliberado» decidido por la propia industria. ¿Quién pone la regla?",
+      "opciones": [
+        {
+          "texto": "Nadella. Un compromiso de la industria se cumple al día siguiente; una ley del Congreso se discute dos años y nace vieja.",
+          "y": -7
+        },
+        {
+          "texto": "La industria escribe la regla y el Estado la homologa: un organismo financiado por las empresas y supervisado por el gobierno.",
+          "y": -3
+        },
+        {
+          "texto": "Thune: una ley mínima, sólo para lo más riesgoso, antes que un pacto voluntario que nadie puede hacer cumplir.",
+          "y": 3
+        },
+        {
+          "texto": "Jeffries. El único que puede obligar a Microsoft es alguien a quien Microsoft no le paga el sueldo.",
+          "y": 7
+        }
+      ]
+    }
+  ],
+  "campos": [
+    {
+      "id": "ley",
+      "nombre": "Frenar por ley",
+      "centro": {
+        "x": -6,
+        "y": 5
+      },
+      "color": "#38bdf8",
+      "afirma": "La IA de frontera hay que frenarla, y el freno lo tiene que poner la ley del Estado."
+    },
+    {
+      "id": "adentro",
+      "nombre": "Frenar desde adentro",
+      "centro": {
+        "x": -6,
+        "y": -5
+      },
+      "color": "#34d399",
+      "afirma": "La IA de frontera hay que frenarla, pero el freno lo ponen mejor los propios laboratorios que una ley."
+    },
+    {
+      "id": "guard",
+      "nombre": "Guardarraíles sin freno",
+      "centro": {
+        "x": 6,
+        "y": 5
+      },
+      "color": "#f59e0b",
+      "afirma": "No hay que frenar la IA de frontera, pero el Estado tiene que fijarle guardarraíles vinculantes."
+    },
+    {
+      "id": "nada",
+      "nombre": "Ni freno ni ley",
+      "centro": {
+        "x": 6,
+        "y": -5
+      },
+      "color": "#fb7185",
+      "afirma": "No hay que frenar la IA de frontera ni regularla por ley: el ritmo y las reglas los fija la industria."
+    }
+  ]
+};

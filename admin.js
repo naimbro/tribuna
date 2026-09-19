@@ -163,7 +163,14 @@ function partidaHtml({ s, jugadores, feedback, telemetria }) {
   const v = s.veredicto, mk = s.marcador || {};
   const A = s.equipos?.A || { nombre: "A FAVOR", color: "var(--A)" }, B = s.equipos?.B || { nombre: "EN CONTRA", color: "var(--B)" };
   const rot = s.modo === "rotacion";
-  const rotHtml = rot ? `<div class="caja" style="margin-bottom:12px"><h3>RANKING</h3>
+  const colorCampo = id => ((s.brujula && s.brujula.campos || []).find(c => c.id === id) || {}).color || "#7d8fa1";
+  const brujulaHtml = (s.mapa || []).length && s.brujula && s.brujula.campos ? `<div class="caja" style="margin-bottom:12px"><h3>LA BRÚJULA</h3>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        ${mapaSvg({ puntos: (s.mapaMov || []).length ? s.mapaMov.map(m => ({ x: m.x, y: m.y, desde: { x: m.dx, y: m.dy }, color: colorCampo(m.campo) }))
+                     : s.mapa.map(p => ({ ...p, color: colorCampo(p.campo) })), campos: s.brujula.campos, ejes: s.brujula.ejes, tam: 300 })}
+        <div>${(s.mapaMov || []).length ? `<p style="color:var(--dim);font-size:12px">Flechas: de la primera respuesta a la del cierre (${s.mapaMov.length}).</p>` : ""}
+          ${(s.gruposInfo || []).map(g => `<div>Grupo ${g.n} · <b style="color:${colorCampo(g.campo)}">${esc(g.nombre)}</b> (${g.tam})</div>`).join("")}</div></div></div>` : "";
+  const rotHtml = rot ? `${brujulaHtml}<div class="caja" style="margin-bottom:12px"><h3>RANKING</h3>
       ${(s.ranking || []).map(f => `<div class="com"><div class="q"><b>${f.puesto ? "#" + f.puesto : "·"} Grupo ${f.grupo}</b>
         <span style="color:var(--dim)">${f.debates} debate${f.debates === 1 ? "" : "s"} · jurado ${f.jurado ?? "—"} · público ${f.publico ?? "—"}</span>
         <span class="mono" style="margin-left:auto;color:var(--neon)">${f.puntaje ?? "—"}</span></div></div>`).join("")}

@@ -358,7 +358,8 @@ function conteo() {
 function pintarMarcador() {
   for (const k of ["A", "B"]) {
     $("nom" + k).textContent = S.debate ? `GRUPO ${S.debate[k]}` : EQUIPOS[k].nombre;
-    $("lema" + k).textContent = S.debate ? EQUIPOS[k].nombre : EQUIPOS[k].lema;
+    const gi = S.debate ? (S.clase.gruposInfo || []).find(g => g.n === S.debate[k]) : null;
+    $("lema" + k).textContent = S.debate ? EQUIPOS[k].nombre + (gi ? " · " + gi.nombre : "") : EQUIPOS[k].lema;
     $("chatBanca" + k).textContent = S.debate ? `${EQUIPOS[k].nombre} · G${S.debate[k]}` : `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}`;
   }
   const c = conteo(), P = S.publico || {};
@@ -384,6 +385,7 @@ function pintarMarcador() {
 
 // Columna derecha: ranking de grupos, oráculos y las tarjetas del último panel.
 function pintarColumna() {
+  if (typeof actualizarBotonRepetir === "function") actualizarBotonRepetir();
   const f1 = v => (v === null || v === undefined ? "—" : v.toFixed(1));
   const t3 = $("top3");
   if (t3) {

@@ -62,9 +62,9 @@ const BRUJULA = {
 ```
 
 **Formato de las piezas:**
-- **Opciones:** cada una suma puntos en uno o en los dos ejes, en una escala de −10 a 10. Si falta
-  un eje, esa opción vale 0 en él.
-- **Posición del alumno:** el promedio por eje de las opciones que eligió.
+- **Opciones:** cada una suma puntos en uno o en los dos ejes, en una escala de −10 a 10.
+- **Posición del alumno:** en cada eje, el promedio de las opciones elegidas que puntúan en ese eje
+  (como la brújula de ml2); un eje sin opciones queda en 0.
 - **Campos:** cada uno tiene un centro en el plano y una frase `afirma`, que la moderadora usa para
   escribir mociones. Su campo es el de centro más cercano (distancia euclidiana).
 
@@ -119,7 +119,7 @@ adentro, guardarraíles sin freno, y ni freno ni ley.
 
 ```
 posicion(respuestas, preguntas) → { x, y }
-   promedio por eje de las opciones elegidas; las preguntas sin responder no cuentan
+   en cada eje, promedio de las opciones elegidas que puntúan en él; las preguntas sin responder no cuentan
 campoDe(pos, campos) → idCampo
    el de centro más cercano; si hay empate, el primero en el orden del archivo
 formarGrupos(alumnos:[{uid, pos, campo}], campos, tam = 5) → { grupos:[{n, campo, miembros:[uid], pos}], de:{uid: n} }

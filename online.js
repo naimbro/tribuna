@@ -84,6 +84,15 @@ function estadoPublico() {
     shocks: S.shocks.map(x => ({ titular: x.titular, ronda: x.ronda, swing: x.swing })),
     // el ganador llega a los teléfonos cuando el profesor lo revela, no antes
     veredicto: S.fase === "fin" && S.veredictoRevelado ? resumenFinal() : null,
+    // brújula: la definición y la fase (solo si está encendida), el mapa sin uid y los grupos por campo
+    brujula: conBrujulaActiva()
+      ? { activa: true, fase: S.clase.brujula.fase, ejes: BRUJULA.ejes, campos: BRUJULA.campos,
+          preguntas: BRUJULA.preguntas.map(p => ({ id: p.id, texto: p.texto, opciones: p.opciones.map(o => ({ texto: o.texto,
+            ...(typeof o.x === "number" ? { x: o.x } : {}), ...(typeof o.y === "number" ? { y: o.y } : {}) })) })) }
+      : { activa: false, fase: null },
+    mapa: conBrujulaActiva() && ON.brujula ? barajar(window.datosMapa().puntos.map(p => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2), campo: p.campo }))) : [],
+    mapaMov: conBrujulaActiva() && ON.brujula ? barajar(window.datosMapa().movimiento.map(m => ({ x: m.x, y: m.y, dx: m.desde.x, dy: m.desde.y, campo: m.campo }))) : [],
+    gruposInfo: S.clase.gruposInfo || [],
     ticker: $("ticker").textContent, motor: $("modoLbl").textContent
   };
 }
@@ -161,6 +170,7 @@ function activarOnline() {
   onSnapshot(collectionJugadores(), snap => {
     ON.jugadores = {};
     snap.forEach(d => ON.jugadores[d.id] = d.data());
+    asignarRezagados();
     if (S.publico) S.publico.elegibles = elegibles();
     pintarBarraOnline(); pintarFeed(); actualizarPortada(ON.jugadores);
   });
@@ -169,6 +179,19 @@ function activarOnline() {
   // los comentarios con nombre se leen en el panel (admin.html), no frente al curso.
   onSnapshot(collection(db, "salas", ON.codigo, "feedback"), snap => { ON.feedback = snap.size; pintarBarraOnline(); },
     () => {});
+
+  // Brújula: las respuestas de cada alumno. De aquí salen el mapa anónimo y los grupos.
+  ON.brujula = {};
+  onSnapshot(collection(db, "salas", ON.codigo, "brujula"), snap => {
+    ON.brujula = {};
+    snap.forEach(d => ON.brujula[d.id] = d.data());
+    asignarRezagados();
+    if (typeof actualizarMapaPortada === "function") actualizarMapaPortada();
+    if (typeof refrescarMovimiento === "function") refrescarMovimiento();
+    publicar();
+  }, () => {});
+  // quien llegó tarde y no responde la brújula en 90 s queda en el grupo más chico
+  setInterval(asignarRezagados, 10000);
 
   // Las escenas: portada (QR y quién va entrando) → intro → debate
   $("btnIntro").onclick = () => irA("intro");
@@ -253,12 +276,64 @@ function pintarBarraOnline() {
   $("btnPortada").onclick = () => irA("portada");
 }
 
+/* ---------- brújula: mapa, grupos y rezagados ---------- */
+const barajar = xs => xs.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+const conBrujulaActiva = () => !!(S.clase.brujula && S.clase.brujula.activa && typeof BRUJULA !== "undefined");
+window.datosMapa = () => {
+  const r = Object.entries(ON.brujula || {}).filter(([uid, b]) => b.pos && ON.jugadores && ON.jugadores[uid]).map(([, b]) => b);
+  return {
+    puntos: r.map(b => ({ x: b.pos.x, y: b.pos.y, campo: b.campo })),
+    movimiento: r.filter(b => b.repeticion && b.repeticion.pos).map(b => ({ x: b.repeticion.pos.x, y: b.repeticion.pos.y, desde: b.pos, campoAntes: b.campo, campo: b.repeticion.campo }))
+  };
+};
+window.formarGruposBrujula = async () => {
+  const alumnos = Object.entries(ON.brujula || {}).filter(([uid, b]) => b.pos && ON.jugadores[uid]).map(([uid, b]) => ({ uid, pos: b.pos, campo: b.campo }));
+  if (alumnos.length < 2) return { ok: false, motivo: "Faltan alumnos: se necesitan al menos 2 con la brújula respondida." };
+  const { grupos, de } = formarGrupos(alumnos, BRUJULA.campos);
+  S.clase.gruposInfo = grupos.map(g => ({ n: g.n, campo: g.campo, nombre: (BRUJULA.campos.find(c => c.id === g.campo) || {}).nombre || g.campo,
+                                          pos: { x: +g.pos.x.toFixed(2), y: +g.pos.y.toFixed(2) }, tam: g.miembros.length }));
+  S.clase.grupos = grupos.length;
+  S.clase.brujula.fase = "grupos";
+  S.clase.brujula.formadoEn = Date.now();
+  // quienes no respondieron pero ya estaban en un grupo elegido a mano vuelven a quedar sin grupo
+  const sinPos = Object.keys(ON.jugadores).filter(uid => !de[uid]);
+  await Promise.all([...Object.entries(de).map(([uid, n]) => window.moverAlumno(uid, n)),
+                     ...sinPos.filter(uid => ON.jugadores[uid].grupo > 0).map(uid => window.moverAlumno(uid, 0))]);
+  sinPos.forEach(uid => { ON.jugadores[uid].grupo = 0; });
+  Object.entries(de).forEach(([uid, n]) => { ON.jugadores[uid].grupo = n; });
+  asignarRezagados();                                    // quienes no terminaron la brújula
+  publicar();
+  return { ok: true };
+};
+// Después de formar los grupos: quien no tiene grupo entra al más chico de su campo. Quien llegó
+// después de formarlos tiene 90 s para responder la brújula; si no, va al más chico de todos.
+function asignarRezagados() {
+  if (!S.clase.brujula || S.clase.brujula.fase === "responder" || !S.clase.brujula.activa || !(S.clase.gruposInfo || []).length) return;
+  ON.asignando = ON.asignando || {};
+  for (const [uid, j] of Object.entries(ON.jugadores || {})) {
+    if (j.grupo > 0 || ON.asignando[uid]) continue;
+    const b = ON.brujula && ON.brujula[uid];
+    const tarde = (j.unido || 0) > (S.clase.brujula.formadoEn || 0);
+    if (!(b && b.pos) && tarde && Date.now() - (j.unido || 0) < 90000) continue;
+    const n = asignarTarde(b && b.pos, b && b.campo, S.clase.gruposInfo);
+    if (!n) continue;
+    ON.asignando[uid] = true;
+    S.clase.gruposInfo.find(g => g.n === n).tam++;
+    window.moverAlumno(uid, n);
+  }
+}
+window.repetirBrujula = () => { S.clase.brujula.fase = "repetir"; publicar(); };
+window.cerrarRepeticion = () => { S.clase.brujula.fase = "cerrada"; publicar(); };
+
 /* ---------- crear o restaurar la sala ---------- */
 async function crearSala() {
   ON.codigo = nuevoCodigo();
   ON.creada = Date.now();
   S.etapa = "portada";                  // toda sala nueva parte en la portada
   S.clase = { grupos: ROT.GRUPOS_DEFECTO, tema: SESION.tema, debates: [], propuesta: null, evaluado: 0 };
+  // brújula corta: encendida por defecto si la semana la define; el profesor la apaga en la portada
+  S.clase.brujula = { activa: typeof BRUJULA !== "undefined", fase: typeof BRUJULA !== "undefined" ? "responder" : null };
+  S.clase.gruposInfo = [];
   S.fase = "propuesta";
   await setDoc(doc(db, "salas", ON.codigo), limpio({ ...estadoPublico(), creada: Date.now() }));
   await setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado()));

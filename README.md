@@ -204,6 +204,19 @@ La clase sigue hasta «🏁 TERMINAR CLASE». Entonces los teléfonos piden feed
 ceremonia revela el ranking y al campeón. La lógica pura está en `rotacion.js` y se prueba con
 `node --test pruebas/`. El ciclo está en `clase.js`.
 
+## La brújula corta (opcional)
+
+Si la semana define `BRUJULA` (5 preguntas, dos ejes y los campos), la portada trae el
+interruptor **Usar brújula**. Encendido, cada alumno responde la brújula en su teléfono en cerca de
+un minuto y queda en un campo; el proyector muestra el mapa anónimo de la clase, y **FORMAR
+GRUPOS** convierte cada campo en uno o más grupos de hasta 5 (los campos de 1 o 2 personas se
+suman al grupo más cercano). Quien llega tarde responde la brújula y entra al grupo más chico de
+su campo. En cada debate se enfrentan los dos grupos más lejanos entre los que menos han debatido,
+y la moderadora escribe la moción sobre lo que los separa: el grupo cuya posición afirma queda A
+FAVOR (el profesor puede intercambiar los lados con **⇄ lados**). Al final, **🧭 REPETIR
+BRÚJULA** muestra una flecha por alumno con cuánto se movió. Apagada, los alumnos eligen grupo a
+mano. La lógica está en `brujula.js` y se prueba con `node --test pruebas/`.
+
 ## Pantalla del profesor
 
 Dos paneles, como el panel de debate de `mapuche_panel`: a la izquierda **el hilo** —una
