@@ -394,7 +394,7 @@ function pintarColumna() {
   const or = $("oraculos");
   if (or) {
     const r = rankingOraculos(S.clase.oraculos || {}).filter(o => o.predicciones).slice(0, 5);
-    or.innerHTML = r.length ? r.map(o => `<div class="t3"><span>#${o.puesto}</span><b>${esc(o.nombre)}</b><i style="color:#a78bfa">🔮 ${o.puntos}</i></div>`).join("")
+    or.innerHTML = r.length ? r.map(o => `<div class="t3"><span>#${o.puesto}</span><b>${esc(conGrupo(o.nombre, o.grupo))}</b><i style="color:#a78bfa">🔮 ${o.puntos}</i></div>`).join("")
       : `<div class="vacio">Aparecen cuando los jueces dan su primer veredicto.</div>`;
   }
   const up = $("ultimoPanel");
@@ -469,7 +469,7 @@ function pintarFeed() {
   for (const k of ["A", "B"]) {
     const xs = ps.filter(p => p.equipo === k);
     $("lista" + k).innerHTML = `<b style="color:var(--c)">${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}</b> ` +
-      (xs.length ? xs.map(p => `<span class="${p.n ? "" : "cero"}">${esc(p.nombre)} · ${p.n}</span>`).join("") : `<span class="cero">nadie aún</span>`);
+      (xs.length ? xs.map(p => `<span class="${p.n ? "" : "cero"}">${esc(conGrupo(p.nombre, p.grupo))} · ${p.n}</span>`).join("") : `<span class="cero">nadie aún</span>`);
   }
 }
 

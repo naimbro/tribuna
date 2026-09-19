@@ -96,6 +96,7 @@ function acumularOraculos(registro, votantes, ganador) {
     if (!v || !v.uid) continue;
     const x = r[v.uid] = { uid: v.uid, nombre: v.nombre || "", puntos: 0, predicciones: 0, aciertos: 0, ...(r[v.uid] || {}) };
     if (v.nombre) x.nombre = v.nombre;
+    if (v.grupo) x.grupo = v.grupo;
     if (!ganador || (v.prediccion !== "A" && v.prediccion !== "B")) continue;
     x.predicciones++;
     if (v.prediccion === ganador) { x.aciertos++; x.puntos++; }
@@ -153,8 +154,11 @@ function proximaPreguntaEscrita(preguntas, usadas) {
   return (preguntas || []).find(p => !ya.has(String(p).trim().toLowerCase())) || null;
 }
 
+// Cómo se muestra una persona en pantalla: su nombre y su grupo, «Naim (grupo 1)».
+const conGrupo = (nombre, grupo) => (grupo ? `${nombre} (grupo ${grupo})` : String(nombre || ""));
+
 function mejorIntervencion(historial) {
   return (historial || []).reduce((m, h) => (!m || h.total > m.total ? h : m), null);
 }
 
-if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, mejorIntervencion };
+if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, mejorIntervencion, conGrupo };

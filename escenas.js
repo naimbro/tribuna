@@ -202,7 +202,7 @@ function mostrarResultadoDebate(u, antes, despues, alTerminar, oraculos = []) {
     <div class="rs-q">«${escHtml(u.pregunta)}»</div>
     <div class="rs-vs">${lado("A", EQUIPOS.A.color)}<div class="rs-x">${gana ? `GANA GRUPO ${gana}` : "EMPATE"}</div>${lado("B", EQUIPOS.B.color)}</div>
     <div class="rs-tablas">${tablaRanking(despues, antes)}
-      <div class="rs-or"><div class="rs-ork">🔮 ORÁCULOS</div>${top.length ? top.map(o => `<div><span>#${o.puesto}</span><b>${escHtml(o.nombre)}</b><i>${o.puntos}</i></div>`).join("")
+      <div class="rs-or"><div class="rs-ork">🔮 ORÁCULOS</div>${top.length ? top.map(o => `<div><span>#${o.puesto}</span><b>${escHtml(conGrupo(o.nombre, o.grupo))}</b><i>${o.puntos}</i></div>`).join("")
         : `<div class="vacio">Nadie ha acertado todavía.</div>`}</div></div>
     <div class="rs-pie"><button class="btn pri" id="rsSeguir">SEGUIR ▶</button></div>`;
   document.body.appendChild(el);
@@ -222,7 +222,7 @@ function ceremoniaRanking() {
   el.innerHTML = `<div class="cer-k" id="cer0">EL RANKING DE LA CLASE</div>
     <div class="cer-rk">${[...filas].reverse().map((f, i) => `<div class="cer-fila" id="cf${i}"><span class="n">#${f.puesto}</span><b>GRUPO ${f.grupo}</b><span class="p">${f.puntaje.toFixed(1)}</span></div>`).join("")}</div>
     <div class="cer-bloque" id="cerG"><div class="cer-k">CAMPEÓN</div><div class="cer-g" style="color:var(--amber)">${filas[0] ? `🏆 GRUPO ${filas[0].grupo}` : "SIN DEBATES"}</div></div>
-    ${ors.length ? `<div class="cer-lect" id="cerM">🔮 Oráculos: ${ors.map(o => `<b>${escHtml(o.nombre)}</b> (${o.puntos})`).join(" · ")}</div>` : ""}
+    ${ors.length ? `<div class="cer-lect" id="cerM">🔮 Oráculos: ${ors.map(o => `<b>${escHtml(conGrupo(o.nombre, o.grupo))}</b> (${o.puntos})`).join(" · ")}</div>` : ""}
     <div class="cer-lect" id="cer3"><button class="btn" id="cerCerrar">Cerrar</button></div>`;
   document.body.appendChild(el);
   sonar("redoble");

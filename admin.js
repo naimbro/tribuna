@@ -156,7 +156,7 @@ function partidaHtml({ s, jugadores, feedback }) {
         ${(d.jueces || []).length ? `<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin-top:4px">${d.jueces.map(j => `<span title="${esc(j.fraseA)} / ${esc(j.fraseB)}">${j.emoji} ${j.A ?? "—"} · ${j.B ?? "—"}</span>`).join("")}
           <span>· jueces ${d.totalA ?? "—"} / ${d.totalB ?? "—"} · votos ${d.votosA ?? "—"} / ${d.votosB ?? "—"}</span></div>` : ""}</div>`).join("") || `<p style="color:var(--dim)">Sin debates.</p>`}
       <h3 style="margin-top:12px">🔮 ORÁCULOS</h3>
-      ${(s.oraculos || []).map(o => `<div class="com"><div class="q"><b>#${o.puesto} ${esc(o.nombre)}</b>
+      ${(s.oraculos || []).map(o => `<div class="com"><div class="q"><b>#${o.puesto} ${esc(o.nombre)}${o.grupo ? ` (grupo ${o.grupo})` : ""}</b>
         <span style="color:var(--dim)">${o.aciertos} de ${o.predicciones} aciertos</span><span class="mono" style="margin-left:auto;color:#a78bfa">${o.puntos}</span></div></div>`).join("") || `<p style="color:var(--dim)">Sin predicciones.</p>`}
     </div>` : "";
   const coms = feedback.filter(f => (f.comentario || "").trim() || typeof f.nota === "number").sort((a, b) => (b.t || 0) - (a.t || 0));
