@@ -396,7 +396,7 @@ function pintarJueces() {
     : "") +
     RUBRICA.map(c => fila(c.nombre, prom("A", c.id), prom("B", c.id), c.max)).join("") +
     fila("Total", rigorMedio("A"), rigorMedio("B"), 20, true) +
-    `<div class="jn">${n("A")} intervenci${n("A") === 1 ? "ón" : "ones"} · ${n("B")} intervenci${n("B") === 1 ? "ón" : "ones"}</div>` +
+    `<div class="jn"><span style="color:var(--A)">${n("A")}</span> · <span style="color:var(--B)">${n("B")}</span> intervenciones evaluadas</div>` +
     (ultima ? `<div class="jult"><b style="color:${EQUIPOS[ultima.equipo].color}">⚖ ${esc(ultima.autor)}</b> ${esc(ultima.ev.nota)}</div>` : "");
   // EL PÚBLICO: un hemiciclo, un asiento por alumno, ordenados por posición y sin nombres
   const vs = (S.publico.votantes || []).map(v => v.final).sort((x, y) => y - x);

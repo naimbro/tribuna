@@ -30,47 +30,25 @@ refutación que le responde.
 
 ## La idea
 
-Dos marcadores que pueden apuntar a lados distintos, y ahí está la clase:
+Juzgan dos, y pueden apuntar a lados distintos. Ahí está la clase:
 
-| Marcador | Qué mide | De dónde sale |
+| Marcador | Qué mide | Quién juzga |
 |---|---|---|
-| **PERSUASIÓN** | swing neto de votos que producen las intervenciones propias, en **voto suave** (ganar un voto y quitárselo al rival cuentan igual) | la regla del curso: *gana quien mueve más votos, no quien obtiene más sufragios* |
-| **RIGOR** | promedio de la rúbrica sobre 20 | la rúbrica de `debates.html`: evidencia / refutación / estructura / concesión |
+| **EL JURADO** | promedio de la rúbrica sobre 20: evidencia, refutación, estructura, concesión | una IA que conoce las lecturas de la semana y lee cada intervención por separado |
+| **EL PÚBLICO** | votos que ganó cada bancada entre los alumnos que no debaten, en **voto suave** | los alumnos que entran como PÚBLICO y mueven su deslizador |
 
-La cifra de cada tarjeta del feed es ese mismo swing, así que las tarjetas de una bancada
-suman exactamente su marcador. Los shocks del profesor **no** cuentan como persuasión de
-nadie: el veredicto los muestra aparte como «sala de control».
+Si los dos coinciden, gana esa bancada. Si no coinciden, es empate: una argumentó mejor y la
+otra convenció más, y esa brecha es el pie para la síntesis docente. Sin público decide el
+jurado; si un marcador empata, decide el otro. El público empata bajo medio voto de diferencia
+(`EMPATE_VOTOS` en `app.js`).
 
-**Voto suave.** La votación que se ve en pantalla (a favor / indecisos / en contra) cuenta por
-umbral: ±8 en el eje de cada persona. La PERSUASIÓN no: cada persona aporta
-`votos · tanh(pos / 12)` al margen de la sala, así que un voto se gana de a poco alrededor del
-centro y empujar a un convencido casi no suma. Medida por cruces de umbral, la sala terminaba
-5–7 como había empezado en cerca de la mitad de las partidas y las bancadas empataban aunque
-todos se hubieran movido (`pruebas/RESULTADOS.md`). Por eso el marcador tiene un decimal. Como con
-decimales siempre habría un ganador, el veredicto declara **empate en persuasión bajo medio
-voto de diferencia** (`EMPATE_VOTOS` en `app.js`).
+En la pantalla del profesor, la columna derecha muestra los dos jueces. Arriba está EL JURADO:
+cada criterio de la rúbrica en espejo, el total y el último comentario. Abajo está EL PÚBLICO:
+un hemiciclo con un asiento por alumno, ordenado por posición y sin nombres, y cuántos están a
+favor, indecisos y en contra. La barra del centro del marcador también es del público.
 
-Una bancada puede ganar la sala y perder la rúbrica. Cuando eso pasa, el veredicto
-final lo dice con todas sus letras y ese es el pie para la síntesis docente.
-
-**La audiencia no es una masa.** Son seis bloques con intereses distintos —trabajo,
-capital, estado, calle, academia, territorio— que suman 27 votos. Ignacio (CALLE,
-6 votos) es casi indiferente a la rúbrica y se mueve con el argumento anti-élite;
-Marta (ACADEMIA, 3 votos) castiga una cita mal atribuida. Ganar a los seis es
-imposible por diseño: hay que elegir una coalición. Eso es lo que hace que los dos
-marcadores puedan divergir.
-
-**La audiencia escucha el texto, no al jurado.** Cada bloque oye los conceptos y las consignas
-por palabras clave (`oidoSala`); del jurado solo le llega el puntaje de rigor —que pondera con su
-`peso_rigor`— y la inyección. Así un jurado LLM estricto no le apaga la calle a una arenga. Como
-ese oído no distingue citar de sostener, los conceptos que puso el rival en rondas anteriores
-valen un cuarto cuando los repite quien lo refuta (`ecosDe`). Con los textos de ejemplo y jurado
-LLM y el marcador de voto suave, los marcadores divergen en ~85 % de las partidas con esta
-audiencia y en 20 de 20 con la sociedad de agentes (`pruebas/RESULTADOS.md`).
-
-**La audiencia recuerda.** Cada persona tiene una posición en un eje de −100 a +100
-que se arrastra de ronda en ronda, con saturación: a quien ya convenciste no lo
-vuelves a convencer. Sin memoria esto sería un quiz.
+Los titulares de la sala de control (📰) ya no mueven votos. Se proyectan y entran a la
+conversación como «última hora» para que las bancadas los usen o los refuten.
 
 ## La conversación y los dos moderadores
 
@@ -164,15 +142,13 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
 
 Los alumnos que no debaten entran como **PÚBLICO** (`jugar.html`, tercer botón). No escriben:
 marcan con un deslizador dónde están frente a la moción (−100 en contra … +100 a favor) y lo
-mueven cuando algo los convence. Mientras dura el debate no ven notas del jurado, votos ni
-reacciones de la audiencia sintética: leen los textos y votan con criterio propio; al final
-ven todo.
+mueven cuando algo los convence. Mientras dura el debate no ven las notas del jurado: leen
+los textos y votan con criterio propio; al final ven todo.
 
 El profesor toma una foto de las posiciones al abrir cada ronda y al revelar al ganador; lo
 que se mueve cada alumno entre dos fotos se le anota a la bancada hacia la que se movió, con
-la misma medida que la sala sintética (voto suave). Es un **tercer marcador aparte** —EL
-PÚBLICO— que la ceremonia revela entre la sala y el jurado, y la lectura final dice si el
-público real coincidió o no con la sala sintética. En el CSV, una fila por alumno del
+voto suave: `tanh(pos / 12)`, así un voto se gana de a poco alrededor del centro y empujar a
+un convencido casi no suma. La ceremonia revela primero al jurado y después al público. En el CSV, una fila por alumno del
 público con su posición inicial, final y los votos que aportó (`delta_votos`, + hacia A FAVOR).
 Las posiciones individuales solo las ve el profesor.
 
@@ -247,7 +223,14 @@ Ambos evaluadores marcan **INYECCIÓN DETECTADA** cuando el texto intenta dar
 instrucciones al evaluador en vez de argumentar: rigor 0 y la sala se da vuelta.
 En un curso de IA eso no es un bug, es materia.
 
-## Audiencia: sociedad de agentes (experimental)
+## Audiencia sintética (fuera del juego)
+
+Hasta septiembre de 2026 había un tercer juez: LA SALA, seis personajes sintéticos (Camila,
+Rodrigo, Fernanda, Ignacio, Marta, Héctor) que sumaban 27 votos. Se sacó del juego para
+simplificarlo. Su motor sigue en `app.js` (sección 3) y en `contenido/semana*.js` porque lo
+usan `pruebas/simular.js` y `pruebas/escala.js`. Lo que sigue documenta ese experimento.
+
+### Sociedad de agentes (experimental)
 
 En ⚙ MOTOR → AUDIENCIA se puede cambiar la audiencia paramétrica (los pesos `mueve`
 escritos a mano) por una **sociedad de agentes**: cada persona es un LLM chico
