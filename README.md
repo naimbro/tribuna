@@ -176,6 +176,34 @@ público real coincidió o no con la sala sintética. En el CSV, una fila por al
 público con su posición inicial, final y los votos que aportó (`delta_votos`, + hacia A FAVOR).
 Las posiciones individuales solo las ve el profesor.
 
+## Inicio, intro y cierre
+
+Una partida online tiene cuatro escenas (`escenas.js`, más la ceremonia en `app.js`):
+
+1. **Portada.** Toda sala nueva parte aquí: QR, código y los alumnos que van entrando, con su
+   foto de Google y su nombre. El anillo de color dice qué eligieron (A FAVOR, EN CONTRA,
+   PÚBLICO o gris si todavía eligen). **EMPEZAR ▶** pasa a la intro.
+2. **Intro.** Cuatro láminas: tema, moción, las dos posiciones con su lema y cómo se gana.
+   Se avanza con clic, → o espacio; **AL DEBATE ▶** abre la pantalla del debate. Los
+   teléfonos muestran la moción y el papel de cada alumno. **📖 INTRO** en la sala de control la
+   repite, y **⛶ PORTADA** en la barra de la sala vuelve al QR.
+3. **Debate.** La conversación de siempre.
+4. **Cierre.** Al terminar el último tramo, cada teléfono pide feedback (nota de 1 a 7 y
+   un comentario de hasta 300 caracteres; se puede saltar). Después de los tres marcadores, la
+   ceremonia **declara al ganador**: quien gana más marcadores (2 de 3, o 2 de 2 sin público),
+   con confeti. Si quedan parejos, es empate.
+
+El feedback no se proyecta: se lee en el panel.
+
+## Panel del profesor (`admin.html`)
+
+Todas las salas que creó tu cuenta, agrupadas por curso. Por partida muestra la fecha, el
+código, el estado, el ganador, cuántos jugaron en cada rol y el promedio del feedback. Al abrir
+una partida se ven los marcadores, los comentarios con nombre, quiénes jugaron, y los botones
+para volver a la pantalla, descargar la conversación en `.txt` o archivarla. Desde la cabecera
+de cada curso se crea una partida nueva. Las salas vacías y las archivadas se ocultan por
+defecto. El curso de cada semana está en `contenido/sesiones.js`.
+
 ## Pantalla del profesor
 
 Dos paneles, como el panel de debate de `mapuche_panel`: a la izquierda **el hilo** —una
