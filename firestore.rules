@@ -37,10 +37,19 @@ service cloud.firestore {
 
       match /jugadores/{uid} {
         allow read: if conSesion();
-        allow write: if conSesion() && uid == request.auth.uid
-          && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 40
-          && request.resource.data.email == request.auth.token.email
-          && request.resource.data.equipo in ['', 'A', 'B', 'P'];     // '' = entró y está eligiendo; P = público
+        // El alumno escribe su propio documento. Su grupo (rotación) solo cambia mientras la
+        // sala está en la portada o si todavía no eligió (0). El profesor puede moverlo.
+        allow write: if (conSesion() && uid == request.auth.uid
+            && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 40
+            && request.resource.data.email == request.auth.token.email
+            && request.resource.data.get('equipo', '') in ['', 'A', 'B', 'P']
+            && (!('grupo' in request.resource.data)
+                || (request.resource.data.grupo is int && request.resource.data.grupo >= 0 && request.resource.data.grupo <= 10
+                    && (resource == null || resource.data.get('grupo', 0) == 0
+                        || resource.data.get('grupo', 0) == request.resource.data.grupo
+                        || sala(codigo).data.get('etapa', null) == 'portada'))))
+          || (esProfe(codigo) && request.resource.data.get('grupo', 0) is int
+              && request.resource.data.get('grupo', 0) >= 0 && request.resource.data.get('grupo', 0) <= 10);
       }
 
       // Una intervención por alumno y ronda (se sobreescribe cada ronda). Solo su dueño la
@@ -62,14 +71,29 @@ service cloud.firestore {
       // relator, resultados) lo publica la pantalla del profesor. Nadie edita ni borra salvo él.
       match /mensajes/{id} {
         allow read: if esProfe(codigo) || (conSesion() && esJugador(codigo));
-        allow create: if esProfe(codigo) || (conSesion() && esJugador(codigo)
-          && request.resource.data.tipo == 'alumno'
-          && request.resource.data.uid == request.auth.uid
-          && request.resource.data.equipo == jugador(codigo).data.equipo
-          && request.resource.data.equipo in ['A', 'B']
-          && sala(codigo).data.fase == 'abierta'
-          && request.resource.data.texto is string
-          && request.resource.data.texto.size() > 0 && request.resource.data.texto.size() <= 1500);
+        allow create: if esProfe(codigo)
+          // modo clásico (salas antiguas)
+          || (conSesion() && esJugador(codigo)
+            && sala(codigo).data.get('modo', '') != 'rotacion'
+            && request.resource.data.tipo == 'alumno'
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.equipo == jugador(codigo).data.equipo
+            && request.resource.data.equipo in ['A', 'B']
+            && sala(codigo).data.fase == 'abierta'
+            && request.resource.data.texto is string
+            && request.resource.data.texto.size() > 0 && request.resource.data.texto.size() <= 1500)
+          // rotación: solo los dos grupos llamados, cada uno por su lado, en el debate en curso
+          || (conSesion() && esJugador(codigo)
+            && sala(codigo).data.get('modo', '') == 'rotacion'
+            && request.resource.data.tipo == 'alumno'
+            && request.resource.data.uid == request.auth.uid
+            && sala(codigo).data.fase == 'abierta'
+            && request.resource.data.debate == sala(codigo).data.debate.n
+            && request.resource.data.grupo == jugador(codigo).data.grupo
+            && ((request.resource.data.equipo == 'A' && jugador(codigo).data.grupo == sala(codigo).data.debate.A)
+                || (request.resource.data.equipo == 'B' && jugador(codigo).data.grupo == sala(codigo).data.debate.B))
+            && request.resource.data.texto is string
+            && request.resource.data.texto.size() > 0 && request.resource.data.texto.size() <= 1500);
         allow update, delete: if esProfe(codigo);
       }
 
@@ -91,6 +115,21 @@ service cloud.firestore {
         allow read: if esProfe(codigo) || (conSesion() && uid == request.auth.uid);
         allow write: if conSesion() && uid == request.auth.uid
           && esJugador(codigo) && jugador(codigo).data.equipo == 'P'
+          && request.resource.data.pos is number
+          && request.resource.data.pos >= -100 && request.resource.data.pos <= 100;
+      }
+
+      // Rotación: la posición de cada votante en cada debate (id = "{debate}_{uid}"). Vota solo
+      // quien no está debatiendo, en el debate en curso, con el tramo abierto o en votación.
+      match /votos/{id} {
+        allow read: if esProfe(codigo) || (conSesion() && id.matches('^[0-9]+_' + request.auth.uid + '$'));
+        allow write: if conSesion() && esJugador(codigo)
+          && id == string(request.resource.data.debate) + '_' + request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.debate == sala(codigo).data.debate.n
+          && sala(codigo).data.fase in ['abierta', 'votando']
+          && jugador(codigo).data.grupo != sala(codigo).data.debate.A
+          && jugador(codigo).data.grupo != sala(codigo).data.debate.B
           && request.resource.data.pos is number
           && request.resource.data.pos >= -100 && request.resource.data.pos <= 100;
       }
