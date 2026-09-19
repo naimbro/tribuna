@@ -18,7 +18,7 @@ const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
 const db = HAY_FIREBASE ? getFirestore(app) : null;
 
-const J = { uid: null, email: null, codigo: null, nombre: "", equipo: null, sala: null, chat: [], reloj: null, primera: true };
+const J = { uid: null, email: null, foto: null, fbListo: false, codigo: null, nombre: "", equipo: null, sala: null, chat: [], reloj: null, primera: true };
 const google = new GoogleAuthProvider();
 const colorRigor = t => t >= 14 ? "var(--neon)" : t >= 9 ? "var(--amber)" : "var(--B)";
 const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -46,13 +46,16 @@ $("btnEntrar").onclick = async () => {
     localStorage.setItem("tribuna_jugador", JSON.stringify({ codigo, nombre }));
     history.replaceState(null, "", `?sala=${codigo}`);
     const yo = await getDoc(doc(db, "salas", codigo, "jugadores", J.uid));
-    if (yo.exists() && yo.data().equipo) { J.equipo = yo.data().equipo; await entrarAlJuego(); }
-    else mostrarBancadas();
+    if (yo.exists() && yo.data().equipo) { J.equipo = yo.data().equipo; await entrarAlJuego(); return; }
+    // llegó: aparece en la portada del profesor (foto y nombre) mientras elige dónde participar
+    if (!yo.exists()) await setDoc(doc(db, "salas", codigo, "jugadores", J.uid),
+      { nombre, email: J.email, foto: J.foto || "", equipo: "", unido: Date.now() });
+    mostrarBancadas();
   } catch (e) { $("errEntrar").textContent = "No se pudo entrar: " + e.message; }
 };
 
 function mostrarBancadas() {
-  ["pEntrar", "pJuego", "estado", "caja", "voto"].forEach(id => $(id).classList.add("oculto"));
+  ["pEntrar", "pJuego", "estado", "caja", "voto", "espera", "fb"].forEach(id => $(id).classList.add("oculto"));
   $("pBancada").classList.remove("oculto");
   $("mocion1").textContent = J.sala.mocion;
   $("btnA").textContent = `${J.sala.equipos.A.bandera} ${J.sala.equipos.A.nombre}`;
@@ -64,7 +67,8 @@ function mostrarBancadas() {
 
 async function elegir(k) {
   J.equipo = k;
-  await setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { nombre: J.nombre, email: J.email, equipo: k, unido: Date.now() });
+  // merge: conserva `unido` (el orden de llegada en la portada)
+  await setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { nombre: J.nombre, email: J.email, foto: J.foto || "", equipo: k }, { merge: true });
   if (k === "P") {
     const yo = await getDoc(doc(db, "salas", J.codigo, "publico", J.uid)).catch(() => null);
     if (!yo || !yo.exists()) await guardarPos(0, true);   // el público parte indeciso: esa es su base
@@ -91,6 +95,10 @@ async function entrarAlJuego() {
     J.primera = false;
   }, e => { $("pJuego").innerHTML = `<div class="sep">No se pudo leer la conversación (${esc(e.code)}).</div>`; }));
   if (esPublico) prepararVoto(); else prepararCaja();
+  // ¿ya dejó su feedback en esta sala? (o lo saltó en este teléfono)
+  J.fbListo = localStorage.getItem("tribuna_fb_" + J.codigo) === "1";
+  if (!J.fbListo) getDoc(doc(db, "salas", J.codigo, "feedback", J.uid))
+    .then(d => { if (d.exists()) { J.fbListo = true; pintarSala(); } }).catch(() => {});
   clearInterval(J.reloj); J.reloj = setInterval(pintarReloj, 500);
 }
 
@@ -127,7 +135,9 @@ function pintarSala() {
     ${mk.publicoN ? `<span>Público <b style="color:${s.equipos.A.color}">${esc(mk.publicoA)}</b> · <b style="color:${s.equipos.B.color}">${esc(mk.publicoB)}</b></span>` : ""}
     <span>Jurado <b style="color:${s.equipos.A.color}">${esc(mk.rigorA)}</b> · <b style="color:${s.equipos.B.color}">${esc(mk.rigorB)}</b></span>`;
   if (J.equipo === "P") document.body.classList.toggle("es-publico", !s.veredicto);
-  if (s.veredicto && !J.ceremoniaVista) { J.ceremoniaVista = true; ceremonia(s, s.veredicto); }
+  pintarEspera(s);
+  pintarFeedback(s);
+  if (s.veredicto && !J.ceremoniaVista && J.fbListo) { J.ceremoniaVista = true; ceremonia(s, s.veredicto); }
   pintarChat(); pintarCaja(); pintarReloj();
 }
 
@@ -240,32 +250,138 @@ function prepararVoto() {
   pinta();
 }
 
+/* ---------- espera: portada e intro ---------- */
+const iniciales = n => String(n || "?").trim().split(/\s+/).slice(0, 2).map(x => x[0] || "").join("").toUpperCase();
+function miRol(s) {
+  return J.equipo === "P" ? { nombre: "PÚBLICO", color: "#a78bfa", bandera: "🗳" } : s.equipos[J.equipo];
+}
+function pintarEspera(s) {
+  const el = $("espera");
+  if (s.etapa !== "portada" && s.etapa !== "intro") { el.classList.add("oculto"); el.dataset.clave = ""; return; }
+  el.classList.remove("oculto");
+  const r = miRol(s);
+  const clave = s.etapa + "|" + J.equipo;
+  if (el.dataset.clave === clave) return;           // no repintar en cada cambio de la sala
+  el.dataset.clave = clave;
+  const av = `<div class="av" style="--c:${r.color};--t:92px">${J.foto ? `<img src="${esc(J.foto)}" referrerpolicy="no-referrer" alt="">` : `<span>${iniciales(J.nombre)}</span>`}</div>`;
+  const papel = J.equipo === "P"
+    ? "Eres <b>público</b>: lee la conversación y mueve tu deslizador cada vez que algo te convenza. Cuenta cuánto te mueve cada bancada."
+    : `Debates <b style="color:${r.color}">${esc(r.nombre)}</b>: escribe en la conversación cuando se abra cada tramo. La moderadora puede preguntarte a ti por tu nombre; respóndele con argumentos y lecturas del curso.`;
+  el.innerHTML = s.etapa === "portada"
+    ? `${av}<h1 style="margin-top:14px">¡Estás dentro, ${esc(J.nombre.split(" ")[0])}!</h1>
+       <span class="chip" style="--c:${r.color}">${r.bandera} ${esc(r.nombre)}</span>
+       <p style="color:var(--dim);margin-top:18px;max-width:340px">Mira la pantalla del curso. El debate empieza cuando el profesor lo diga.</p>
+       <button class="link" id="esCambiar">cambiar de rol</button>`
+    : `<div class="k">Semana ${s.semana} · la moción</div>
+       <div class="es-mocion">«${esc(s.mocion)}»</div>
+       <div class="es-lados">
+         <div style="--c:${s.equipos.A.color}"><b>${s.equipos.A.bandera} ${esc(s.equipos.A.nombre)}</b>${esc(s.equipos.A.lema || "Defiende la moción.")}</div>
+         <div style="--c:${s.equipos.B.color}"><b>${s.equipos.B.bandera} ${esc(s.equipos.B.nombre)}</b>${esc(s.equipos.B.lema || "Rechaza la moción.")}</div>
+       </div>
+       <div class="es-papel">${papel}</div>`;
+  const b = $("esCambiar"); if (b) b.onclick = () => { subs.forEach(u => u()); subs = []; el.dataset.clave = ""; mostrarBancadas(); };
+}
+
+/* ---------- feedback: al terminar, antes del veredicto (como en ml2) ----------
+   1 a 7 porque es la escala de notas y no hay que explicarla; el comentario es corto porque
+   se escribe con el pulgar. Se puede saltar: obligar sube la tasa y baja la calidad. No es
+   anónimo (el documento lleva el uid) y en ninguna parte se dice que lo sea. */
+const FB = { nota: null };
+function pintarFeedback(s) {
+  const el = $("fb");
+  const toca = s.fase === "fin" && !J.fbListo && s.etapa == null;
+  el.classList.toggle("oculto", !toca);
+  if (!toca) return;
+  if (!$("fbNotas").children.length) {
+    $("fbNotas").innerHTML = [1, 2, 3, 4, 5, 6, 7].map(n => `<button data-n="${n}">${n}</button>`).join("");
+    $("fbNotas").onclick = e => {
+      const n = +e.target.dataset?.n; if (!n) return;
+      FB.nota = n; [...$("fbNotas").children].forEach(b => b.classList.toggle("on", +b.dataset.n === n)); fbBoton();
+    };
+    $("fbTx").oninput = () => { $("fbCuenta").textContent = `${$("fbTx").value.length}/300`; fbBoton(); };
+    $("fbEnviar").onclick = enviarFeedback;
+    $("fbSaltar").onclick = () => listoFeedback();
+  }
+  $("fbAviso").textContent = s.veredicto ? "🏆 El veredicto ya está en la pantalla: envía o salta para verlo aquí." : "";
+}
+const fbBoton = () => { $("fbEnviar").disabled = FB.nota === null && !$("fbTx").value.trim(); };
+async function enviarFeedback() {
+  $("fbEnviar").disabled = true; $("fbEnviar").textContent = "Enviando…";
+  try {
+    await setDoc(doc(db, "salas", J.codigo, "feedback", J.uid), {
+      nota: FB.nota, comentario: $("fbTx").value.trim().slice(0, 300),
+      nombre: J.nombre, email: J.email, equipo: J.equipo, t: Date.now()
+    });
+    listoFeedback();
+  } catch (e) { $("fbAviso").textContent = "No se envió: " + e.code; $("fbEnviar").textContent = "Enviar y ver el veredicto"; fbBoton(); }
+}
+function listoFeedback() {
+  J.fbListo = true;
+  localStorage.setItem("tribuna_fb_" + J.codigo, "1");
+  $("fb").classList.add("oculto");
+  pintarSala();
+}
+
 /* ---------- el ganador, en grande ---------- */
 function ceremonia(s, v) {
   const col = n => n === s.equipos.A.nombre ? s.equipos.A.color : n === s.equipos.B.nombre ? s.equipos.B.color : "var(--txt)";
   const band = n => n === s.equipos.A.nombre ? s.equipos.A.bandera + " " : n === s.equipos.B.nombre ? s.equipos.B.bandera + " " : "";
   const el = document.createElement("div");
   el.id = "ceremonia";
-  el.innerHTML = `<div class="k" style="color:var(--amber);font-size:14px">EL VEREDICTO</div>
+  // salas anteriores a la declaración final: el ganador se calcula con los marcadores
+  const noms = [v.ganaP, v.pubN ? v.ganaU : null, v.ganaR].filter(x => x != null);
+  const cA = noms.filter(x => x === s.equipos.A.nombre).length, cB = noms.filter(x => x === s.equipos.B.nombre).length;
+  const gG = v.ganaG || (cA > cB ? s.equipos.A.nombre : cB > cA ? s.equipos.B.nombre : "EMPATE");
+  const n = v.marcN || noms.length, m = Math.max(v.marcA ?? cA, v.marcB ?? cB);
+  el.innerHTML = `<div class="ctab"><div class="k" style="color:var(--amber);font-size:14px">EL VEREDICTO</div>
     <div class="cb" id="c1"><div class="k">La sala · votos ganados</div><div class="cg" style="color:${col(v.ganaP)}">${band(v.ganaP)}${esc(v.ganaP)}</div>
       <div class="cs">${v.movA > 0 ? "+" : ""}${v.movA} · ${v.movB > 0 ? "+" : ""}${v.movB}</div></div>
     ${v.pubN ? `<div class="cb" id="cP"><div class="k">El público · ${v.pubN} alumnos</div><div class="cg" style="color:${col(v.ganaU)}">${band(v.ganaU)}${esc(v.ganaU)}</div>
       <div class="cs">${v.pubA > 0 ? "+" : ""}${v.pubA} · ${v.pubB > 0 ? "+" : ""}${v.pubB}</div></div>` : ""}
     <div class="cb" id="c2"><div class="k">El jurado · rigor /20</div><div class="cg" style="color:${col(v.ganaR)}">${band(v.ganaR)}${esc(v.ganaR)}</div>
-      <div class="cs">${v.rA} · ${v.rB}</div></div>
-    <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>`;
+      <div class="cs">${v.rA} · ${v.rB}</div></div></div>
+    <div class="cfin">
+      <div id="cGpre">${gG !== "EMPATE" ? "Y EL DEBATE LO GANA…" : "Y EL DEBATE…"}</div>
+      <div class="cb" id="cG"><div class="cg" style="color:${col(gG)}">${gG !== "EMPATE" ? "🏆 " + band(gG) + esc(gG) : "TERMINA EN EMPATE"}</div>
+        <div class="cs">${gG !== "EMPATE" ? `${m} de ${n} marcadores` : "ningún lado ganó más marcadores"}</div>
+        <div class="cmini"><span>Sala: <b style="color:${col(v.ganaP)}">${esc(v.ganaP)}</b></span>${v.pubN ? `<span>Público: <b style="color:${col(v.ganaU)}">${esc(v.ganaU)}</b></span>` : ""}<span>Jurado: <b style="color:${col(v.ganaR)}">${esc(v.ganaR)}</b></span></div></div>
+      <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>
+    </div>`;
   document.body.appendChild(el);
   const ids = v.pubN ? ["c1", "cP", "c2"] : ["c1", "c2"];
   ids.forEach((id, i) => setTimeout(() => $(id)?.classList.add("on"), 2600 + i * 3000));
-  setTimeout(() => $("c3")?.classList.add("on"), 2600 + ids.length * 3000 - 200);
+  const tFinal = 2600 + ids.length * 3000 + 1200;
+  setTimeout(() => el.classList.add("final"), tFinal);
+  setTimeout(() => {
+    $("cGpre")?.remove(); $("cG")?.classList.add("on"); navigator.vibrate?.([80, 60, 200]);
+    confeti(gG !== "EMPATE" ? [col(gG), "#ffffff", "#f5b301"] : [s.equipos.A.color, s.equipos.B.color, "#f5b301"]);
+  }, tFinal + 2800);
+  setTimeout(() => $("c3")?.classList.add("on"), tFinal + 4400);
   $("c3").onclick = () => el.remove();
+}
+
+function confeti(colores, ms = 4500) {
+  const c = document.createElement("canvas");
+  c.style.cssText = "position:fixed;inset:0;z-index:30;pointer-events:none";
+  c.width = innerWidth; c.height = innerHeight; document.body.appendChild(c);
+  const x = c.getContext("2d");
+  const ps = Array.from({ length: 140 }, () => ({ x: c.width / 2, y: c.height * .4, vx: (Math.random() - .5) * 14, vy: -Math.random() * 14 - 4,
+    r: Math.random() * 6 + 3, a: Math.random() * 6, va: (Math.random() - .5) * .4, col: colores[Math.floor(Math.random() * colores.length)] }));
+  const t0 = performance.now();
+  (function paso(t) {
+    x.clearRect(0, 0, c.width, c.height);
+    const vida = 1 - (t - t0) / ms;
+    for (const p of ps) { p.vy += .35; p.x += p.vx; p.y += p.vy; p.a += p.va;
+      x.save(); x.globalAlpha = Math.max(0, Math.min(1, vida * 2)); x.translate(p.x, p.y); x.rotate(p.a); x.fillStyle = p.col; x.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); x.restore(); }
+    if (vida > 0) requestAnimationFrame(paso); else c.remove();
+  })(t0);
 }
 
 /* ---------- arranque ---------- */
 if (!HAY_FIREBASE) $("errEntrar").textContent = "Esta copia de TRIBUNA no tiene configurado el proyecto Firebase (firebase-config.js).";
 else onAuthStateChanged(auth, user => {
   if (user && (user.isAnonymous || !user.email)) { signOut(auth); return; }   // sesión anónima vieja
-  J.uid = user?.uid || null; J.email = user?.email || null;
+  J.uid = user?.uid || null; J.email = user?.email || null; J.foto = user?.photoURL || null;
   if (!user) { $("btnEntrar").textContent = "Entrar con Google"; return; }
   $("btnEntrar").textContent = "Entrar";
   if (!$("inNombre").value && user.displayName) $("inNombre").value = user.displayName;

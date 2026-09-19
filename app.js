@@ -631,14 +631,23 @@ function siguienteRonda() {
 
 // El momento dramático: pantalla completa, redoble, la sala elige, el jurado elige, y la lectura.
 // Al final, "Ver detalle" abre el veredicto con la tabla por bloque.
-function ceremonia() {
-  S.veredictoRevelado = true;
+// Los tres marcadores y quién ganó cada uno. El debate lo gana quien gana más marcadores
+// (2 de 3, o 2 de 2 sin público); si quedan parejos es empate.
+function marcadores() {
   const movA = persuasion("A"), movB = persuasion("B");
   const rA = rigorMedio("A") || 0, rB = rigorMedio("B") || 0;
+  const P = S.publico, hayP = P.n > 0;
   const gP = empatanEnVotos(movA, movB) ? null : (movA > movB ? "A" : "B");
   const gR = Math.abs(rA - rB) < 0.05 ? null : (rA > rB ? "A" : "B");
-  const P = S.publico, hayP = P.n > 0;
   const gU = !hayP || empatanEnVotos(P.A, P.B) ? null : (P.A > P.B ? "A" : "B");
+  const lista = hayP ? [gP, gU, gR] : [gP, gR];
+  const a = lista.filter(g => g === "A").length, b = lista.filter(g => g === "B").length;
+  return { movA, movB, rA, rB, P, hayP, gP, gR, gU, gG: a > b ? "A" : b > a ? "B" : null, a, b, n: lista.length };
+}
+
+function ceremonia() {
+  S.veredictoRevelado = true;
+  const { movA, movB, rA, rB, P, hayP, gP, gR, gU, gG, a, b, n } = marcadores();
   const nombre = k => k ? `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}` : "EMPATE";
   const color = k => k ? EQUIPOS[k].color : "var(--txt)";
   const lectura = gP && gR && gP !== gR ? "Una bancada ganó la sala y la otra el jurado. Esto es la clase."
@@ -647,9 +656,12 @@ function ceremonia() {
   const lecturaP = !hayP ? "" : gU === gP
     ? `<div style="font-size:18px;color:var(--dim);margin-top:8px">El público real coincidió con la sala sintética.</div>`
     : `<div style="font-size:18px;color:var(--amber);margin-top:8px">El público real no coincidió con la sala sintética: ¿qué vieron los agentes que ustedes no, o al revés?</div>`;
+  const cuenta = gG ? `${Math.max(a, b)} de ${n} marcadores` : a === b && a > 0 ? "cada bancada ganó la misma cantidad de marcadores" : "ningún marcador los separó";
+  const mini = (l, k) => `<span>${l}<b style="color:${color(k)}">${k ? EQUIPOS[k].nombre : "empate"}</b></span>`;
   const el = document.createElement("div");
   el.id = "ceremonia";
   el.innerHTML = `
+    <div class="cer-tablero">
     <div class="cer-k" id="cer0">EL VEREDICTO</div>
     <div class="cer-bloque" id="cer1"><div class="cer-k">LA SALA · votos ganados</div>
       <div class="cer-g" style="color:${color(gP)}">${nombre(gP)}</div>
@@ -660,9 +672,18 @@ function ceremonia() {
     <div class="cer-bloque" id="cer2"><div class="cer-k">EL JURADO · rigor promedio /20</div>
       <div class="cer-g" style="color:${color(gR)}">${nombre(gR)}</div>
       <div class="cer-s"><span style="color:${EQUIPOS.A.color}">${rA.toFixed(1)}</span> · <span style="color:${EQUIPOS.B.color}">${rB.toFixed(1)}</span></div></div>
-    <div class="cer-lect" id="cer3">${lectura}${lecturaP}
-      <div style="margin-top:18px;display:flex;gap:10px;justify-content:center">
-        <button class="btn pri" id="cerDetalle">Ver detalle</button><button class="btn" id="cerCerrar">Cerrar</button></div></div>`;
+    </div>
+    <div class="cer-final">
+      <div id="cerGpre">${gG ? "Y EL DEBATE LO GANA…" : "Y EL DEBATE…"}</div>
+      <div class="cer-bloque" id="cerG">
+        <div class="cer-g" style="color:${color(gG)}">${gG ? `🏆 ${nombre(gG)}` : "TERMINA EN EMPATE"}</div>
+        <div class="cer-s">${cuenta}</div>
+        <div class="cer-mini">${mini("LA SALA", gP)}${hayP ? mini("EL PÚBLICO", gU) : ""}${mini("EL JURADO", gR)}</div>
+      </div>
+      <div class="cer-lect" id="cer3">${lectura}${lecturaP}
+        <div style="margin-top:18px;display:flex;gap:10px;justify-content:center">
+          <button class="btn pri" id="cerDetalle">Ver detalle</button><button class="btn" id="cerCerrar">Cerrar</button></div></div>
+    </div>`;
   document.body.appendChild(el);
   const ver = (id, t) => setTimeout(() => $(id)?.classList.add("on"), t);
   sonar("redoble");
@@ -670,7 +691,15 @@ function ceremonia() {
   if (hayP) el.classList.add("tres");
   const pasos = hayP ? [["cer1", gP], ["cerP", gU], ["cer2", gR]] : [["cer1", gP], ["cer2", gR]];
   pasos.forEach(([id, g], i) => { ver(id, 2600 + i * 3000); setTimeout(() => sonar(g ? "fanfarria" : "whoosh"), 2600 + i * 3000); });
-  ver("cer3", 2600 + pasos.length * 3000 - 200);
+  // la declaración: se va el tablero, redoble, y el ganador en grande con confeti
+  const tFinal = 2600 + pasos.length * 3000 + 1200;
+  setTimeout(() => { el.classList.add("final"); sonar("redoble"); }, tFinal);
+  setTimeout(() => {
+    $("cerGpre")?.remove(); $("cerG")?.classList.add("on");
+    sonar("fanfarria"); setTimeout(() => sonar("aplauso"), 500);
+    if (typeof confeti === "function") confeti(gG ? [EQUIPOS[gG].color, "#ffffff", "#ffb020"] : [EQUIPOS.A.color, EQUIPOS.B.color, "#ffb020"]);
+  }, tFinal + 2800);
+  ver("cer3", tFinal + 4600);
   $("cerCerrar").onclick = () => el.remove();
   $("cerDetalle").onclick = () => { el.remove(); veredicto(); };
   $("btnPrincipal").textContent = "VER VEREDICTO";

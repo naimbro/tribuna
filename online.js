@@ -24,7 +24,7 @@ const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
 const db = HAY_FIREBASE ? getFirestore(app) : null;
 
-const ON = { codigo: null, uid: null, email: null, jugadores: {}, intervenciones: {}, publico: {}, timer: null, pendiente: false };
+const ON = { codigo: null, uid: null, email: null, creada: null, jugadores: {}, intervenciones: {}, publico: {}, feedback: 0, timer: null, pendiente: false };
 const CODIGO_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const nuevoCodigo = () => Array.from({ length: 4 }, () => CODIGO_CHARS[Math.floor(Math.random() * CODIGO_CHARS.length)]).join("");
 const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, "")}jugar.html?sala=${ON.codigo}`;
@@ -33,10 +33,11 @@ const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, 
 function estadoPublico() {
   const R = RONDAS[S.ronda];
   return {
-    profeUid: ON.uid, profeEmail: ON.email, actualizado: Date.now(),
-    semana: SESION.semana, tema: SESION.tema, mocion: SESION.mocion,
-    equipos: { A: { nombre: EQUIPOS.A.nombre, bandera: EQUIPOS.A.bandera, color: EQUIPOS.A.color },
-               B: { nombre: EQUIPOS.B.nombre, bandera: EQUIPOS.B.bandera, color: EQUIPOS.B.color } },
+    profeUid: ON.uid, profeEmail: ON.email, actualizado: Date.now(), creada: ON.creada || null,
+    curso: SESION.curso || "", semana: SESION.semana, tema: SESION.tema, mocion: SESION.mocion,
+    etapa: S.etapa || null,                                     // "portada" → "intro" → null (debate)
+    equipos: { A: { nombre: EQUIPOS.A.nombre, bandera: EQUIPOS.A.bandera, color: EQUIPOS.A.color, lema: EQUIPOS.A.lema || "" },
+               B: { nombre: EQUIPOS.B.nombre, bandera: EQUIPOS.B.bandera, color: EQUIPOS.B.color, lema: EQUIPOS.B.lema || "" } },
     fase: S.fase, ronda: S.ronda, totalRondas: RONDAS.length,
     rondaNombre: R.nombre, rol: R.rol, pauta: R.pauta, seg: R.seg,
     abreEn: S.abreEn || null,                                   // epoch ms; el alumno calcula el reloj
@@ -67,11 +68,10 @@ function estadoPublico() {
 }
 
 function resumenVeredicto() {
-  const movA = persuasion("A"), movB = persuasion("B");
-  const rA = rigorMedio("A") || 0, rB = rigorMedio("B") || 0;
-  const P = S.publico;
+  const { movA, movB, rA, rB, P, gG, a, b, n } = marcadores();
   return {
     movA, movB, rA: +rA.toFixed(1), rB: +rB.toFixed(1),
+    ganaG: gG ? EQUIPOS[gG].nombre : "EMPATE", marcA: a, marcB: b, marcN: n,
     pubN: P.n, pubA: decima(P.A), pubB: decima(P.B),
     ganaU: !P.n ? null : empatanEnVotos(P.A, P.B) ? "EMPATE" : P.A > P.B ? EQUIPOS.A.nombre : EQUIPOS.B.nombre,
     ganaP: empatanEnVotos(movA, movB) ? "EMPATE" : movA > movB ? EQUIPOS.A.nombre : EQUIPOS.B.nombre,
@@ -82,7 +82,7 @@ function resumenVeredicto() {
 // Estado completo para restaurar la pestaña del profesor (incluye evaluaciones y memorias).
 function estadoPrivado() {
   return {
-    ronda: S.ronda, fase: S.fase, seq: S.seq, votoInicial: S.votoInicial, iniPos: S.iniPos,
+    ronda: S.ronda, fase: S.fase, etapa: S.etapa || null, seq: S.seq, votoInicial: S.votoInicial, iniPos: S.iniPos,
     historial: S.historial, turnos: S.turnos, shocks: S.shocks, abreEn: S.abreEn || null,
     publicoSnaps: S.publicoSnaps || [], publicoBase: S.publicoBase || {},
     audiencia: Object.fromEntries(AUDIENCIA.map(p => [p.id, { pos: p.pos, memoria: p.memoria || [], ultimo: p.ultimo || "" }]))
@@ -157,8 +157,18 @@ function activarOnline() {
   onSnapshot(collectionJugadores(), snap => {
     ON.jugadores = {};
     snap.forEach(d => ON.jugadores[d.id] = d.data());
-    pintarBarraOnline(); pintarFeed();
+    pintarBarraOnline(); pintarFeed(); actualizarPortada(ON.jugadores);
   });
+
+  // El feedback de los alumnos (se pide en el teléfono al terminar). Aquí solo se cuenta:
+  // los comentarios con nombre se leen en el panel (admin.html), no frente al curso.
+  onSnapshot(collection(db, "salas", ON.codigo, "feedback"), snap => { ON.feedback = snap.size; pintarBarraOnline(); },
+    () => {});
+
+  // Las escenas: portada (QR y quién va entrando) → intro → debate
+  $("btnIntro").onclick = () => irA("intro");
+  if (S.etapa === "portada") irA("portada");
+  else if (S.etapa === "intro") irA("intro");
 
   pintarBarraOnline();
   $("btnEjemplo").style.display = "none";        // en línea escriben los alumnos, no el botón
@@ -173,6 +183,17 @@ function activarOnline() {
 }
 
 const collectionJugadores = () => collection(db, "salas", ON.codigo, "jugadores");
+
+// Cambia de escena y la publica: los teléfonos muestran lo mismo (espera en la portada,
+// la moción durante la intro, la conversación en el debate).
+function irA(etapa) {
+  S.etapa = etapa;
+  cerrarPortada();
+  if (etapa === "portada") { mostrarPortada(urlJugar(), ON.codigo, () => irA("intro")); actualizarPortada(ON.jugadores); }
+  if (etapa === "intro") mostrarIntro(() => irA(null));
+  if (etapa === null) tick("Comienza el debate. Abre el primer tramo cuando estén listos.");
+  publicar();
+}
 
 /* ---------- EL PÚBLICO: alumnos que no debaten marcan su posición (−100…+100) ----------
    Se toma una foto de las posiciones al abrir cada ronda y al revelar al ganador. Lo que se
@@ -222,33 +243,17 @@ function pintarBarraOnline() {
     <span title="profesor">${ON.email || ""}</span>
     <span>${js.length} en la sala · <span style="color:var(--A)">${EQUIPOS.A.nombre} ${nA}</span> · <span style="color:var(--B)">${EQUIPOS.B.nombre} ${nB}</span> · <span style="color:#a78bfa">PÚBLICO ${nP}</span></span>
     <span class="mono" style="color:var(--txt)">${urlJugar()}</span>
-    <button class="btn" id="btnCodigo" style="margin-left:auto">⛶ MOSTRAR CÓDIGO</button>`;
-  $("btnCodigo").onclick = mostrarCodigo;
-}
-
-function mostrarCodigo() {
-  // QR con la URL de la sala (como en ml2); si la librería no cargó, queda la URL y el código
-  let qr = "";
-  if (typeof qrcode === "function") {
-    const q = qrcode(0, "M"); q.addData(urlJugar()); q.make();
-    qr = `<div style="background:#fff;padding:14px;border-radius:12px;display:inline-block">${q.createSvgTag({ cellSize: 6, margin: 0 })}</div>`;
-  }
-  abrirModal(`<h2 style="text-align:center">Entra con tu teléfono</h2>
-    <div style="display:flex;gap:28px;align-items:center;justify-content:center;flex-wrap:wrap;margin:8px 0 14px">
-      ${qr}
-      <div style="text-align:center">
-        <div style="color:var(--dim);font-size:12px;letter-spacing:.14em">CÓDIGO DE LA SALA</div>
-        <div class="mono" style="font-size:96px;letter-spacing:.3em;color:var(--neon);line-height:1.1">${ON.codigo}</div>
-        <div style="color:var(--dim)">o abre <b>jugar.html</b> y escribe el código</div>
-      </div>
-    </div>
-    <p class="mono" style="text-align:center;font-size:18px;color:var(--txt);word-break:break-all">${urlJugar()}</p>
-    <div style="text-align:center"><button class="btn" onclick="cerrarModal()">Volver</button></div>`);
+    ${ON.feedback ? `<span title="Feedback recibido; se lee en MIS PARTIDAS">💬 ${ON.feedback} feedback</span>` : ""}
+    <a class="btn" href="admin.html" target="_blank" style="margin-left:auto;text-decoration:none;color:inherit">📋 MIS PARTIDAS</a>
+    <button class="btn" id="btnPortada" title="Volver a la portada con el QR y quién entró">⛶ PORTADA</button>`;
+  $("btnPortada").onclick = () => irA("portada");
 }
 
 /* ---------- crear o restaurar la sala ---------- */
 async function crearSala() {
   ON.codigo = nuevoCodigo();
+  ON.creada = Date.now();
+  S.etapa = "portada";                  // toda sala nueva parte en la portada
   await setDoc(doc(db, "salas", ON.codigo), limpio({ ...estadoPublico(), creada: Date.now() }));
   await setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado()));
   location.href = `${location.pathname}?sala=${ON.codigo}&semana=${SESION.semana}`;
@@ -268,6 +273,8 @@ async function restaurar(codigo) {
   }
   const priv = (await getDoc(doc(db, "salas", codigo, "privado", "estado"))).data();
   ON.codigo = codigo;
+  ON.creada = pub.data().creada || null;
+  S.etapa = priv?.etapa ?? null;
   if (priv && priv.historial) {
     S.ronda = priv.ronda; S.seq = priv.seq || 0; S.shocks = priv.shocks || [];
     S.publicoSnaps = priv.publicoSnaps || []; S.publicoBase = priv.publicoBase || {};
@@ -309,7 +316,8 @@ function botonCrear() {
   bar.id = "barraEntrar";
   bar.style.cssText = "display:flex;gap:14px;align-items:center;padding:8px 18px;background:#0c1319;border-bottom:1px solid var(--line);font-size:13px;color:var(--dim)";
   bar.innerHTML = `<span>Conectado como <b style="color:var(--txt)">${ON.email}</b>. Crea una sala para que las bancadas escriban desde sus teléfonos.</span>
-    <button class="btn pri" id="btnOnline" style="margin-left:auto">🌐 CREAR SALA ONLINE</button>
+    <a class="btn" href="admin.html" style="margin-left:auto;text-decoration:none;color:inherit">📋 MIS PARTIDAS</a>
+    <button class="btn pri" id="btnOnline">🌐 CREAR SALA ONLINE</button>
     <button class="btn" id="btnSalir" title="Salir">⎋ salir</button>`;
   document.querySelector(".marcador").before(bar);
   $("btnOnline").onclick = () => crearSala().catch(e => alert(e.code === "permission-denied"

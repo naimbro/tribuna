@@ -40,7 +40,7 @@ service cloud.firestore {
         allow write: if conSesion() && uid == request.auth.uid
           && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 40
           && request.resource.data.email == request.auth.token.email
-          && request.resource.data.equipo in ['A', 'B', 'P'];     // P = público
+          && request.resource.data.equipo in ['', 'A', 'B', 'P'];     // '' = entró y está eligiendo; P = público
       }
 
       // Una intervención por alumno y ronda (se sobreescribe cada ronda). Solo su dueño la
@@ -71,6 +71,17 @@ service cloud.firestore {
           && request.resource.data.texto is string
           && request.resource.data.texto.size() > 0 && request.resource.data.texto.size() <= 1500);
         allow update, delete: if esProfe(codigo);
+      }
+
+      // Feedback del juego (al terminar, en el teléfono): nota 1–7 o null y un comentario corto.
+      // Lo escribe cada alumno sobre sí mismo; lo leen él y el profesor de la sala (en el panel,
+      // no frente al curso). No es anónimo: el id es su uid.
+      match /feedback/{uid} {
+        allow read: if esProfe(codigo) || (conSesion() && uid == request.auth.uid);
+        allow write: if conSesion() && uid == request.auth.uid && esJugador(codigo)
+          && (request.resource.data.nota == null
+              || (request.resource.data.nota is int && request.resource.data.nota >= 1 && request.resource.data.nota <= 7))
+          && request.resource.data.comentario is string && request.resource.data.comentario.size() <= 300;
       }
 
       // El público: cada alumno que no debate guarda su posición frente a la moción (−100…+100).

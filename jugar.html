@@ -68,6 +68,31 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 .escala{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--dim)}
 .escala b{font-size:14px;color:#a78bfa}
 #voto.pide{box-shadow:0 -6px 30px rgba(167,139,250,.35);border-top-color:#a78bfa}
+/* espera (portada / intro) y feedback: tapan la conversación */
+.capa{position:fixed;inset:0;z-index:15;background:var(--bg);overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 18px;text-align:center}
+.capa .k{margin-top:14px}
+.av{width:var(--t);height:var(--t);border-radius:50%;border:3px solid var(--c);overflow:hidden;display:grid;place-items:center;background:#16212c;margin:0 auto}
+.av img{width:100%;height:100%;object-fit:cover}.av span{font-weight:800;font-size:calc(var(--t)*.36);color:var(--c)}
+.chip{display:inline-block;margin-top:8px;padding:3px 12px;border-radius:99px;border:1px solid var(--c);color:var(--c);font-size:13px;font-weight:700}
+.es-mocion{font-family:Georgia,serif;font-size:21px;font-weight:700;line-height:1.3;margin:6px 0 14px}
+.es-lados{display:flex;gap:8px;text-align:left;width:100%;max-width:520px}
+.es-lados div{flex:1;border-top:3px solid var(--c);background:#101820;border-radius:10px;padding:10px;font-size:13px}
+.es-lados b{color:var(--c);display:block;margin-bottom:3px}
+.es-papel{margin-top:16px;max-width:520px;font-size:14px;color:var(--txt);background:#10181f;border:1px solid var(--line);border-radius:10px;padding:12px}
+.link{background:none;border:none;color:var(--dim);text-decoration:underline;font:inherit;font-size:13px;margin-top:14px;cursor:pointer}
+#fb .card{width:100%;max-width:440px;text-align:left;margin:0}
+.notas{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.notas button{aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:#141d26;color:var(--txt);font:inherit;font-weight:800;font-size:18px;cursor:pointer}
+.notas button.on{background:var(--neon);color:#062a17;border-color:transparent;transform:scale(1.06)}
+.escala7{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:4px}
+#fbAviso{color:var(--amber);font-size:13px;margin-top:10px}
+#ceremonia .cfin{display:none;flex-direction:column;align-items:center;gap:12px}
+#ceremonia.final .ctab{display:none}#ceremonia.final .cfin{display:flex}
+#ceremonia .ctab{display:flex;flex-direction:column;gap:22px;align-items:center}
+#cGpre{color:var(--amber);letter-spacing:.24em;font-size:15px;animation:pulso .8s infinite}
+@keyframes pulso{50%{opacity:.4}}
+#cG .cg{font-size:40px}
+.cmini{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:12.5px;color:var(--dim)}
 #ceremonia{position:fixed;inset:0;z-index:20;background:rgba(5,9,13,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center;padding:20px}
 #ceremonia .cb{opacity:0;transform:scale(.7);transition:all .7s cubic-bezier(.2,1.5,.4,1)}
 #ceremonia .on{opacity:1;transform:scale(1)}
@@ -106,6 +131,26 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
   </div>
 </section>
 
+<!-- espera: portada e intro (el profesor proyecta; aquí se ve lo esencial) -->
+<div id="espera" class="capa oculto"></div>
+
+<!-- feedback: al terminar el debate, antes del veredicto (se puede saltar) -->
+<div id="fb" class="capa oculto">
+  <div class="card">
+    <h1>Antes del veredicto</h1>
+    <p style="color:var(--dim);font-size:13.5px;margin:0 0 16px">Dos preguntas cortas sobre el juego de hoy. Las lee el profesor.</p>
+    <div style="font-weight:700;margin-bottom:8px">¿Cuánto te gustó?</div>
+    <div class="notas" id="fbNotas"></div>
+    <div class="escala7"><span>nada</span><span>me encantó</span></div>
+    <div style="font-weight:700;margin:18px 0 8px">¿Qué cambiarías para la próxima?</div>
+    <textarea id="fbTx" rows="3" maxlength="300" placeholder="Una cosa. La que más te molestó o la que más te faltó."></textarea>
+    <div style="text-align:right;font-size:11px;color:var(--dim2)" id="fbCuenta">0/300</div>
+    <button class="btn pri" id="fbEnviar" disabled>Enviar y ver el veredicto</button>
+    <button class="link" id="fbSaltar" style="display:block;margin:12px auto 0">Saltar</button>
+    <div id="fbAviso"></div>
+  </div>
+</div>
+
 <!-- 3. la conversación -->
 <div id="estado" class="estado oculto">
   <div><b id="tramoLbl"></b> <span id="pauta"></span></div>
@@ -128,6 +173,6 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
   <div class="nota-caja" id="avisoVoto"></div>
 </div>
 
-<script type="module" src="jugar.js?v=20260919l"></script>
+<script type="module" src="jugar.js?v=20260920a"></script>
 </body>
 </html>
