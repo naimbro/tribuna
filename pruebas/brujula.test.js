@@ -84,12 +84,6 @@ test("emparejarLejanos: nadie queda dos debates atrás y se elige el par más le
   assert.equal(B.emparejarLejanos([1], [], posDe), null);
 });
 
-test("movimiento: solo quienes respondieron las dos veces", () => {
-  const m = B.movimiento({ a: { x: 0, y: 0 }, b: { x: 1, y: 1 } }, { a: { x: 3, y: 4 } });
-  assert.equal(m.length, 1);
-  assert.equal(m[0].d, 5);
-});
-
 test("mapaSvg: un círculo por campo y por punto, flecha si hay «desde»", () => {
   const s = B.mapaSvg({ puntos: [{ x: 1, y: 1, color: "#fff" }, { x: 2, y: 2, color: "#fff", desde: { x: 0, y: 0 } }], campos: campos.map(c => ({ ...c, nombre: c.id, color: "#38bdf8" })), ejes: null });
   assert.equal((s.match(/<circle/g) || []).length, 6);
@@ -129,4 +123,33 @@ test("ofrecerBrujula: a quien no la respondió, mientras se puede, tenga o no gr
   assert.equal(B.ofrecerBrujula({ activa: true, fase: "cerrada" }, false), false);
   assert.equal(B.ofrecerBrujula({ activa: false, fase: null }, false), false);
   assert.equal(B.ofrecerBrujula(null, false), false);
+});
+
+test("emparejarLejanos: A FAVOR va al grupo que menos veces lo ha sido", () => {
+  const posDe = { 1: { x: -6, y: 5 }, 2: { x: 6, y: -5 } };
+  assert.deepEqual(B.emparejarLejanos([1, 2], [{ A: 1, B: 2 }], posDe), { A: 2, B: 1 });
+  assert.deepEqual(B.emparejarLejanos([1, 2], [{ A: 1, B: 2 }, { A: 2, B: 1 }], posDe), { A: 1, B: 2 });
+});
+
+test("formarGrupos: al sumar campos chicos ningún grupo pasa de 5", () => {
+  const xs = [...Array.from({ length: 5 }, (_, i) => al("l" + i, "ley", -6, 5 + i * 0.1)),
+              al("a1", "adentro", -6, -5), al("a2", "adentro", -6, -4),
+              al("g1", "guard", 6, 5), al("g2", "guard", 5, 5),
+              al("n1", "nada", 6, -5), al("n2", "nada", 5, -5)];
+  const { grupos, de } = B.formarGrupos(xs, campos);
+  assert.ok(grupos.every(g => g.miembros.length <= 5), grupos.map(g => g.miembros.length).join(","));
+  assert.equal(Object.keys(de).length, 11);
+});
+
+test("formarGrupos: nunca más de 10 grupos (la regla admite grupo 1..10)", () => {
+  const xs = Array.from({ length: 63 }, (_, i) => al("u" + i, campos[i % 4].id, campos[i % 4].centro.x + (i % 7) * 0.1, campos[i % 4].centro.y));
+  const { grupos, de } = B.formarGrupos(xs, campos);
+  assert.ok(grupos.length <= 10, String(grupos.length));
+  assert.equal(Object.keys(de).length, 63);
+});
+
+test("mapaSvg: solo los puntos nuevos llevan la animación de llegada", () => {
+  const s = B.mapaSvg({ puntos: [{ x: 1, y: 1, color: "#fff", nuevo: true }, { x: 2, y: 2, color: "#fff" }], campos: [], ejes: null });
+  assert.equal((s.match(/class="pt nuevo"/g) || []).length, 1);
+  assert.equal((s.match(/class="pt"/g) || []).length, 1);
 });

@@ -2,13 +2,14 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const vm = require("vm");
+const path = require("path");
 const B = require("../brujula.js");
 
 // Los archivos de semana son scripts clásicos con const: se evalúan en un contexto y se leen.
 function cargar(archivo) {
   const ctx = {};
   vm.createContext(ctx);
-  vm.runInContext(fs.readFileSync(archivo, "utf8") + "\n;this.BRUJULA = typeof BRUJULA === 'undefined' ? null : BRUJULA;", ctx);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", archivo), "utf8") + "\n;this.BRUJULA = typeof BRUJULA === 'undefined' ? null : BRUJULA;", ctx);
   return ctx.BRUJULA;
 }
 

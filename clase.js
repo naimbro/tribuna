@@ -177,7 +177,7 @@ function actualizarBotonRepetir() {
   if (b) b.style.display = (S.clase.gruposInfo || []).length ? "" : "none";
 }
 $("btnRepetir").onclick = () => {
-  if (!["propuesta", "listo", "fin"].includes(S.fase)) { tick("Termina el debate en curso antes de repetir la brújula."); return; }
+  if (!["propuesta", "fin"].includes(S.fase)) { tick("Termina el debate en curso antes de repetir la brújula."); return; }
   if (S.fase === "propuesta") clearInterval(cuentaPropuesta);           // que no se publique la pregunta por detrás
   window.repetirBrujula?.();
   mostrarMovimiento();
