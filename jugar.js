@@ -18,7 +18,7 @@ const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
 const db = HAY_FIREBASE ? getFirestore(app) : null;
 
-const J = { uid: null, email: null, foto: null, fbListo: false, codigo: null, nombre: "", equipo: null, grupo: null, sala: null, chat: [], reloj: null, primera: true };
+const J = { gente: [], uid: null, email: null, foto: null, fbListo: false, codigo: null, nombre: "", equipo: null, grupo: null, sala: null, chat: [], reloj: null, primera: true };
 const google = new GoogleAuthProvider();
 const colorRigor = t => t >= 14 ? "var(--neon)" : t >= 9 ? "var(--amber)" : "var(--B)";
 const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -93,6 +93,10 @@ async function entrarAlJuego() {
   $("pEntrar").classList.add("oculto"); $("pBancada").classList.add("oculto");
   $("pJuego").classList.remove("oculto"); $("estado").classList.remove("oculto");
   subs.push(onSnapshot(doc(db, "salas", J.codigo), snap => { J.sala = snap.data(); pintarSala(); }));
+  // quiénes están en la sala: para sugerir nombres al escribir @
+  subs.push(onSnapshot(collection(db, "salas", J.codigo, "jugadores"), snap => {
+    J.gente = []; snap.forEach(d => J.gente.push({ uid: d.id, nombre: d.data().nombre || "", grupo: d.data().grupo || 0 }));
+  }));
   // el profesor puede moverme de grupo: el rol y lo que escribo dependen de mi grupo actual
   subs.push(onSnapshot(doc(db, "salas", J.codigo, "jugadores", J.uid), snap => {
     const g = snap.data()?.grupo;
@@ -126,6 +130,13 @@ function avisarNuevos(nuevos) {
       navigator.vibrate?.([120, 60, 120]);
       $("notaCaja").textContent = "🎙 La moderadora te pregunta a ti. Responde abajo.";
       $("notaCaja").classList.add("ati");
+    }
+    // otro alumno me nombró con @
+    if (m.tipo === "alumno" && m.uid !== J.uid && meNombran(m.texto)) {
+      navigator.vibrate?.([80, 50, 80]);
+      const aviso = `💬 ${m.nombre} te mencionó en la conversación.`;
+      if (rolEn(J.sala) === "P") $("avisoVoto").textContent = aviso;
+      else { $("notaCaja").textContent = aviso + " Puedes responderle con @."; $("notaCaja").classList.add("ati"); }
     }
     if (m.tipo === "relator" && rolEn(J.sala) === "P") {
       navigator.vibrate?.(150);
@@ -226,10 +237,42 @@ function pintarChat() {
 /* ---------- escribir (bancadas) ---------- */
 function prepararCaja() {
   const tx = $("tx");
-  tx.oninput = () => { tx.style.height = "auto"; tx.style.height = Math.min(140, tx.scrollHeight) + "px"; pintarCaja(); };
+  tx.oninput = () => { tx.style.height = "auto"; tx.style.height = Math.min(140, tx.scrollHeight) + "px"; pintarCaja(); sugerir(); };
+  tx.onclick = tx.onkeyup = sugerir;
   $("btnEnviar").onclick = enviar;
   pintarCaja();
 }
+/* ---------- @menciones: al escribir @ se sugieren nombres de la sala ----------
+   Primero los del debate en curso (a quienes tiene sentido responder), después el resto.
+   Se inserta nombre y primer apellido: así la mención se destaca entera y la persona la recibe. */
+const corto = n => String(n || "").trim().split(/\s+/).slice(0, 2).join(" ");
+function sugerir() {
+  const tx = $("tx"), caja = $("sugiere");
+  const antes = tx.value.slice(0, tx.selectionStart ?? tx.value.length);
+  const m = antes.match(/(^|\s)@([^\s@]{0,20})$/);
+  if (!m || tx.disabled) { caja.innerHTML = ""; return; }
+  const q = norm(m[2]), d = J.sala && J.sala.debate;
+  // la gente de la sala, más quienes escribieron en la conversación (por si alguien no tiene ficha)
+  const por = new Map();
+  for (const g of J.gente) if (g.nombre && g.uid !== J.uid) por.set(norm(g.nombre), { nombre: g.nombre, grupo: g.grupo });
+  for (const x of J.chat) if (x.tipo === "alumno" && x.nombre && x.uid !== J.uid && !por.has(norm(x.nombre))) por.set(norm(x.nombre), { nombre: x.nombre, grupo: x.grupo || 0 });
+  const enDebate = g => d && (g.grupo === d.A || g.grupo === d.B);
+  const lista = [...por.values()]
+    .filter(g => !q || norm(g.nombre).split(/\s+/).some(w => w.startsWith(q)))
+    .sort((a, b) => (enDebate(b) - enDebate(a)) || corto(a.nombre).localeCompare(corto(b.nombre)))
+    .slice(0, 8);
+  caja.innerHTML = lista.map(g => `<button type="button" data-n="${esc(corto(g.nombre))}">@${esc(corto(g.nombre))}${g.grupo ? `<small>G${g.grupo}</small>` : ""}</button>`).join("");
+  caja.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const ini = antes.length - m[2].length - 1;              // dónde está la @
+    const resto = tx.value.slice(antes.length);
+    tx.value = tx.value.slice(0, ini) + "@" + b.dataset.n + " " + resto;
+    const pos = ini + b.dataset.n.length + 2;
+    tx.focus(); tx.setSelectionRange(pos, pos);
+    caja.innerHTML = ""; pintarCaja();
+  };
+}
+
 function pintarCaja() {
   if (!J.sala) return;
   const abierta = J.sala.fase === "abierta" && (rolEn(J.sala) === "A" || rolEn(J.sala) === "B");
@@ -247,7 +290,7 @@ async function enviar() {
     await setDoc(doc(db, "salas", J.codigo, "mensajes", id),
       { tipo: "alumno", uid: J.uid, nombre: J.nombre, email: J.email, grupo: J.grupo, equipo: rolEn(J.sala),
         debate: J.sala.debate.n, tramo: J.sala.tramo, ronda: J.sala.ronda, texto: texto.slice(0, 1500), t: Date.now() });
-    $("tx").value = ""; $("tx").style.height = "auto";
+    $("tx").value = ""; $("tx").style.height = "auto"; $("sugiere").innerHTML = "";
     $("notaCaja").textContent = ""; $("notaCaja").classList.remove("ati");
     $("pJuego").scrollTop = $("pJuego").scrollHeight;
   } catch (e) { $("notaCaja").textContent = "No se envió: " + e.code; }
