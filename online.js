@@ -283,7 +283,7 @@ window.datosMapa = () => {
   const r = Object.entries(ON.brujula || {}).filter(([uid, b]) => b.pos && ON.jugadores && ON.jugadores[uid]).map(([, b]) => b);
   return {
     puntos: r.map(b => ({ x: b.pos.x, y: b.pos.y, campo: b.campo })),
-    movimiento: r.filter(b => b.repeticion && b.repeticion.pos).map(b => ({ x: b.repeticion.pos.x, y: b.repeticion.pos.y, desde: b.pos, campo: b.repeticion.campo }))
+    movimiento: r.filter(b => b.repeticion && b.repeticion.pos).map(b => ({ x: b.repeticion.pos.x, y: b.repeticion.pos.y, desde: b.pos, campoAntes: b.campo, campo: b.repeticion.campo }))
   };
 };
 window.formarGruposBrujula = async () => {

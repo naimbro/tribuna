@@ -385,6 +385,7 @@ function pintarMarcador() {
 
 // Columna derecha: ranking de grupos, oráculos y las tarjetas del último panel.
 function pintarColumna() {
+  if (typeof actualizarBotonRepetir === "function") actualizarBotonRepetir();
   const f1 = v => (v === null || v === undefined ? "—" : v.toFixed(1));
   const t3 = $("top3");
   if (t3) {

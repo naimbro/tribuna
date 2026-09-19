@@ -302,6 +302,25 @@ function ceremoniaOraculos(el) {
   $("coCerrar").onclick = () => el.remove();
 }
 
+/* ------------------------ LA BRÚJULA, OTRA VEZ ------------------------ */
+// El cierre opcional: la brújula otra vez y una flecha por alumno, desde su punto inicial al final.
+// Se repinta cada vez que llega una respuesta (online.js llama a refrescarMovimiento).
+function mostrarMovimiento() {
+  escena("movimiento");
+  botonEscena("LISTO ▶");
+  refrescarMovimiento();
+}
+function refrescarMovimiento() {
+  const el = $("escena");
+  if (!el || !el.classList.contains("movimiento") || typeof BRUJULA === "undefined" || !window.datosMapa) return;
+  const { puntos, movimiento } = window.datosMapa();
+  const color = id => (BRUJULA.campos.find(c => c.id === id) || {}).color || "#7d8fa1";
+  const cuenta = (xs, id) => xs.filter(p => p.campo === id).length;
+  el.innerHTML = `<div class="es-k">🧭 LA BRÚJULA, OTRA VEZ · ${movimiento.length} de ${puntos.length} respondieron</div>
+    <div class="po-mapa" style="justify-content:center">${mapaSvg({ puntos: movimiento.map(m => ({ x: m.x, y: m.y, desde: m.desde, color: color(m.campo) })), campos: BRUJULA.campos, ejes: BRUJULA.ejes, tam: 520 })}
+      <div class="rs-or"><div class="rs-ork">ANTES → AHORA</div>${BRUJULA.campos.map(c => `<div><b style="color:${c.color}">${escHtml(c.nombre)}</b><i>${cuenta(movimiento.map(m => ({ campo: m.campoAntes })), c.id)} → ${cuenta(movimiento, c.id)}</i></div>`).join("")}</div></div>`;
+}
+
 /* ------------------------ 5. VEREDICTOS ------------------------ */
 // Cada escena ocupa la pantalla completa (#escena). Las esperas se pueden saltar con el botón
 // principal: saltarEscena() termina la espera en curso y las siguientes pasan de inmediato.

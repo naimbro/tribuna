@@ -158,6 +158,7 @@ function terminarClase() {
 
 // El botón principal hace lo que corresponde a cada momento.
 function accionPrincipal() {
+  if ($("escena") && $("escena").classList.contains("movimiento")) { window.cerrarRepeticion?.(); cerrarEscena(); return; }
   if (S.fase === "propuesta") { if (typeof publicarPropuestaActual === "function") publicarPropuestaActual(); }
   else if (S.fase === "listo") abrirRonda();                 // tramo restaurado tras cerrar la pestaña
   else if (S.fase === "abierta") cerrarRonda();
@@ -169,6 +170,18 @@ function accionPrincipal() {
 
 $("btnPrincipal").onclick = accionPrincipal;
 $("btnTerminar").onclick = terminarClase;
+
+// 🧭 REPETIR BRÚJULA: solo si la partida formó los grupos con la brújula, y entre debates
+function actualizarBotonRepetir() {
+  const b = $("btnRepetir");
+  if (b) b.style.display = (S.clase.gruposInfo || []).length ? "" : "none";
+}
+$("btnRepetir").onclick = () => {
+  if (!["propuesta", "listo", "fin"].includes(S.fase)) { tick("Termina el debate en curso antes de repetir la brújula."); return; }
+  if (S.fase === "propuesta") clearInterval(cuentaPropuesta);           // que no se publique la pregunta por detrás
+  window.repetirBrujula?.();
+  mostrarMovimiento();
+};
 
 /* ---------------- la propuesta de la moderadora ---------------- */
 

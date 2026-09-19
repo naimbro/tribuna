@@ -542,6 +542,7 @@ table.rank td.num{font-family:var(--mono);text-align:right}
         <button class="btn pri" id="btnPrincipal">ABRIR TRAMO</button>
         <button class="btn sm" id="btnModerar" title="La moderadora interviene ahora">🎙 MODERADORA</button>
         <button class="btn sm" id="btnMasMin" title="Alargar el tramo un minuto">+1 MIN</button>
+        <button class="btn sm" id="btnRepetir" title="Los alumnos responden la brújula otra vez; el proyector muestra cuánto se movió cada uno" style="display:none">🧭 REPETIR BRÚJULA</button>
         <button class="btn sm" id="btnTerminar" title="Terminar la clase y pasar al ranking final">🏁 TERMINAR CLASE</button>
         <button class="btn sm" id="btnEjemplo">✎ ejemplo</button>
         <span class="hint" id="hint"></span>
@@ -584,15 +585,15 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   })();
 </script>
 <script src="rotacion.js?v=20260922c"></script>
-<script src="brujula.js?v=20260924a"></script>
+<script src="brujula.js?v=20260924b"></script>
 <script src="moderacion.js?v=20260922b"></script>
-<script src="app.js?v=20260924a"></script>
+<script src="app.js?v=20260924b"></script>
 <script src="jueces.js?v=20260922b"></script>
-<script src="clase.js?v=20260924a"></script>
-<script src="escenas.js?v=20260924a"></script>
+<script src="clase.js?v=20260924b"></script>
+<script src="escenas.js?v=20260924b"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260924a"></script>
+<script type="module" src="online.js?v=20260924b"></script>
 </body>
 </html>
