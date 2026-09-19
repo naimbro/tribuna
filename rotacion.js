@@ -7,7 +7,7 @@
    ===================================================================== */
 
 const ROT = {
-  SEG_APERTURA: 180, SEG_REPLICA: 180, SEG_VOTACION: 60, SEG_RESULTADO: 10, SEG_PROPUESTA: 15,
+  SEG_APERTURA: 180, SEG_REPLICA: 180, SEG_VOTACION: 45, SEG_VEREDICTO_PUBLICO: 6, SEG_JUEZ: 3, SEG_TOTALES: 6, SEG_RESULTADO: 10, SEG_PROPUESTA: 15,
   GRUPOS_DEFECTO: 6, GRUPOS_MIN: 2, GRUPOS_MAX: 10,
   INDECISO: 8,          // |pos| ≤ 8 es indeciso y no suma votos
   ESCALA: 12,           // voto suave: tanh(|pos| / 12)
@@ -42,40 +42,72 @@ function emparejar(disponibles, debates) {
   return vecesA(primero) <= vecesA(rival) ? { A: primero, B: rival } : { A: rival, B: primero };
 }
 
-// Votos de un debate. Cada votante parte en 0, así que su posición final es su voto.
-function votosSuaves(posiciones) {
-  let A = 0, B = 0, n = 0;
-  for (const p of posiciones || []) {
-    if (typeof p !== "number" || !isFinite(p)) continue;
-    n++;
-    if (p > ROT.INDECISO) A += Math.tanh(p / ROT.ESCALA);
-    else if (p < -ROT.INDECISO) B += Math.tanh(-p / ROT.ESCALA);
-  }
-  return { A, B, n };
-}
 
 const promedio = xs => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
 
-// Puntaje 0–100 de cada lado en un debate: mitad jurado, mitad público.
-function puntajeDebate({ notasA, notasB, posiciones }) {
-  const mA = promedio(notasA || []), mB = promedio(notasB || []);
-  const jA = mA * 5, jB = mB * 5;
-  const votos = votosSuaves(posiciones);
-  const hayPublico = votos.n > 0;
-  const tot = votos.A + votos.B;
-  const pA = hayPublico ? (tot > 0 ? 100 * votos.A / tot : 50) : null;
-  const pB = hayPublico ? 100 - pA : null;
-  const pun = (j, p) => hayPublico ? 0.5 * j + 0.5 * p : j;
-  const ganadorJurado = Math.abs(mA - mB) < ROT.EMPATE_JURADO ? null : (mA > mB ? "A" : "B");
-  const ganadorPublico = !hayPublico || Math.abs(votos.A - votos.B) < ROT.EMPATE_VOTOS ? null : (votos.A > votos.B ? "A" : "B");
-  const ganador = !hayPublico ? ganadorJurado
-    : ganadorJurado === ganadorPublico ? ganadorJurado
-    : !ganadorJurado ? ganadorPublico : !ganadorPublico ? ganadorJurado : null;
-  return {
-    A: { jurado: jA, publico: pA, puntaje: pun(jA, pA) },
-    B: { jurado: jB, publico: pB, puntaje: pun(jB, pB) },
-    ganadorJurado, ganadorPublico, ganador, votos, hayPublico
+// El panel de jueces, como en los clavados: de cada grupo se descartan la nota más alta y la más
+// baja y se suman las tres del medio (sobre 30). Si algún juez no respondió, se escala.
+function panelJueces(notas) {
+  const lado = k => {
+    const validas = (notas || []).map((j, i) => ({ id: j.id, i, v: j[k] }))
+      .filter(x => typeof x.v === "number" && isFinite(x.v));
+    if (!validas.length) return { total: null, descartadas: [] };
+    if (validas.length <= 3) return { total: validas.reduce((a, x) => a + x.v, 0) / validas.length * 3, descartadas: [] };
+    // entre notas iguales: la alta es la de menor índice y la baja la de mayor índice (determinista)
+    const alta = validas.reduce((m, x) => (x.v > m.v ? x : m));
+    const baja = validas.reduce((m, x) => (x.v < m.v || (x.v === m.v && x.i > m.i) ? x : m));
+    const medio = validas.filter(x => x !== alta && x !== baja);
+    return { total: medio.reduce((a, x) => a + x.v, 0) * 3 / medio.length, descartadas: [alta.id, baja.id] };
   };
+  const A = lado("A"), B = lado("B");
+  const ganador = A.total === null || B.total === null || Math.abs(A.total - B.total) < 1e-9 ? null : (A.total > B.total ? "A" : "B");
+  return { A, B, ganador };
+}
+
+// El voto del público: una respuesta por votante («¿quién te convenció?»); null = no votó.
+function votoPublico(votos) {
+  const A = (votos || []).filter(v => v === "A").length, B = (votos || []).filter(v => v === "B").length, n = A + B;
+  const parteA = n ? 100 * A / n : 50;
+  return { A, B, n, parteA, parteB: 100 - parteA, ganador: A > B ? "A" : B > A ? "B" : null };
+}
+
+// Puntaje 0–100 de cada grupo en un debate: mitad jueces, mitad público.
+// `jurado` guarda el porcentaje de los jueces (el nombre se mantiene: lo leen ranking y el panel).
+function puntajeDebate({ panel, publico }) {
+  const hayJueces = !!panel && panel.A.total !== null && panel.B.total !== null;
+  const hayPublico = !!publico && publico.n > 0;
+  const lado = k => {
+    const jurado = hayJueces ? panel[k].total / 30 * 100 : null;
+    const pub = hayPublico ? (k === "A" ? publico.parteA : publico.parteB) : null;
+    const puntaje = hayJueces && hayPublico ? 0.5 * jurado + 0.5 * pub : hayJueces ? jurado : hayPublico ? pub : 50;
+    return { jurado, publico: pub, puntaje };
+  };
+  const ganadorJueces = hayJueces ? panel.ganador : null, ganadorPublico = hayPublico ? publico.ganador : null;
+  const ganador = ganadorJueces && ganadorPublico ? (ganadorJueces === ganadorPublico ? ganadorJueces : null)
+    : ganadorJueces || ganadorPublico || null;
+  return { A: lado("A"), B: lado("B"), ganadorJueces, ganadorPublico, ganador, hayJueces, hayPublico };
+}
+
+// Oráculos: 1 punto por predecir al ganador de los jueces. Si los jueces empatan, esa predicción
+// no cuenta (ni punto ni intento). El registro es por uid y se acumula toda la clase.
+function acumularOraculos(registro, votantes, ganador) {
+  const r = { ...(registro || {}) };
+  for (const v of votantes || []) {
+    if (!v || !v.uid) continue;
+    const x = r[v.uid] = { uid: v.uid, nombre: v.nombre || "", puntos: 0, predicciones: 0, aciertos: 0, ...(r[v.uid] || {}) };
+    if (v.nombre) x.nombre = v.nombre;
+    if (!ganador || (v.prediccion !== "A" && v.prediccion !== "B")) continue;
+    x.predicciones++;
+    if (v.prediccion === ganador) { x.aciertos++; x.puntos++; }
+  }
+  return r;
+}
+
+function rankingOraculos(registro) {
+  return Object.values(registro || {})
+    .map(o => ({ ...o, tasa: o.predicciones ? o.aciertos / o.predicciones : 0 }))
+    .sort((a, b) => b.puntos - a.puntos || b.tasa - a.tasa || String(a.nombre).localeCompare(String(b.nombre)))
+    .map((o, i) => ({ ...o, puesto: i + 1 }));
 }
 
 // El ranking de la clase: promedio por debate de cada grupo (no suma: algunos grupos
@@ -91,7 +123,7 @@ function ranking(grupos, debates) {
     const conPublico = mios.filter(x => x.publico !== null && x.publico !== undefined);
     filas.push({
       grupo: g, debates: mios.length,
-      jurado: mios.length ? promedio(mios.map(x => x.jurado)) : null,
+      jurado: (() => { const j = mios.filter(x => x.jurado !== null && x.jurado !== undefined); return j.length ? promedio(j.map(x => x.jurado)) : null; })(),
       publico: conPublico.length ? promedio(conPublico.map(x => x.publico)) : null,
       puntaje: mios.length ? promedio(mios.map(x => x.puntaje)) : null,
       puesto: null, distincion: null
@@ -103,10 +135,11 @@ function ranking(grupos, debates) {
   jugaron.forEach((f, i) => f.puesto = i + 1);
   if (jugaron.length > 1) {
     const top = jugaron[0];
-    const mejorJ = jugaron.reduce((a, b) => (b.jurado > a.jurado ? b : a));
     const conP = jugaron.filter(f => f.publico !== null);
     const mejorP = conP.length ? conP.reduce((a, b) => (b.publico > a.publico ? b : a)) : null;
-    if (mejorJ !== top) mejorJ.distincion = "jurado";
+    const conJ = jugaron.filter(f => f.jurado !== null);
+    const mejorJ = conJ.length ? conJ.reduce((a, b) => (b.jurado > a.jurado ? b : a)) : null;
+    if (mejorJ && mejorJ !== top) mejorJ.distincion = "jurado";
     if (mejorP && mejorP !== top) mejorP.distincion = mejorP.distincion ? "ambos" : "publico";
   }
   return filas;
@@ -122,4 +155,4 @@ function mejorIntervencion(historial) {
   return (historial || []).reduce((m, h) => (!m || h.total > m.total ? h : m), null);
 }
 
-if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, votosSuaves, puntajeDebate, ranking, proximaPreguntaEscrita, mejorIntervencion };
+if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, mejorIntervencion };
