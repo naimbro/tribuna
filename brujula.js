@@ -151,4 +151,21 @@ function mapaSvg({ puntos = [], campos = [], ejes = null, tam = 420, chico = fal
   return s + "</svg>";
 }
 
-if (typeof module !== "undefined") module.exports = { TAM_GRUPO, posicion, campoDe, formarGrupos, asignarTarde, emparejarLejanos, movimiento, mapaSvg };
+// El teléfono: qué hacer con la pantalla de la brújula según lo que publica la sala. La pantalla
+// solo se muestra mientras la regla deja guardar la respuesta; si no, queda atrapado en ella.
+const FASES_INICIO = ["responder", "grupos", "repetir"];
+function accionBrujula(bj, { visible, modo, tieneMio, tieneRepeticion }) {
+  const activa = !!(bj && bj.activa);
+  if (visible) {
+    if (!activa) return "cerrar";
+    if (modo === "repetir") return bj.fase === "repetir" ? "nada" : "cerrar";
+    return FASES_INICIO.includes(bj.fase) ? "nada" : "cerrar";
+  }
+  return activa && bj.fase === "repetir" && tieneMio && !tieneRepeticion ? "repetir" : "nada";
+}
+// Ofrecer la brújula a quien no la ha respondido (con o sin grupo) mientras sirve de algo.
+function ofrecerBrujula(bj, tieneMio) {
+  return !!(bj && bj.activa && !tieneMio && ["responder", "grupos"].includes(bj.fase));
+}
+
+if (typeof module !== "undefined") module.exports = { TAM_GRUPO, posicion, campoDe, formarGrupos, asignarTarde, emparejarLejanos, movimiento, mapaSvg, accionBrujula, ofrecerBrujula };

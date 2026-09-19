@@ -66,7 +66,8 @@ $("btnEntrar").onclick = async () => {
     // con brújula, el grupo lo forma el profesor según la posición; sin ella, se elige a mano
     if (J.sala.brujula && J.sala.brujula.activa) {
       await cargarBrujula();
-      if (BJ.mio) await entrarAlJuego(); else mostrarBrujula("inicio");
+      await entrarAlJuego();
+      if (ofrecerBrujula(J.sala.brujula, !!BJ.mio)) mostrarBrujula("inicio");
     } else mostrarBancadas();
   } catch (e) { $("errEntrar").textContent = "No se pudo entrar: " + e.message; }
 };
@@ -178,7 +179,10 @@ function pintarSala() {
   }
   // brújula: la repetición del cierre; y si el profesor la apaga, quien no tiene grupo elige a mano
   const bj = s.brujula;
-  if (bj && bj.activa && bj.fase === "repetir" && BJ.mio && !BJ.mio.repeticion && $("brujula").classList.contains("oculto")) mostrarBrujula("repetir");
+  const accion = accionBrujula(bj, { visible: !$("brujula").classList.contains("oculto"), modo: BJ.modo,
+    tieneMio: !!BJ.mio, tieneRepeticion: !!(BJ.mio && BJ.mio.repeticion) });
+  if (accion === "cerrar") { $("brujula").classList.add("oculto"); $("espera").dataset.clave = ""; }
+  if (accion === "repetir") mostrarBrujula("repetir");
   if (!J.grupo && !$("pBancada").classList.contains("oculto")) {
     if (!(bj && bj.activa)) return;                                             // eligiendo grupo a mano
     // el profesor volvió a encender la brújula: de los botones de grupo a la espera con su campo
@@ -475,7 +479,10 @@ async function guardarBrujula(modo) {
     $("espera").dataset.clave = "";
     if (modo === "inicio" && !J.grupo && $("pJuego").classList.contains("oculto")) await entrarAlJuego();
     else pintarSala();
-  } catch (e) { $("brujula").insertAdjacentHTML("beforeend", `<p class="aviso">No se guardó: ${esc(e.code || e.message)}</p>`); }
+  } catch (e) {
+    $("brujula").insertAdjacentHTML("beforeend", `<p class="aviso">No se guardó: ${esc(e.code || e.message)}</p>`);
+    if (!$("pJuego").classList.contains("oculto")) pintarSala();
+  }
 }
 // el mapa público es anónimo y ya trae mi punto: se quita uno igual para no dibujarlo dos veces
 function sinMiPunto(mapa, mio) {
@@ -505,16 +512,19 @@ function pintarEspera(s) {
     const clave2 = "bj|" + (BJ.mio ? BJ.mio.campo : "") + "|" + (s.mapa || []).length + "|" + s.brujula.fase;
     if (el.dataset.clave === clave2) return;
     el.dataset.clave = clave2;
-    el.innerHTML = BJ.mio ? resultadoBrujula(s) + `<p style="color:var(--dim)">Espera: el profesor va a formar los grupos.</p>
+    const espera = s.brujula.fase === "responder" ? "Espera: el profesor va a formar los grupos." : "Te estamos asignando un grupo…";
+    el.innerHTML = BJ.mio ? resultadoBrujula(s) + `<p style="color:var(--dim)">${espera}</p>
         ${s.brujula.fase === "responder" ? `<button class="link" id="bjRehacer">rehacer la brújula</button>` : ""}`
-      : `<h1>Falta tu brújula</h1><button class="btn pri" id="bjHacer">Responder (1 minuto)</button>`;
+      : ofrecerBrujula(s.brujula, false) ? `<h1>Falta tu brújula</h1><button class="btn pri" id="bjHacer">Responder (1 minuto)</button>`
+      : `<p style="color:var(--dim)">${espera}</p>`;
     const r = $("bjRehacer") || $("bjHacer");
     if (r) r.onclick = () => { BJ.modo = ""; mostrarBrujula("inicio"); };
     return;
   }
   const r = miRol(s);
   const gi = (s.gruposInfo || []).find(g => g.n === J.grupo);
-  const clave = s.etapa + "|" + J.grupo + "|" + (gi ? gi.nombre : "");
+  const ofrecer = ofrecerBrujula(s.brujula, !!BJ.mio);
+  const clave = s.etapa + "|" + J.grupo + "|" + (gi ? gi.nombre : "") + "|" + ofrecer;
   if (el.dataset.clave === clave) return;           // no repintar en cada cambio de la sala
   el.dataset.clave = clave;
   const av = `<div class="av" style="--c:${r.color};--t:92px">${J.foto ? `<img src="${esc(J.foto)}" referrerpolicy="no-referrer" alt="">` : `<span>${iniciales(J.nombre)}</span>`}</div>`;
@@ -523,6 +533,7 @@ function pintarEspera(s) {
     ? `${av}<h1 style="margin-top:14px">¡Estás dentro, ${esc(J.nombre.split(" ")[0])}!</h1>
        <span class="chip" style="--c:${r.color}">${r.bandera} ${esc(r.nombre)}${gi ? " · " + esc(gi.nombre) : ""}</span>
        <p style="color:var(--dim);margin-top:18px;max-width:340px">Mira la pantalla del curso. El debate empieza cuando el profesor lo diga.</p>
+       ${ofrecer ? `<button class="btn pri" id="bjOfrecer" style="margin-top:14px">Responder la brújula (1 minuto)</button>` : ""}
        ${gi ? "" : `<button class="link" id="esCambiar">cambiar de rol</button>`}`
     : `<div class="k">Semana ${s.semana} · tema general</div>
        <div class="es-mocion">«${esc(s.temaGeneral || s.tema)}»</div>
@@ -531,6 +542,7 @@ function pintarEspera(s) {
          <div style="--c:${s.equipos.B.color}"><b>${s.equipos.B.bandera} ${esc(s.equipos.B.nombre)}</b>${esc(s.equipos.B.lema || "Rechaza la moción.")}</div>
        </div>
        <div class="es-papel">${papel}</div>`;
+  if ($("bjOfrecer")) $("bjOfrecer").onclick = () => { BJ.modo = ""; mostrarBrujula("inicio"); };
   const b = $("esCambiar"); if (b) b.onclick = () => { subs.forEach(u => u()); subs = []; el.dataset.clave = ""; mostrarBancadas(); };
 }
 

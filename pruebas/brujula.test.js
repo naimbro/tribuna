@@ -101,3 +101,32 @@ test("mapaSvg: puntos en la misma posición se dibujan separados", () => {
   const cs = [...s.matchAll(/<circle class="pt" cx="([\d.]+)" cy="([\d.]+)"/g)].map(m => m[1] + "," + m[2]);
   assert.equal(new Set(cs).size, 3);
 });
+
+// El teléfono: qué hacer con la pantalla de la brújula según lo que publica la sala.
+test("accionBrujula: la pantalla abierta se cierra si ya no se puede guardar", () => {
+  const vis = { visible: true, modo: "inicio", tieneMio: false, tieneRepeticion: false };
+  assert.equal(B.accionBrujula({ activa: false, fase: null }, vis), "cerrar");
+  assert.equal(B.accionBrujula({ activa: true, fase: "cerrada" }, vis), "cerrar");
+  assert.equal(B.accionBrujula({ activa: true, fase: "responder" }, vis), "nada");
+  assert.equal(B.accionBrujula({ activa: true, fase: "grupos" }, vis), "nada");
+  const rep = { ...vis, modo: "repetir", tieneMio: true };
+  assert.equal(B.accionBrujula({ activa: true, fase: "cerrada" }, rep), "cerrar");
+  assert.equal(B.accionBrujula({ activa: true, fase: "repetir" }, rep), "nada");
+});
+
+test("accionBrujula: la repetición se abre sola una vez, solo a quien respondió la primera", () => {
+  const oculto = { visible: false, modo: "inicio", tieneMio: true, tieneRepeticion: false };
+  assert.equal(B.accionBrujula({ activa: true, fase: "repetir" }, oculto), "repetir");
+  assert.equal(B.accionBrujula({ activa: true, fase: "repetir" }, { ...oculto, tieneRepeticion: true }), "nada");
+  assert.equal(B.accionBrujula({ activa: true, fase: "repetir" }, { ...oculto, tieneMio: false }), "nada");
+  assert.equal(B.accionBrujula({ activa: true, fase: "grupos" }, oculto), "nada");
+});
+
+test("ofrecerBrujula: a quien no la respondió, mientras se puede, tenga o no grupo", () => {
+  assert.equal(B.ofrecerBrujula({ activa: true, fase: "responder" }, false), true);
+  assert.equal(B.ofrecerBrujula({ activa: true, fase: "grupos" }, false), true);
+  assert.equal(B.ofrecerBrujula({ activa: true, fase: "grupos" }, true), false);
+  assert.equal(B.ofrecerBrujula({ activa: true, fase: "cerrada" }, false), false);
+  assert.equal(B.ofrecerBrujula({ activa: false, fase: null }, false), false);
+  assert.equal(B.ofrecerBrujula(null, false), false);
+});
