@@ -23,6 +23,8 @@ function postChat(m) {
   m.id = m.id || ("m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
   m.t = m.t || Date.now();
   m.ronda = m.ronda ?? S.ronda;
+  m.debate = m.debate ?? (S.debate ? S.debate.n : 0);
+  m.tramo = m.tramo ?? S.tramo;
   if (typeof window.chatRemoto === "function") return window.chatRemoto(m);   // en línea: Firestore
   recibirChat([m]);
 }
@@ -111,7 +113,7 @@ function transcripcionChat(filtro = () => true, max = 40) {
 
 /* ---------- 🎙 la moderadora ---------- */
 function abrirTramoChat() {
-  const R = RONDAS[S.ronda];
+  const R = tramoActual();
   S.mod = { ultimo: Date.now(), nuevos: 0, enCurso: false, ultimoAlumno: 0, abre: Date.now() };
   const ps = participantes();
   const a = ps.filter(p => p.equipo === "A").map(p => "@" + p.nombre), b = ps.filter(p => p.equipo === "B").map(p => "@" + p.nombre);
@@ -139,16 +141,16 @@ function moderadorTalvez(forzar = false) {
 }
 
 function promptModerador() {
-  const R = RONDAS[S.ronda];
+  const R = tramoActual();
   const ps = participantes();
   const lista = k => ps.filter(p => p.equipo === k).map(p => `${p.nombre} (${p.n} mensajes en este tramo)`).join(", ") || "(nadie aún)";
   return `Eres la moderadora de un debate universitario en vivo, en un chat grupal. Curso: "${SESION.curso}", semana ${SESION.semana}: ${SESION.tema}.
-MOCIÓN: "${SESION.mocion}". ${EQUIPOS.A.nombre} la defiende; ${EQUIPOS.B.nombre} la rechaza.
+MOCIÓN: "${mocionActual()}". ${ladoNombre("A")} la defiende; ${ladoNombre("B")} la rechaza.
 TRAMO ACTUAL: ${R.nombre}. Pauta: ${R.pauta}
 
 PARTICIPANTES
-- ${EQUIPOS.A.nombre}: ${lista("A")}
-- ${EQUIPOS.B.nombre}: ${lista("B")}
+- ${ladoNombre("A")}: ${lista("A")}
+- ${ladoNombre("B")}: ${lista("B")}
 
 CONCEPTOS Y LECTURAS DEL CURSO (SOLO PARA TI, para juzgar si lo que dicen está bien; NO los nombres en tu intervención si el participante no los nombró antes):
 ${CONCEPTOS.map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n")}
@@ -193,12 +195,12 @@ function moderadorSimple() {
 
 /* ---------- ⚖ el relator ---------- */
 async function relatorPideVoto() {
-  const R = RONDAS[S.ronda];
-  const delTramo = m => m.ronda === S.ronda;
+  const R = tramoActual();
+  const delTramo = m => S.debate ? m.debate === S.debate.n : m.ronda === S.ronda;
   let d = null;
   if (S.motor.activo) {
     const prompt = `Eres el relator de un debate universitario en vivo. Curso: "${SESION.curso}", semana ${SESION.semana}.
-MOCIÓN: "${SESION.mocion}". ${EQUIPOS.A.nombre} la defiende; ${EQUIPOS.B.nombre} la rechaza. Acaba de terminar el tramo "${R.nombre}" (${R.pauta}).
+MOCIÓN: "${mocionActual()}". ${ladoNombre("A")} la defiende; ${ladoNombre("B")} la rechaza. Acaba de terminar el debate ${S.debate ? S.debate.n : ""}: «${mocionActual()}» (apertura y réplica).
 
 LO QUE SE DIJO EN ESTE TRAMO:
 ${transcripcionChat(delTramo, 60) || "(nadie escribió)"}
@@ -223,7 +225,7 @@ Responde SOLO un JSON: {"resumenA": "máx. 35 palabras", "resumenB": "máx. 35 p
   }
   if (!d) {
     const n = k => S.chat.filter(m => m.tipo === "alumno" && m.equipo === k && delTramo(m)).length;
-    d = { resumenA: `${n("A")} mensajes en este tramo.`, resumenB: `${n("B")} mensajes en este tramo.`, disputa: SESION.mocion,
+    d = { resumenA: `${n("A")} mensajes en este tramo.`, resumenB: `${n("B")} mensajes en este tramo.`, disputa: mocionActual(),
           revisar: ["Si las afirmaciones empíricas citaron alguna lectura del curso.", "Si cada bancada respondió el argumento más fuerte del otro lado."],
           criterios: ["Evidencia atribuida por sobre el tono.", "Reconocer lo válido del rival suma."] };
   }

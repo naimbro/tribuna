@@ -31,7 +31,7 @@ const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, 
 
 /* ---------- lo que ve el alumno: estado público de la sala ---------- */
 function estadoPublico() {
-  const R = RONDAS[S.ronda];
+  const R = tramoActual();
   return {
     profeUid: ON.uid, profeEmail: ON.email, actualizado: Date.now(), creada: ON.creada || null,
     curso: SESION.curso || "", semana: SESION.semana, tema: SESION.tema, mocion: SESION.mocion,

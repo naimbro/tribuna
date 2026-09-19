@@ -6,7 +6,10 @@
    ===================================================================== */
 
 const S = {
-  fase: "listo",          // listo | abierta | resuelta | fin
+  fase: "propuesta",      // propuesta | listo | abierta | votando | resultado | fin   (rotación)
+  tramo: 0,               // 0 = apertura, 1 = réplica, dentro del debate en curso
+  clase: { grupos: ROT.GRUPOS_DEFECTO, tema: "", debates: [], propuesta: null, evaluado: 0 },
+  debate: null,           // { n, pregunta, A: grupo, B: grupo } — el debate en curso
   ronda: 0,
   chat: [],               // la conversación: alumnos, moderadora, relator, resultados (moderacion.js)
   mod: null,              // estado de la moderadora en el tramo abierto
@@ -31,6 +34,13 @@ const norm = s => (s || "").toLowerCase()
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const palabras = t => (t.trim().match(/\S+/g) || []).length;
+
+// La ronda global (S.ronda) cuenta tramos de toda la clase: así los filtros de la
+// conversación (m.ronda === S.ronda) siguen sirviendo. El tramo dentro del debate es S.tramo.
+const tramoActual = () => TRAMOS[S.tramo] || TRAMOS[0];
+const mocionActual = () => (S.debate && S.debate.pregunta) || SESION.mocion;
+const ladoNombre = k => S.debate ? `${EQUIPOS[k].nombre} · Grupo ${S.debate[k]}` : EQUIPOS[k].nombre;
+const delDebate = h => !S.debate || h.debate === S.debate.n;
 
 /* ====================== 1. LECTURA DEL TEXTO ========================= */
 
@@ -336,7 +346,7 @@ const swingA = (antes, despues) => decima(despues - antes);
 // PERSUASIÓN de una bancada = suma del swing de SUS turnos (bancada × ronda). Los shocks no entran.
 const persuasion = k => decima(S.turnos.filter(t => t.equipo === k).reduce((s, t) => s + t.deltaVotos, 0));
 // RIGOR de una bancada = promedio de todas sus intervenciones (todos los integrantes, todas las rondas)
-const rigorMedio = k => { const h = S.historial.filter(x => x.equipo === k); return h.length ? h.reduce((s, x) => s + x.ev.rubrica.total, 0) / h.length : null; };
+const rigorMedio = k => { const h = S.historial.filter(x => x.equipo === k && delDebate(x)); return h.length ? h.reduce((s, x) => s + x.ev.rubrica.total, 0) / h.length : null; };
 const conSigno = n => (decima(n) > 0 ? "+" : "") + decima(n).toFixed(1);
 
 // Dónde está el público ahora: cuántos alumnos a favor, indecisos y en contra (±8 es indeciso).
@@ -352,6 +362,10 @@ function conteo() {
 /* ====================== 5. RENDER =================================== */
 
 function pintarMarcador() {
+  for (const k of ["A", "B"]) {
+    $("nom" + k).textContent = S.debate ? `GRUPO ${S.debate[k]}` : EQUIPOS[k].nombre;
+    $("lema" + k).textContent = S.debate ? EQUIPOS[k].nombre : EQUIPOS[k].lema;
+  }
   const c = conteo();
   $("rA").textContent = c.a; $("rN").textContent = c.n; $("rB").textContent = c.b;
   const hayP = S.publico.n > 0;
@@ -381,8 +395,8 @@ function pintarJueces() {
   const jur = $("jurado"), pub = $("hemiciclo");
   if (!jur || !pub) return;
   // EL JURADO: cada criterio de la rúbrica, en espejo (A a la izquierda, B a la derecha)
-  const prom = (k, c) => { const h = S.historial.filter(x => x.equipo === k); return h.length ? h.reduce((s, x) => s + (x.ev.rubrica[c] || 0), 0) / h.length : null; };
-  const n = k => S.historial.filter(x => x.equipo === k).length;
+  const prom = (k, c) => { const h = S.historial.filter(x => x.equipo === k && delDebate(x)); return h.length ? h.reduce((s, x) => s + (x.ev.rubrica[c] || 0), 0) / h.length : null; };
+  const n = k => S.historial.filter(x => x.equipo === k && delDebate(x)).length;
   const fmt = v => v === null ? "—" : v.toFixed(1);
   const fila = (nombre, a, b, max, total = false) => `<div class="jr ${total ? "tot" : ""}">
       <div class="jl">${nombre}</div>
@@ -390,7 +404,7 @@ function pintarJueces() {
         <div class="bar a"><i style="width:${a === null ? 0 : 100 * a / max}%"></i></div>
         <div class="bar b"><i style="width:${b === null ? 0 : 100 * b / max}%"></i></div>
         <span class="v" style="color:var(--B)">${fmt(b)}</span></div></div>`;
-  const ultima = [...S.historial].reverse().find(h => h.ev.nota);
+  const ultima = S.historial.filter(delDebate).reverse().find(h => h.ev.nota);
   jur.innerHTML = (n("A") + n("B") === 0
     ? `<div class="vacio">El jurado lee cada intervención al cerrar el tramo y la puntúa con la rúbrica del curso.</div>`
     : "") +
@@ -484,9 +498,10 @@ function tarjetaTurno(t) {
 function pintarFeed() {
   const f = $("feed");
   const abajo = f.scrollHeight - f.scrollTop - f.clientHeight < 120;
-  let html = "", ronda = null;
+  let html = "", clave = null;
   for (const m of S.chat) {
-    if (m.ronda !== ronda && RONDAS[m.ronda]) { ronda = m.ronda; html += `<div class="turno-sep">TRAMO ${m.ronda + 1} · ${RONDAS[m.ronda].nombre.toUpperCase()}</div>`; }
+    const k = `${m.debate || 0}|${m.tramo || 0}`;
+    if (k !== clave && m.debate) { clave = k; html += `<div class="turno-sep">DEBATE ${m.debate} · ${(TRAMOS[m.tramo || 0] || TRAMOS[0]).nombre.toUpperCase()}</div>`; }
     html += burbuja(m);
   }
   f.innerHTML = html || `<div style="color:var(--dim2);text-align:center;padding:60px 20px;font-size:13px">
@@ -508,9 +523,10 @@ function tick(msg) {
 /* ====================== 6. FLUJO DE JUEGO =========================== */
 
 function pintarRonda() {
-  const R = RONDAS[S.ronda];
-  $("rondaPill").textContent = `TRAMO ${S.ronda + 1}/${RONDAS.length} · ${R.nombre.toUpperCase()}`;
-  $("pauta").innerHTML = `<b>TRAMO ${S.ronda + 1}: ${R.nombre.toUpperCase()}</b> — ${R.pauta}`;
+  const R = tramoActual();
+  const d = S.debate;
+  $("rondaPill").textContent = d ? `DEBATE ${d.n} · ${R.nombre.toUpperCase()}` : "ROTACIÓN";
+  $("pauta").innerHTML = d ? `<b>DEBATE ${d.n} · ${R.nombre.toUpperCase()}</b> — «${esc(d.pregunta)}» · ${R.pauta}` : "Esperando la próxima pregunta.";
   $("reloj").textContent = fmt(R.seg);
 }
 const fmt = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
@@ -520,8 +536,8 @@ function abrirRonda() {
   $("chatTx").focus();
   // El reloj se calcula con la hora real, no descontando segundos: Chrome frena los
   // temporizadores de las pestañas ocultas y el reloj se atrasaba (40 s duraron varios minutos).
-  S.finRonda = Date.now() + RONDAS[S.ronda].seg * 1000;
-  S.seg = RONDAS[S.ronda].seg;
+  S.finRonda = Date.now() + tramoActual().seg * 1000;
+  S.seg = tramoActual().seg;
   $("reloj").classList.add("corriendo");
   const tic = () => {
     if (S.fase !== "abierta") return;
@@ -534,7 +550,7 @@ function abrirRonda() {
   if (!S.relojVisible) { S.relojVisible = true; document.addEventListener("visibilitychange", () => { if (!document.hidden) tic(); }); }
   $("btnPrincipal").textContent = "⚖ PEDIR VOTACIÓN";
   sonar("campana");
-  tick(`Tramo ${S.ronda + 1} abierto — ${RONDAS[S.ronda].nombre}. Reloj corriendo.`);
+  tick(`${S.debate ? `Debate ${S.debate.n} · ` : ""}${tramoActual().nombre} abierta. Reloj corriendo.`);
   abrirTramoChat();
 }
 
@@ -573,7 +589,7 @@ async function cerrarRonda() {
   $("btnPrincipal").disabled = true;
   $("btnPrincipal").textContent = "VOTANDO…";
 
-  const R = RONDAS[S.ronda];
+  const R = tramoActual();
   const orden = Math.random() < .5 ? ["A", "B"] : ["B", "A"];
   // Lo evaluado en tramos anteriores (para ecos y conceptos del rival) y la conversación de este
   // tramo, que todos leyeron en vivo: el jurado juzga la refutación contra lo que de verdad se dijo.
@@ -787,7 +803,7 @@ function lanzarEvento() {
   flash.innerHTML = `<div class="k">ÚLTIMA HORA · SALA DE CONTROL</div><div class="t">${ev.titular}</div>`;
   document.body.appendChild(flash);
   setTimeout(() => flash.remove(), 6500);
-  S.shocks.push({ orden: S.seq++, id: ev.id, titular: ev.titular, ronda: RONDAS[S.ronda].nombre, swing: 0 });
+  S.shocks.push({ orden: S.seq++, id: ev.id, titular: ev.titular, ronda: tramoActual().nombre, swing: 0 });
   postChat({ tipo: "noticia", nombre: "Última hora", texto: ev.titular });
   sonar("campana");
   tick(`Noticia lanzada al debate: ${ev.titular.slice(0, 70)}…`);
@@ -1028,8 +1044,8 @@ Tenlo en cuenta, pero la rúbrica del curso manda.\n`;
 
 function promptEval(texto, ctx, eq) {
   return `Eres el jurado de un debate universitario del curso "${SESION.curso}", semana ${SESION.semana}: ${SESION.tema}.
-MOCIÓN: "${SESION.mocion}"
-La intervención a evaluar es de la bancada ${EQUIPOS[eq].nombre}, en la ronda "${ctx.rondaNombre || ctx.ronda}".
+MOCIÓN: "${mocionActual()}"
+La intervención a evaluar es de la bancada ${ladoNombre(eq)}, en la ronda "${ctx.rondaNombre || ctx.ronda}".
 PAUTA DE ESTA RONDA: ${ctx.pauta || "—"}
 
 CONCEPTOS DEL CURSO (knowledge base de la semana):
@@ -1043,7 +1059,7 @@ autoridad no cuenta como argumento; conceder puntos válidos del adversario SUMA
 
 ${transcripcion(ctx, eq)}
 ${contextoTramo(ctx)}
-INTERVENCIÓN A EVALUAR (bancada ${EQUIPOS[eq].nombre}; son todos los mensajes de una persona en este tramo):
+INTERVENCIÓN A EVALUAR (bancada ${ladoNombre(eq)}; son todos los mensajes de una persona en este tramo):
 """${texto}"""
 
 Responde SOLO un JSON:
@@ -1167,7 +1183,7 @@ function rellenarEjemplo() {
   if (!EJ) return;
   if (S.fase === "listo") abrirRonda();
   if (S.fase !== "abierta") return;
-  const R = RONDAS[S.ronda];
+  const R = tramoActual();
   postChat({ tipo: "alumno", nombre: "Valentina", equipo: "A", uid: "sim:Valentina", texto: EJ[R.id].A });
   setTimeout(() => postChat({ tipo: "alumno", nombre: "Camilo", equipo: "B", uid: "sim:Camilo", texto: EJ[R.id].B }), 700);
 }
