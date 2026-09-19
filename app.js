@@ -339,14 +339,14 @@ const persuasion = k => decima(S.turnos.filter(t => t.equipo === k).reduce((s, t
 const rigorMedio = k => { const h = S.historial.filter(x => x.equipo === k); return h.length ? h.reduce((s, x) => s + x.ev.rubrica.total, 0) / h.length : null; };
 const conSigno = n => (decima(n) > 0 ? "+" : "") + decima(n).toFixed(1);
 
+// Dónde está el público ahora: cuántos alumnos a favor, indecisos y en contra (±8 es indeciso).
+// La audiencia sintética (AUDIENCIA, sección 3) ya no juega; la usa solo pruebas/simular.js.
 function conteo() {
   let a = 0, b = 0, n = 0;
-  for (const p of AUDIENCIA) {
-    if (p.pos > 8) a += p.votos;
-    else if (p.pos < -8) b += p.votos;
-    else n += p.votos;
+  for (const v of S.publico.votantes || []) {
+    if (v.final > 8) a++; else if (v.final < -8) b++; else n++;
   }
-  return { a, b, n, total: a + b + n };
+  return { a, b, n, total: Math.max(1, a + b + n) };
 }
 
 /* ====================== 5. RENDER =================================== */
@@ -354,58 +354,87 @@ function conteo() {
 function pintarMarcador() {
   const c = conteo();
   $("rA").textContent = c.a; $("rN").textContent = c.n; $("rB").textContent = c.b;
-  $("vA").style.width = (100 * c.a / c.total) + "%";
-  $("vN").style.width = (100 * c.n / c.total) + "%";
-  $("vB").style.width = (100 * c.b / c.total) + "%";
-
-  $("persuA").textContent = conSigno(persuasion("A"));
-  $("persuB").textContent = conSigno(persuasion("B"));
-
+  const hayP = S.publico.n > 0;
+  $("vA").style.width = hayP ? (100 * c.a / c.total) + "%" : "50%";
+  $("vN").style.width = hayP ? (100 * c.n / c.total) + "%" : "0%";
+  $("vB").style.width = hayP ? (100 * c.b / c.total) + "%" : "50%";
+  const rA = rigorMedio("A"), rB = rigorMedio("B"), P = S.publico;
   for (const k of ["A", "B"]) {
     const r = rigorMedio(k);
     $("rigor" + k).textContent = r === null ? "—" : r.toFixed(1);
-  }
-  // quién lidera cada competencia: la sala (votos ganados) y el jurado (rigor)
-  const pA = persuasion("A"), pB = persuasion("B"), rA = rigorMedio("A"), rB = rigorMedio("B");
-  const hay = S.turnos.length > 0;
-  $("persuA").parentElement.classList.toggle("lidera", hay && !empatanEnVotos(pA, pB) && pA > pB);
-  $("persuB").parentElement.classList.toggle("lidera", hay && !empatanEnVotos(pA, pB) && pB > pA);
-  $("rigorA").parentElement.classList.toggle("lidera", rA !== null && rB !== null && rA - rB >= 0.05);
-  $("rigorB").parentElement.classList.toggle("lidera", rA !== null && rB !== null && rB - rA >= 0.05);
-  // el público real: se muestra solo si hay alumnos votando
-  const P = S.publico, hayP = P.n > 0;
-  for (const k of ["A", "B"]) {
-    $("publico" + k).parentElement.style.display = hayP ? "" : "none";
     $("publico" + k).textContent = hayP ? conSigno(P[k]) : "—";
   }
+  // quién lidera cada marcador: el jurado (rigor) y el público (votos ganados)
+  $("rigorA").parentElement.classList.toggle("lidera", rA !== null && rB !== null && rA - rB >= 0.05);
+  $("rigorB").parentElement.classList.toggle("lidera", rA !== null && rB !== null && rB - rA >= 0.05);
   $("publicoA").parentElement.classList.toggle("lidera", hayP && !empatanEnVotos(P.A, P.B) && P.A > P.B);
   $("publicoB").parentElement.classList.toggle("lidera", hayP && !empatanEnVotos(P.A, P.B) && P.B > P.A);
-  const probA = clamp((c.a + c.n * 0.5) / c.total, 0.06, 0.94);
+  // cuotas: de dónde está el público ahora (sin público, parejo)
+  const probA = hayP ? clamp((c.a + c.n * 0.5) / c.total, 0.06, 0.94) : 0.5;
   $("cuotaA").textContent = (1 / probA).toFixed(2);
   $("cuotaB").textContent = (1 / (1 - probA)).toFixed(2);
+  pintarJueces();
 }
 
-function pintarAudiencia(reacciones) {
-  const cont = $("gente");
-  cont.innerHTML = AUDIENCIA.map(p => {
-    const r = reacciones && reacciones.find(x => x.id === p.id);
-    const d = r ? r.delta : 0;
-    const col = d > 0.4 ? "var(--A)" : d < -0.4 ? "var(--B)" : "var(--dim2)";
-    const sig = d > 0.4 ? "▲" : d < -0.4 ? "▼" : "·";
-    const say = r && r.comentario ? r.comentario : (p.ultimo || "");
-    if (r && r.comentario) p.ultimo = r.comentario;
-    const lado = p.pos > 8 ? "a favor" : p.pos < -8 ? "en contra" : "indeciso";
-    return `<div class="p ${r && r.comentario ? "reacciona" : ""}" style="--c:${p.color}">
-      <div class="top">
-        <div class="av">${p.emoji}</div>
-        <div class="who"><b>${p.nombre}</b><small>${p.bloque} · ${p.votos} votos · ${lado}</small></div>
-        <div class="mv" style="color:${col}">${sig}${d ? Math.abs(d).toFixed(1) : ""}</div>
-      </div>
-      <div class="eje"><div class="mid"></div>
-        <div class="dot" style="left:${(p.pos + 100) / 2}%"></div></div>
-      <div class="say">${say ? "“" + say + "”" : "<span style='color:var(--dim2)'>escuchando…</span>"}</div>
-    </div>`;
-  }).join("");
+/* ---------- la columna derecha: EL JURADO y EL PÚBLICO ---------- */
+function pintarJueces() {
+  const jur = $("jurado"), pub = $("hemiciclo");
+  if (!jur || !pub) return;
+  // EL JURADO: cada criterio de la rúbrica, en espejo (A a la izquierda, B a la derecha)
+  const prom = (k, c) => { const h = S.historial.filter(x => x.equipo === k); return h.length ? h.reduce((s, x) => s + (x.ev.rubrica[c] || 0), 0) / h.length : null; };
+  const n = k => S.historial.filter(x => x.equipo === k).length;
+  const fmt = v => v === null ? "—" : v.toFixed(1);
+  const fila = (nombre, a, b, max, total = false) => `<div class="jr ${total ? "tot" : ""}">
+      <div class="jl">${nombre}</div>
+      <div class="jb"><span class="v" style="color:var(--A)">${fmt(a)}</span>
+        <div class="bar a"><i style="width:${a === null ? 0 : 100 * a / max}%"></i></div>
+        <div class="bar b"><i style="width:${b === null ? 0 : 100 * b / max}%"></i></div>
+        <span class="v" style="color:var(--B)">${fmt(b)}</span></div></div>`;
+  const ultima = [...S.historial].reverse().find(h => h.ev.nota);
+  jur.innerHTML = (n("A") + n("B") === 0
+    ? `<div class="vacio">El jurado lee cada intervención al cerrar el tramo y la puntúa con la rúbrica del curso.</div>`
+    : "") +
+    RUBRICA.map(c => fila(c.nombre, prom("A", c.id), prom("B", c.id), c.max)).join("") +
+    fila("Total", rigorMedio("A"), rigorMedio("B"), 20, true) +
+    `<div class="jn">${n("A")} intervenci${n("A") === 1 ? "ón" : "ones"} · ${n("B")} intervenci${n("B") === 1 ? "ón" : "ones"}</div>` +
+    (ultima ? `<div class="jult"><b style="color:${EQUIPOS[ultima.equipo].color}">⚖ ${esc(ultima.autor)}</b> ${esc(ultima.ev.nota)}</div>` : "");
+  // EL PÚBLICO: un hemiciclo, un asiento por alumno, ordenados por posición y sin nombres
+  const vs = (S.publico.votantes || []).map(v => v.final).sort((x, y) => y - x);
+  $("pubN").textContent = vs.length ? `${vs.length} alumno${vs.length === 1 ? "" : "s"} votando` : "nadie votando";
+  pub.innerHTML = hemiciclo(vs);
+}
+
+// Asientos de un parlamento en semicírculo. A FAVOR se sienta a la izquierda (como en la barra
+// de arriba); el color se intensifica cuanto más convencido está cada uno.
+function hemiciclo(posiciones) {
+  const W = 330, R = 150, r0 = 62, H = R + 14, cx = W / 2, cy = H - 6;
+  const vacio = !posiciones.length;
+  const n = vacio ? 21 : posiciones.length;
+  const filas = n <= 12 ? 1 : n <= 28 ? 2 : n <= 50 ? 3 : n <= 85 ? 4 : 5;
+  const radios = Array.from({ length: filas }, (_, i) => filas === 1 ? (r0 + R) / 2 + 10 : r0 + 12 + (R - r0 - 20) * i / (filas - 1));
+  const suma = radios.reduce((a, b) => a + b, 0);
+  const cupos = radios.map(r => Math.max(1, Math.round(n * r / suma)));
+  let dif = n - cupos.reduce((a, b) => a + b, 0), i = cupos.length - 1;
+  while (dif !== 0) { cupos[i] = Math.max(1, cupos[i] + Math.sign(dif)); dif -= Math.sign(dif); i = (i - 1 + cupos.length) % cupos.length; }
+  const asientos = [];
+  let paso = Infinity;
+  radios.forEach((r, fi) => {
+    const k = cupos[fi];
+    if (k > 1) paso = Math.min(paso, Math.PI * r / (k - 1));
+    for (let j = 0; j < k; j++) {
+      const ang = k === 1 ? Math.PI / 2 : Math.PI - Math.PI * j / (k - 1);
+      asientos.push({ ang, x: cx + r * Math.cos(ang), y: cy - r * Math.sin(ang) });
+    }
+  });
+  asientos.sort((a, b) => b.ang - a.ang);
+  const rad = Math.max(3.5, Math.min(11, paso * 0.4, (R - r0) / filas * 0.42));
+  const color = v => v > 8 ? `color-mix(in srgb,var(--A) ${45 + Math.round(55 * Math.min(1, v / 70))}%,#0e141b)`
+    : v < -8 ? `color-mix(in srgb,var(--B) ${45 + Math.round(55 * Math.min(1, -v / 70))}%,#0e141b)` : "#3b4958";
+  const circ = asientos.map((a, j) => vacio
+    ? `<circle cx="${a.x.toFixed(1)}" cy="${a.y.toFixed(1)}" r="${rad.toFixed(1)}" fill="none" stroke="#243140" stroke-dasharray="2 2"/>`
+    : `<circle cx="${a.x.toFixed(1)}" cy="${a.y.toFixed(1)}" r="${rad.toFixed(1)}" fill="${color(posiciones[j])}"/>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${vacio ? "Nadie en el público" : `Público: ${posiciones.length} alumnos`}">${circ}
+    ${vacio ? `<text x="${cx}" y="${cy - 14}" text-anchor="middle" fill="#7d8fa1" font-size="11.5">Quienes elijan PÚBLICO se sientan aquí</text>` : ""}</svg>`;
 }
 
 const colorRigor = t => t >= 14 ? "var(--neon)" : t >= 9 ? "var(--amber)" : "var(--hot)";
@@ -550,9 +579,9 @@ async function cerrarRonda() {
   // tramo, que todos leyeron en vivo: el jurado juzga la refutación contra lo que de verdad se dijo.
   const previas = S.historial.slice();
   const entregas = recogerEntregas();
-  // Todo lo lento corre a la vez: ⚖ el relator (resume y pide el voto a humanos y máquinas) y el
-  // jurado de AMBAS bancadas, cada intervención por separado. El jurado juzga con su rúbrica y no
-  // espera al relator; la sala sintética sí lo escucha, porque reacciona después.
+  // Todo lo lento corre a la vez: ⚖ el relator (resume y pide el voto al público) y el jurado de
+  // AMBAS bancadas, cada intervención por separado. El jurado juzga con su rúbrica y no espera
+  // al relator.
   const t0 = Date.now();
   const relatorP = relatorPideVoto();
   const chatTramo = transcripcionChat(m => m.ronda === S.ronda, 60);
@@ -569,13 +598,12 @@ async function cerrarRonda() {
     const evsP = Promise.all(textos.map(t => S.motor.activo ? evaluarConLLM(t.texto, ctx, k) : Promise.resolve(evaluarRigor(t.texto, ctx))));
     prep[k] = { textos, ctx, evsP };
   }
-  const relator = await relatorP;
+  await relatorP;
 
   for (const k of orden) {
     const { textos, ctx } = prep[k];
     if (!textos.length) { tick(`${EQUIPOS[k].nombre} no entregó. Cero puntos, cero movimiento.`); continue; }
     const evs = await prep[k].evsP;
-    ctx.relator = relator;   // para la sala sintética
     // el jurado "canta" cada nota: un tono por intervención, más agudo cuanto más rigor
     evs.forEach((ev, i) => setTimeout(() => sonar("nota", ev.rubrica.total), i * 220));
     const turnoOrden = S.seq++;
@@ -584,33 +612,22 @@ async function cerrarRonda() {
       equipo: k, autor: t.autor, autorEmail: t.email || "", ronda: R.id, rondaNombre: R.nombre,
       rolNombre: R.rol, texto: t.texto, ev: evs[i]
     }));
-    // la sala oye a la bancada como bloque y se mueve una vez por bancada y ronda
-    const antes = margen();
     const inyeccion = evs.some(ev => ev.banderas.includes("INYECCIÓN DETECTADA"));
-    const conSociedad = S.motor.activo && S.motor.sociedad && !inyeccion;
-    const soloTextos = textos.map(t => t.texto);
-    const reacciones = conSociedad ? await reaccionarSociedad(soloTextos, evs, k, ctx)
-                                   : reaccionar(soloTextos, evs, EQUIPOS[k].dir, ctx.ecos);
-    const dv = (k === "A" ? 1 : -1) * swingA(antes, margen());
     const rig = evs.reduce((a, ev) => a + ev.rubrica.total, 0) / evs.length;
     S.turnos.push({ orden: turnoOrden, equipo: k, ronda: R.id, rondaNombre: R.nombre, n: textos.length,
-                    autores: textos.map(t => t.autor), rigorMedio: rig, deltaVotos: dv, reacciones });
-    // el resultado va a la conversación: votos de la bancada, nota de cada participante, murmullos
+                    autores: textos.map(t => t.autor), rigorMedio: rig, deltaVotos: 0, reacciones: [] });
+    // el resultado va a la conversación: la nota del jurado para cada participante
     postChat({ tipo: "resultado", equipo: k, nombre: "resultado", texto: "", datos: {
-      rondaNombre: R.nombre, n: textos.length, rigorMedio: +rig.toFixed(1), deltaVotos: dv,
-      alumnos: textos.map((t, i) => ({ autor: t.autor, total: evs[i].rubrica.total, nota: evs[i].nota || "", banderas: evs[i].banderas })),
-      dicen: reacciones.filter(r => r.comentario).map(r => ({ id: r.id, delta: +r.delta.toFixed(1), comentario: r.comentario }))
+      rondaNombre: R.nombre, n: textos.length, rigorMedio: +rig.toFixed(1),
+      alumnos: textos.map((t, i) => ({ autor: t.autor, total: evs[i].rubrica.total, nota: evs[i].nota || "", banderas: evs[i].banderas }))
     } });
-    pintarAudiencia(reacciones); pintarMarcador();
+    pintarMarcador();
     const res = document.querySelectorAll("#feed .msg.res");
     if (res.length) res[res.length - 1].scrollIntoView({ block: "center", behavior: "smooth" });
-    setTimeout(() => sonar(dv > 0.5 ? "aplauso" : dv < -0.5 ? "abucheo" : "whoosh"), evs.length * 220 + 150);
+    setTimeout(() => sonar(rig >= 14 ? "aplauso" : rig < 8 ? "abucheo" : "whoosh"), evs.length * 220 + 150);
     if (rig >= 14) setTimeout(() => sonar("moneda"), 450);
-    if (inyeccion)
-      tick(`⚑ ${EQUIPOS[k].nombre} intentó manipular al evaluador. Rigor 0 y la sala se le da vuelta.`);
-    // sin sociedad la reacción es instantánea: una pausa corta separa las dos bancadas.
-    // Con sociedad, la consulta a los agentes de la siguiente bancada ya hace de pausa.
-    if (!conSociedad && k !== orden[1]) await new Promise(r => setTimeout(r, 1400));
+    if (inyeccion) tick(`⚑ ${EQUIPOS[k].nombre} intentó manipular al evaluador: esa intervención tiene rigor 0.`);
+    if (k !== orden[1]) await new Promise(r => setTimeout(r, 1400));
   }
   console.info(`TRIBUNA: votación del tramo en ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 
@@ -631,65 +648,60 @@ function siguienteRonda() {
 
 // El momento dramático: pantalla completa, redoble, la sala elige, el jurado elige, y la lectura.
 // Al final, "Ver detalle" abre el veredicto con la tabla por bloque.
-// Los tres marcadores y quién ganó cada uno. El debate lo gana quien gana más marcadores
-// (2 de 3, o 2 de 2 sin público); si quedan parejos es empate.
+// Los dos marcadores y quién ganó cada uno: EL JURADO (rigor) y EL PÚBLICO (votos ganados).
+// Si coinciden, gana esa bancada. Si no coinciden, es empate: una argumentó mejor y la otra
+// convenció más. Sin público decide el jurado; si un marcador empata, decide el otro.
 function marcadores() {
-  const movA = persuasion("A"), movB = persuasion("B");
   const rA = rigorMedio("A") || 0, rB = rigorMedio("B") || 0;
   const P = S.publico, hayP = P.n > 0;
-  const gP = empatanEnVotos(movA, movB) ? null : (movA > movB ? "A" : "B");
   const gR = Math.abs(rA - rB) < 0.05 ? null : (rA > rB ? "A" : "B");
   const gU = !hayP || empatanEnVotos(P.A, P.B) ? null : (P.A > P.B ? "A" : "B");
-  const lista = hayP ? [gP, gU, gR] : [gP, gR];
+  const lista = hayP ? [gU, gR] : [gR];
   const a = lista.filter(g => g === "A").length, b = lista.filter(g => g === "B").length;
-  return { movA, movB, rA, rB, P, hayP, gP, gR, gU, gG: a > b ? "A" : b > a ? "B" : null, a, b, n: lista.length };
+  return { rA, rB, P, hayP, gR, gU, gG: a > b ? "A" : b > a ? "B" : null, a, b, n: lista.length };
 }
 
 function ceremonia() {
   S.veredictoRevelado = true;
-  const { movA, movB, rA, rB, P, hayP, gP, gR, gU, gG, a, b, n } = marcadores();
+  const { rA, rB, P, hayP, gR, gU, gG, a, b, n } = marcadores();
   const nombre = k => k ? `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}` : "EMPATE";
   const color = k => k ? EQUIPOS[k].color : "var(--txt)";
-  const lectura = gP && gR && gP !== gR ? "Una bancada ganó la sala y la otra el jurado. Esto es la clase."
-    : gP && gR ? `${EQUIPOS[gP].nombre} ganó la sala y el jurado.`
-    : !gP && !gR ? "Empate total." : !gP ? "La sala empató; el jurado decidió." : "El jurado empató; la sala decidió.";
-  const lecturaP = !hayP ? "" : gU === gP
-    ? `<div style="font-size:18px;color:var(--dim);margin-top:8px">El público real coincidió con la sala sintética.</div>`
-    : `<div style="font-size:18px;color:var(--amber);margin-top:8px">El público real no coincidió con la sala sintética: ¿qué vieron los agentes que ustedes no, o al revés?</div>`;
-  const cuenta = gG ? `${Math.max(a, b)} de ${n} marcadores` : a === b && a > 0 ? "cada bancada ganó la misma cantidad de marcadores" : "ningún marcador los separó";
+  const lectura = !hayP ? (gR ? "Decidió el jurado: no hubo público votando." : "El jurado no separó a las bancadas.")
+    : gR && gU && gR !== gU ? `Una bancada argumentó mejor y la otra convenció más al público. Esto es la clase: ¿qué vio el jurado que el público no, o al revés?`
+    : gR && gU ? `El jurado y el público coincidieron.`
+    : !gR && !gU ? "Ni el jurado ni el público separaron a las bancadas."
+    : !gR ? "El jurado empató; decidió el público." : "El público empató; decidió el jurado.";
+  const cuenta = gG ? (n === 1 ? "decidió el jurado" : a === 2 || b === 2 ? "el jurado y el público" : "un marcador empató y el otro decidió")
+    : gR && gU ? "el jurado y el público eligieron distinto" : "ningún marcador los separó";
   const mini = (l, k) => `<span>${l}<b style="color:${color(k)}">${k ? EQUIPOS[k].nombre : "empate"}</b></span>`;
   const el = document.createElement("div");
   el.id = "ceremonia";
   el.innerHTML = `
     <div class="cer-tablero">
     <div class="cer-k" id="cer0">EL VEREDICTO</div>
-    <div class="cer-bloque" id="cer1"><div class="cer-k">LA SALA · votos ganados</div>
-      <div class="cer-g" style="color:${color(gP)}">${nombre(gP)}</div>
-      <div class="cer-s"><span style="color:${EQUIPOS.A.color}">${conSigno(movA)}</span> · <span style="color:${EQUIPOS.B.color}">${conSigno(movB)}</span></div></div>
-    ${hayP ? `<div class="cer-bloque" id="cerP"><div class="cer-k">EL PÚBLICO · ${P.n} alumno${P.n === 1 ? "" : "s"} · votos ganados</div>
-      <div class="cer-g" style="color:${color(gU)}">${nombre(gU)}</div>
-      <div class="cer-s"><span style="color:${EQUIPOS.A.color}">${conSigno(P.A)}</span> · <span style="color:${EQUIPOS.B.color}">${conSigno(P.B)}</span></div></div>` : ""}
     <div class="cer-bloque" id="cer2"><div class="cer-k">EL JURADO · rigor promedio /20</div>
       <div class="cer-g" style="color:${color(gR)}">${nombre(gR)}</div>
       <div class="cer-s"><span style="color:${EQUIPOS.A.color}">${rA.toFixed(1)}</span> · <span style="color:${EQUIPOS.B.color}">${rB.toFixed(1)}</span></div></div>
+    ${hayP ? `<div class="cer-bloque" id="cerP"><div class="cer-k">EL PÚBLICO · ${P.n} alumno${P.n === 1 ? "" : "s"} · votos ganados</div>
+      <div class="cer-g" style="color:${color(gU)}">${nombre(gU)}</div>
+      <div class="cer-s"><span style="color:${EQUIPOS.A.color}">${conSigno(P.A)}</span> · <span style="color:${EQUIPOS.B.color}">${conSigno(P.B)}</span></div></div>` : ""}
     </div>
     <div class="cer-final">
       <div id="cerGpre">${gG ? "Y EL DEBATE LO GANA…" : "Y EL DEBATE…"}</div>
       <div class="cer-bloque" id="cerG">
         <div class="cer-g" style="color:${color(gG)}">${gG ? `🏆 ${nombre(gG)}` : "TERMINA EN EMPATE"}</div>
         <div class="cer-s">${cuenta}</div>
-        <div class="cer-mini">${mini("LA SALA", gP)}${hayP ? mini("EL PÚBLICO", gU) : ""}${mini("EL JURADO", gR)}</div>
+        <div class="cer-mini">${mini("EL JURADO", gR)}${hayP ? mini("EL PÚBLICO", gU) : ""}</div>
       </div>
-      <div class="cer-lect" id="cer3">${lectura}${lecturaP}
+      <div class="cer-lect" id="cer3">${lectura}
         <div style="margin-top:18px;display:flex;gap:10px;justify-content:center">
           <button class="btn pri" id="cerDetalle">Ver detalle</button><button class="btn" id="cerCerrar">Cerrar</button></div></div>
     </div>`;
   document.body.appendChild(el);
   const ver = (id, t) => setTimeout(() => $(id)?.classList.add("on"), t);
   sonar("redoble");
-  // tres (o dos) revelaciones, una cada 3 s; los bloques se compactan para caber en pantalla
-  if (hayP) el.classList.add("tres");
-  const pasos = hayP ? [["cer1", gP], ["cerP", gU], ["cer2", gR]] : [["cer1", gP], ["cer2", gR]];
+  // una revelación cada 3 s: primero el jurado, después el público
+  const pasos = hayP ? [["cer2", gR], ["cerP", gU]] : [["cer2", gR]];
   pasos.forEach(([id, g], i) => { ver(id, 2600 + i * 3000); setTimeout(() => sonar(g ? "fanfarria" : "whoosh"), 2600 + i * 3000); });
   // la declaración: se va el tablero, redoble, y el ganador en grande con confeti
   const tFinal = 2600 + pasos.length * 3000 + 1200;
@@ -706,70 +718,57 @@ function ceremonia() {
 }
 
 function veredicto() {
-  const movA = persuasion("A"), movB = persuasion("B");
-  const shockA = S.shocks.reduce((s, x) => s + x.swing, 0);
-  const rA = rigorMedio("A") || 0, rB = rigorMedio("B") || 0;
-  const ganaP = empatanEnVotos(movA, movB) ? "EMPATE" : (movA > movB ? EQUIPOS.A.nombre : EQUIPOS.B.nombre);
-  const ganaR = Math.abs(rA - rB) < 0.05 ? "EMPATE" : (rA > rB ? EQUIPOS.A.nombre : EQUIPOS.B.nombre);
-  const empP = ganaP === "EMPATE", empR = ganaR === "EMPATE";
-  const divergen = ganaP !== ganaR && !empP && !empR;
-  const lectura = divergen
-    ? ["ESTO ES LA CLASE", `Una bancada movió más votos y la otra argumentó mejor. Esa brecha es la
-      pregunta con la que conviene abrir la síntesis docente: ¿qué ganó exactamente cada una, y qué
-      habría pasado si la audiencia fuera otra?`]
-    : empP && empR
-    ? ["EMPATE TOTAL", `Ni la sala ni la rúbrica distinguen a las bancadas. Vale la pena mirar el
-      movimiento por bloque: un empate en votos suele esconder coaliciones distintas.`]
-    : empP
-    ? ["EMPATE EN LA SALA", `Las dos bancadas movieron prácticamente los mismos votos (menos de medio voto de diferencia), pero ${ganaR} argumentó
-      mejor. La pregunta para la síntesis: si el rigor no alcanzó para ganar la sala, ¿a quién le
-      hablaba cada una, y qué bloques quedaron sin mover?`]
-    : empR
-    ? ["EMPATE EN LA RÚBRICA", `Argumentaron igual de bien y aun así ${ganaP} movió más votos. La
-      diferencia no está en el rigor: está en a qué bloques eligió hablarle cada bancada.`]
-    : ["SIN BRECHA", `Persuasión y rigor apuntaron al mismo lado. Vale la pena preguntar si fue
-      mérito o si la sala ya venía inclinada.`];
-
-  const filas = AUDIENCIA.map(p => {
-    const i = S.iniPos[p.id];
-    const d = Math.round(p.pos) - Math.round(i);     // entero: un movimiento de 0,3 no es "−0" en rojo
-    return `<tr><td>${p.emoji} ${p.nombre}</td><td style="color:var(--dim2)">${p.bloque}</td>
-      <td class="num">${Math.round(i)}</td><td class="num">${Math.round(p.pos)}</td>
-      <td class="num" style="color:${d > 0 ? "var(--A)" : d < 0 ? "var(--B)" : "var(--dim2)"}">
-      ${d > 0 ? "+" : ""}${d}</td></tr>`;
-  }).join("");
+  const { rA, rB, P, hayP, gR, gU, gG } = marcadores();
+  const nom = k => k ? EQUIPOS[k].nombre : "EMPATE";
+  const lectura = !hayP ? ["SOLO JURADO", `No hubo público votando: el veredicto es el del jurado.`]
+    : gR && gU && gR !== gU
+    ? ["ESTO ES LA CLASE", `${EQUIPOS[gR].nombre} argumentó mejor según la rúbrica y ${EQUIPOS[gU].nombre} convenció más
+      al público. Esa brecha es la pregunta con la que conviene abrir la síntesis: ¿qué premió cada
+      uno, y cuál de las dos cosas debería pesar más en una democracia?`]
+    : gR && gU ? ["COINCIDEN", `El jurado y el público apuntaron al mismo lado. Vale la pena preguntar si fue
+      mérito o si el público ya venía inclinado.`]
+    : !gR && !gU ? ["EMPATE TOTAL", `Ni la rúbrica ni el público separan a las bancadas.`]
+    : !gR ? ["EMPATE EN LA RÚBRICA", `Argumentaron igual de bien y aun así ${EQUIPOS[gU].nombre} convenció más al público.`]
+    : ["EMPATE EN EL PÚBLICO", `El público se movió parejo, pero ${EQUIPOS[gR].nombre} argumentó mejor.`];
+  const prom = (k, c) => { const h = S.historial.filter(x => x.equipo === k); return h.length ? h.reduce((s, x) => s + (x.ev.rubrica[c] || 0), 0) / h.length : 0; };
+  const filas = RUBRICA.map(c => `<tr><td>${c.nombre}</td>
+      <td class="num" style="color:var(--A)">${prom("A", c.id).toFixed(1)}</td>
+      <td class="num" style="color:var(--B)">${prom("B", c.id).toFixed(1)}</td><td class="num" style="color:var(--dim2)">/${c.max}</td></tr>`).join("");
+  // el público en conjunto: dónde partió y dónde terminó (sin nombres: esto se proyecta)
+  const lado = v => v > 8 ? "a" : v < -8 ? "b" : "n";
+  const cuenta = campo => { const c = { a: 0, n: 0, b: 0 }; (P.votantes || []).forEach(v => c[lado(v[campo])]++); return c; };
+  const ini = cuenta("inicial"), fin = cuenta("final");
 
   abrirModal(`
-    <h2>Veredicto de la sala</h2>
+    <h2>Veredicto</h2>
     <p>${SESION.mocion}</p>
     <div class="veredicto">
       <div class="vcard" style="--c:var(--neon)">
-        <div class="l">GANA EN PERSUASIÓN</div>
-        <div class="n" style="font-size:19px">${ganaP}</div>
-        <div class="sub">Votos movidos por sus intervenciones (voto suave):
-          <b style="color:var(--A)">${conSigno(movA)}</b> /
-          <b style="color:var(--B)">${conSigno(movB)}</b></div>
-        ${S.shocks.length ? `<div class="sub">Sala de control (${S.shocks.length} shock${S.shocks.length > 1 ? "s" : ""}, no cuenta):
-          <b>${decima(shockA) === 0 ? "0" : conSigno(Math.abs(shockA)) + " hacia " + (shockA > 0 ? EQUIPOS.A.nombre : EQUIPOS.B.nombre)}</b></div>` : ""}
+        <div class="l">GANA EL DEBATE</div>
+        <div class="n" style="font-size:19px">${nom(gG)}</div>
       </div>
-      ${S.publico.n ? `<div class="vcard" style="--c:var(--A)">
-        <div class="l">GANA EN EL PÚBLICO REAL</div>
-        <div class="n" style="font-size:19px">${empatanEnVotos(S.publico.A, S.publico.B) ? "EMPATE" : S.publico.A > S.publico.B ? EQUIPOS.A.nombre : EQUIPOS.B.nombre}</div>
-        <div class="sub">${S.publico.n} alumno${S.publico.n === 1 ? "" : "s"} votando · votos movidos:
-          <b style="color:var(--A)">${conSigno(S.publico.A)}</b> /
-          <b style="color:var(--B)">${conSigno(S.publico.B)}</b></div>
-      </div>` : ""}
       <div class="vcard" style="--c:var(--amber)">
-        <div class="l">GANA EN RIGOR</div>
-        <div class="n" style="font-size:19px">${ganaR}</div>
+        <div class="l">GANA EN EL JURADO</div>
+        <div class="n" style="font-size:19px">${nom(gR)}</div>
         <div class="sub">Promedio de rúbrica:
           <b style="color:var(--A)">${rA.toFixed(1)}</b> /
           <b style="color:var(--B)">${rB.toFixed(1)}</b> sobre 20</div>
       </div>
+      ${hayP ? `<div class="vcard" style="--c:#a78bfa">
+        <div class="l">GANA EN EL PÚBLICO</div>
+        <div class="n" style="font-size:19px">${nom(gU)}</div>
+        <div class="sub">${P.n} alumno${P.n === 1 ? "" : "s"} votando · votos ganados:
+          <b style="color:var(--A)">${conSigno(P.A)}</b> /
+          <b style="color:var(--B)">${conSigno(P.B)}</b></div>
+      </div>` : ""}
     </div>
     <h3>${lectura[0]}</h3><p style="color:var(--txt)">${lectura[1]}</p>
-    <h3>MOVIMIENTO POR BLOQUE</h3>
-    <table class="rank"><tr><th>Persona</th><th>Bloque</th><th>Inicio</th><th>Final</th><th>Δ</th></tr>${filas}</table>
+    <h3>EL JURADO POR CRITERIO</h3>
+    <table class="rank"><tr><th>Criterio</th><th>${EQUIPOS.A.nombre}</th><th>${EQUIPOS.B.nombre}</th><th></th></tr>${filas}</table>
+    ${hayP ? `<h3>EL PÚBLICO, AL ENTRAR Y AL FINAL</h3>
+    <table class="rank"><tr><th></th><th>A favor</th><th>Indecisos</th><th>En contra</th></tr>
+      <tr><td>Al entrar</td><td class="num">${ini.a}</td><td class="num">${ini.n}</td><td class="num">${ini.b}</td></tr>
+      <tr><td>Al final</td><td class="num">${fin.a}</td><td class="num">${fin.n}</td><td class="num">${fin.b}</td></tr></table>` : ""}
     <div style="margin-top:18px;display:flex;gap:9px">
       <button class="btn" onclick="cerrarModal()">Volver</button>
       <button class="btn pri" onclick="exportarCsv()">↓ Descargar CSV de la sesión</button>
@@ -778,32 +777,22 @@ function veredicto() {
 
 /* ====================== 7. EVENTOS DEL PROFESOR ===================== */
 
+// Un titular de "última hora" que el profesor mete al debate: se proyecta y entra a la
+// conversación para que las bancadas lo usen o lo refuten. No mueve votos de nadie.
 function lanzarEvento() {
   const ev = EVENTOS.find(e => e.id === $("selEvento").value);
   if (!ev) return;
-  const antes = margen();
-  for (const p of AUDIENCIA) {
-    const d = (ev.efecto[p.id] || 0) * (0.75 + Math.random() * 0.5);
-    p.pos = clamp(p.pos + d, -100, 100);
-  }
   const flash = document.createElement("div");
   flash.className = "flash-ev";
   flash.innerHTML = `<div class="k">ÚLTIMA HORA · SALA DE CONTROL</div><div class="t">${ev.titular}</div>`;
   document.body.appendChild(flash);
   setTimeout(() => flash.remove(), 6500);
-  const swing = swingA(antes, margen());
-  S.shocks.push({ orden: S.seq++, id: ev.id, titular: ev.titular, ronda: RONDAS[S.ronda].nombre, swing });
-  pintarAudiencia(null); pintarMarcador();
-  const efecto = swing === 0 ? "no movió votos"
-    : `movió ${Math.abs(swing).toFixed(1)} votos hacia ${swing > 0 ? EQUIPOS.A.nombre : EQUIPOS.B.nombre} — no cuentan como persuasión de nadie`;
-  tick(`Shock lanzado (${efecto}): ${ev.titular.slice(0, 70)}…`);
+  S.shocks.push({ orden: S.seq++, id: ev.id, titular: ev.titular, ronda: RONDAS[S.ronda].nombre, swing: 0 });
+  postChat({ tipo: "noticia", nombre: "Última hora", texto: ev.titular });
+  sonar("campana");
+  tick(`Noticia lanzada al debate: ${ev.titular.slice(0, 70)}…`);
 }
 
-/* ====================== 7b. SONIDOS ================================= */
-// Síntesis con WebAudio (sin archivos), como el panel de debate de mapuche_panel: aplauso y
-// abucheo al revelar según los votos, moneda por rigor alto, whoosh cuando no pasa nada.
-// Se apagan con el botón 🔊 del pie; la preferencia queda en localStorage.
-let _ac = null;
 function audioCtx() {
   if (!_ac) { try { _ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
   if (_ac.state === "suspended") _ac.resume().catch(() => {});
@@ -899,11 +888,11 @@ function sonar(tipo, valor) {
 /* ====================== 8. EXPORTAR ================================= */
 
 function exportarCsv() {
-  // delta_votos es lo que movió LA BANCADA en esa ronda (se repite en cada intervención suya):
-  // la sala oye a la bancada como bloque; la rúbrica sí es individual.
+  // delta_votos solo lo llena el público (votos que movió cada alumno hacia A FAVOR); las
+  // intervenciones llevan la rúbrica individual del jurado.
   const cab = ["ronda", "equipo", "autor", "autor_email", "palabras", "evidencia", "refutacion", "estructura",
     "concesion", "rigor_total", "delta_votos", "conceptos", "banderas", "texto"];
-  const dvDe = h => { const t = S.turnos.find(x => x.orden === h.turnoOrden); return t ? t.deltaVotos : (h.deltaVotos ?? 0); };
+  const dvDe = () => "";
   const filas = S.historial.map(h => [h.orden,
     h.rondaNombre, EQUIPOS[h.equipo].nombre, h.autor, h.autorEmail || "", h.ev.palabras || palabras(h.texto),
     h.ev.rubrica.evidencia, h.ev.rubrica.refutacion, h.ev.rubrica.estructura, h.ev.rubrica.concesion,
@@ -913,8 +902,7 @@ function exportarCsv() {
   ]);
   const filasShock = S.shocks.map(x => [x.orden,
     x.ronda, "SALA DE CONTROL", "profesor", "", "", "", "", "", "", "",
-    Math.abs(x.swing), "",   // delta_votos sigue siendo numérico; la dirección va en banderas
-    "SHOCK:" + x.id + (x.swing ? "|HACIA:" + EQUIPOS[x.swing > 0 ? "A" : "B"].nombre : ""),
+    "", "", "NOTICIA:" + x.id,
     x.titular.replace(/"/g, "'")
   ]);
   // el público: una fila por alumno, al final; delta_votos = votos que movió hacia A FAVOR
@@ -931,7 +919,7 @@ function exportarCsv() {
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   a.download = `tribuna_s${SESION.semana}_${Date.now()}.csv`;
   a.click();
-  tick("CSV exportado: una fila por intervención (rúbrica individual, votos de la bancada) y por shock.");
+  tick("CSV exportado: una fila por intervención (rúbrica del jurado), por noticia y por alumno del público.");
 }
 
 /* ====================== 9. MOTOR LLM (opcional) ===================== */
@@ -947,7 +935,7 @@ function cerrarModal() { const m = $("modalWrap"); if (m) m.remove(); }
 
 function pintarModo() {
   $("modoLbl").textContent = !S.motor.activo ? "motor: heurístico local"
-    : `motor: ${S.motor.modelo}${S.motor.proxy ? " (.env)" : S.motor.funcion ? " (servidor TRIBUNA)" : ""}${S.motor.sociedad ? " · sociedad de agentes" : ""}`;
+    : `motor: ${S.motor.modelo}${S.motor.proxy ? " (.env)" : S.motor.funcion ? " (servidor TRIBUNA)" : ""}`;
 }
 
 function configMotor() {
@@ -967,11 +955,6 @@ function configMotor() {
       <option value="anthropic">Anthropic — claude-sonnet-5</option>
       <option value="openai">OpenAI — gpt-4o-mini</option>
     </select>
-    <h3>AUDIENCIA</h3>
-    <select id="mSoc" style="width:100%;background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:9px">
-      <option value="0">Paramétrica — pesos escritos a mano (gratis, instantánea)</option>
-      <option value="1">Sociedad de agentes — cada persona es un LLM que lee el texto (experimental)</option>
-    </select>
     <h3>API KEY</h3>
     ${S.proxyProvs.length ? `<p style="color:var(--neon)">El servidor local tiene key en <code>.env</code> para:
       <b>${S.proxyProvs.map(x => x.id).join(", ")}</b>. Deja el campo vacío para usarla: la key se queda
@@ -983,12 +966,11 @@ function configMotor() {
       <button class="btn" onclick="cerrarModal()">Cancelar</button>
     </div>`);
   $("mProv").value = S.motor.prov;
-  $("mSoc").value = S.motor.sociedad ? "1" : "0";
 }
 function guardarMotor() {
   S.motor.prov = $("mProv").value;
   S.motor.key = $("mKey").value.trim();
-  S.motor.sociedad = $("mSoc").value === "1";
+  S.motor.sociedad = false;             // la audiencia sintética ya no juega
   S.motor.modelo = S.motor.prov === "anthropic" ? "claude-sonnet-5" : "gpt-4o-mini";
   S.motor.proxy = !S.motor.key && S.proxyProvs.some(x => x.id === S.motor.prov);
   // servidor TRIBUNA (Cloud Function con la key en Secret Manager): solo Anthropic, solo profesores
@@ -1203,10 +1185,9 @@ function init() {
     $("chatBanca" + k).textContent = `${e.bandera} ${e.nombre}`;
   }
   $("selEvento").innerHTML = EVENTOS.map(e =>
-    `<option value="${e.id}">⚡ ${e.titular.slice(0, 52)}…</option>`).join("");
+    `<option value="${e.id}">📰 ${e.titular.slice(0, 52)}…</option>`).join("");
 
-  S.iniPos = {}; AUDIENCIA.forEach(p => S.iniPos[p.id] = p.pos);
-  S.votoInicial = conteo();
+  S.iniPos = {}; AUDIENCIA.forEach(p => S.iniPos[p.id] = p.pos);   // solo para pruebas/simular.js
 
   const guardado = localStorage.getItem("tribuna_motor");
   if (guardado) { Object.assign(S.motor, JSON.parse(guardado)); }
@@ -1221,8 +1202,10 @@ function init() {
       }
     });
 
-  pintarRonda(); pintarAudiencia(null); pintarMarcador(); pintarFeed();
-  tick(`Votación inicial registrada: ${S.votoInicial.a} a favor · ${S.votoInicial.n} indecisos · ${S.votoInicial.b} en contra. Gana quien mueva más votos.`);
+  const guardadoMotor = JSON.parse(localStorage.getItem("tribuna_motor") || "{}");
+  if (guardadoMotor.sociedad) { S.motor.sociedad = false; localStorage.setItem("tribuna_motor", JSON.stringify(S.motor)); }
+  pintarRonda(); pintarMarcador(); pintarFeed();
+  tick("Juzgan dos: el jurado (rigor, sobre 20) y el público (los alumnos que no debaten).");
 
   $("btnPrincipal").onclick = () => {
     if (S.fase === "listo") abrirRonda();

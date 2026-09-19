@@ -146,7 +146,7 @@ function partidaHtml({ s, jugadores, feedback }) {
     </div>
     <div class="detalle">
       <div class="marc">
-        <div>LA SALA · votos<b><span style="color:${A.color}">${esc(v ? v.movA : mk.persuA ?? "—")}</span> · <span style="color:${B.color}">${esc(v ? v.movB : mk.persuB ?? "—")}</span></b></div>
+        ${(v && v.movA != null) || mk.persuA != null ? `<div>LA SALA · votos<b><span style="color:${A.color}">${esc(v ? v.movA : mk.persuA)}</span> · <span style="color:${B.color}">${esc(v ? v.movB : mk.persuB)}</span></b></div>` : ""}
         <div>EL PÚBLICO · votos<b><span style="color:${A.color}">${esc(v ? v.pubA : mk.publicoA ?? "—")}</span> · <span style="color:${B.color}">${esc(v ? v.pubB : mk.publicoB ?? "—")}</span></b></div>
         <div>EL JURADO · /20<b><span style="color:${A.color}">${esc(v ? v.rA : mk.rigorA ?? "—")}</span> · <span style="color:${B.color}">${esc(v ? v.rB : mk.rigorB ?? "—")}</span></b></div>
         <div>INTERVENCIONES<b>${(s.feed || []).length}</b></div>

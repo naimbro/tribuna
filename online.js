@@ -42,13 +42,10 @@ function estadoPublico() {
     rondaNombre: R.nombre, rol: R.rol, pauta: R.pauta, seg: R.seg,
     abreEn: S.abreEn || null,                                   // epoch ms; el alumno calcula el reloj
     marcador: {
-      persuA: $("persuA").textContent, persuB: $("persuB").textContent,
       publicoA: $("publicoA").textContent, publicoB: $("publicoB").textContent, publicoN: S.publico.n,
       rigorA: $("rigorA").textContent, rigorB: $("rigorB").textContent,
       conteo: conteo()
     },
-    audiencia: AUDIENCIA.map(p => ({ id: p.id, nombre: p.nombre, bloque: p.bloque, emoji: p.emoji, color: p.color,
-                                     votos: p.votos, pos: Math.round(p.pos), ultimo: p.ultimo || "" })),
     turnos: S.turnos.map(t => ({
       orden: t.orden, equipo: t.equipo, ronda: t.ronda, rondaNombre: t.rondaNombre, n: t.n,
       autores: t.autores, rigorMedio: +t.rigorMedio.toFixed(1), deltaVotos: t.deltaVotos,
@@ -68,13 +65,12 @@ function estadoPublico() {
 }
 
 function resumenVeredicto() {
-  const { movA, movB, rA, rB, P, gG, a, b, n } = marcadores();
+  const { rA, rB, P, gG, a, b, n } = marcadores();
   return {
-    movA, movB, rA: +rA.toFixed(1), rB: +rB.toFixed(1),
+    rA: +rA.toFixed(1), rB: +rB.toFixed(1),
     ganaG: gG ? EQUIPOS[gG].nombre : "EMPATE", marcA: a, marcB: b, marcN: n,
     pubN: P.n, pubA: decima(P.A), pubB: decima(P.B),
     ganaU: !P.n ? null : empatanEnVotos(P.A, P.B) ? "EMPATE" : P.A > P.B ? EQUIPOS.A.nombre : EQUIPOS.B.nombre,
-    ganaP: empatanEnVotos(movA, movB) ? "EMPATE" : movA > movB ? EQUIPOS.A.nombre : EQUIPOS.B.nombre,
     ganaR: Math.abs(rA - rB) < 0.05 ? "EMPATE" : rA > rB ? EQUIPOS.A.nombre : EQUIPOS.B.nombre
   };
 }
@@ -137,7 +133,6 @@ function activarOnline() {
   envolver("ceremonia", () => fotoPublico());
   envolver("lanzarEvento");
   envolver("pintarMarcador");
-  envolver("pintarAudiencia");
   envolver("guardarMotor");
 
   // El público: sus posiciones en vivo
@@ -283,7 +278,7 @@ async function restaurar(codigo) {
     // una ronda que estaba abierta cuando se cerró la pestaña se vuelve a abrir a mano
     S.fase = priv.fase === "abierta" ? "listo" : priv.fase;
     S.abreEn = null;
-    pintarRonda(); pintarAudiencia(null); pintarMarcador(); pintarFeed();
+    pintarRonda(); pintarMarcador(); pintarFeed();
     $("btnPrincipal").textContent = { listo: "ABRIR TRAMO", resuelta: "SIGUIENTE TRAMO", fin: S.veredictoRevelado ? "VER VEREDICTO" : "🏆 REVELAR GANADOR" }[S.fase] || "ABRIR TRAMO";
     tick(`Sala ${codigo} restaurada: ${S.historial.length} intervenciones, ronda ${S.ronda + 1}.`);
     // partidas guardadas con la versión anterior (un texto por bancada, votos en cada entrada)

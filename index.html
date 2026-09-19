@@ -52,8 +52,8 @@ header{
 }
 
 /* ---------- marcador ----------
-   En espejo y centrado: los nombres hacia afuera, las cifras hacia el centro, y las de LA SALA
-   pegadas a la línea en vivo (que también es de la sala). Así los dos lados se comparan de un
+   En espejo y centrado: los nombres hacia afuera, las cifras hacia el centro, y las del PÚBLICO
+   pegadas a la barra del centro (que también es del público). Así los dos lados se comparan de un
    vistazo. El ancho está acotado: en una pantalla ancha no se separan. */
 .marcador{
   display:grid;grid-template-columns:minmax(0,520px) 230px minmax(0,520px);justify-content:center;
@@ -74,16 +74,16 @@ header{
 #eqA .id{text-align:right}
 .eq .id b{display:block;font-size:14px;letter-spacing:.12em;color:var(--c);white-space:nowrap}
 .eq .id small{display:block;color:var(--dim2);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* orden en espejo: A = nombre, bandera, jurado, público, sala | centro | B = sala, público, jurado, bandera, nombre */
-#eqA .id{order:1} #eqA .flag{order:2} #eqA .rigor{order:3} #eqA .publico{order:4} #eqA .persu{order:5}
-#eqB .persu{order:1} #eqB .publico{order:2} #eqB .rigor{order:3} #eqB .flag{order:4} #eqB .id{order:5}
+/* orden en espejo: A = nombre, bandera, jurado, público | centro | B = público, jurado, bandera, nombre */
+#eqA .id{order:1} #eqA .flag{order:2} #eqA .rigor{order:3} #eqA .publico{order:4}
+#eqB .publico{order:1} #eqB .rigor{order:2} #eqB .flag{order:3} #eqB .id{order:4}
 .cifra{text-align:center;min-width:70px;padding:2px 4px}
 .cifra .n{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1}
 .cifra .l{font-size:8.5px;letter-spacing:.16em;color:var(--dim2);margin-top:4px}
 .cifra.persu .n{color:var(--neon)}
 .cifra.rigor .n{color:var(--amber)}
-#eqA .cifra.persu{border-left:1px solid var(--line);padding-left:10px}
-#eqB .cifra.persu{border-right:1px solid var(--line);padding-right:10px}
+#eqA .cifra.publico{border-left:1px solid var(--line);padding-left:10px}
+#eqB .cifra.publico{border-right:1px solid var(--line);padding-right:10px}
 .linea{
   border:1px solid var(--line);background:#0c131a;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:6px 12px;
@@ -170,6 +170,29 @@ main{display:grid;grid-template-columns:1fr 372px;gap:0;flex:1 1 auto;min-height
 #cerG .cer-g{font-size:min(11vw,140px)}
 #cerG .cer-mini{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;font-size:17px;color:var(--dim);margin-top:12px}
 #cerG .cer-mini b{margin-left:6px}
+/* ---------- columna de los jueces ---------- */
+.jurado{padding:10px 14px 12px;border-bottom:1px solid var(--line)}
+.jurado .vacio{color:var(--dim2);font-size:12px;margin-bottom:8px}
+.jr{margin-bottom:7px}
+.jl{font-size:10px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;text-align:center;margin-bottom:2px}
+.jb{display:grid;grid-template-columns:34px 1fr 1fr 34px;gap:3px;align-items:center}
+.jb .v{font-family:var(--mono);font-size:13px;font-weight:700}
+.jb .v:last-child{text-align:right}
+.bar{height:8px;background:#0a1016;border:1px solid var(--line);display:flex;overflow:hidden}
+.bar i{display:block;height:100%;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.bar.a{justify-content:flex-end;border-radius:99px 0 0 99px}.bar.a i{background:var(--A)}
+.bar.b{border-radius:0 99px 99px 0}.bar.b i{background:var(--B)}
+.jr.tot{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)}
+.jr.tot .jl{color:var(--amber)}
+.jr.tot .v{font-size:19px}
+.jr.tot .bar{height:11px}
+.jn{font-size:10.5px;color:var(--dim2);text-align:center;margin-top:4px}
+.jult{margin-top:9px;font-size:12px;color:var(--dim);line-height:1.4;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+.hemi{padding:12px 14px 0;display:flex;justify-content:center}
+.hemi svg{width:100%;max-width:330px;height:auto}
+.hemi circle{transition:fill .8s}
+.hemi-nota{font-size:10.5px;color:var(--dim2);text-align:center;margin:8px 14px 12px}
+.msg.noticia{align-self:center;max-width:92%;background:#1f1508;border:1px solid var(--amber);--c:var(--amber)}
 /* ceremonia del ganador */
 #ceremonia{position:fixed;inset:0;z-index:60;background:radial-gradient(900px 500px at 50% 40%,#0f1c26 0%,rgba(3,6,9,.98) 70%);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;text-align:center}
@@ -397,20 +420,18 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   <div class="eq" id="eqA" style="--c:var(--A)">
     <div class="flag" id="flagA"></div>
     <div class="id"><b id="nomA"></b><small id="lemaA"></small></div>
-    <div class="cifra persu" title="Votos que movió esta bancada en la sala (gana quien mueve más)"><div class="n mono" id="persuA">0</div><div class="l">LA SALA</div></div>
-    <div class="cifra publico" style="display:none" title="Votos que movió esta bancada en el público real: los alumnos que no debaten y marcan su posición"><div class="n mono" id="publicoA">—</div><div class="l">PÚBLICO</div></div>
+    <div class="cifra publico" title="Votos que ganó esta bancada en el público: los alumnos que no debaten y marcan su posición"><div class="n mono" id="publicoA">—</div><div class="l">PÚBLICO · votos</div></div>
     <div class="cifra rigor" title="Promedio de la rúbrica del jurado sobre 20 (gana quien argumenta mejor)"><div class="n mono" id="rigorA">—</div><div class="l">JURADO /20</div></div>
   </div>
   <div class="linea">
-    <div class="lbl">LÍNEA EN VIVO · cuotas de la sala</div>
+    <div class="lbl">EL PÚBLICO AHORA · cuotas</div>
     <div class="cuotas"><span class="cuota" id="cuotaA" style="color:var(--A)">—</span><span class="cuota" id="cuotaB" style="color:var(--B)">—</span></div>
     <div class="barra-votos"><i id="vA" style="background:var(--A);width:50%"></i><i id="vN" style="background:#2c3a48;width:0%"></i><i id="vB" style="background:var(--B);width:50%"></i></div>
   </div>
   <div class="eq" id="eqB" style="--c:var(--B)">
     <div class="flag" id="flagB"></div>
     <div class="id"><b id="nomB"></b><small id="lemaB"></small></div>
-    <div class="cifra persu" title="Votos que movió esta bancada en la sala (gana quien mueve más)"><div class="n mono" id="persuB">0</div><div class="l">LA SALA</div></div>
-    <div class="cifra publico" style="display:none" title="Votos que movió esta bancada en el público real: los alumnos que no debaten y marcan su posición"><div class="n mono" id="publicoB">—</div><div class="l">PÚBLICO</div></div>
+    <div class="cifra publico" title="Votos que ganó esta bancada en el público: los alumnos que no debaten y marcan su posición"><div class="n mono" id="publicoB">—</div><div class="l">PÚBLICO · votos</div></div>
     <div class="cifra rigor" title="Promedio de la rúbrica del jurado sobre 20 (gana quien argumenta mejor)"><div class="n mono" id="rigorB">—</div><div class="l">JURADO /20</div></div>
   </div>
 </div>
@@ -439,13 +460,16 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   </section>
 
   <aside class="col der">
-    <div class="cab">LA AUDIENCIA <span class="pt">27 votos en la sala</span></div>
+    <div class="cab">EL JURADO <span class="pt">rúbrica del curso · IA</span></div>
+    <div class="jurado" id="jurado"></div>
+    <div class="cab">EL PÚBLICO <span class="pt" id="pubN">nadie votando</span></div>
+    <div class="hemi" id="hemiciclo"></div>
     <div class="resumen">
       <div class="res"><div class="n mono" id="rA" style="color:var(--A)">0</div><div class="l">A FAVOR</div></div>
       <div class="res"><div class="n mono" id="rN" style="color:var(--dim)">0</div><div class="l">INDECISOS</div></div>
       <div class="res"><div class="n mono" id="rB" style="color:var(--B)">0</div><div class="l">EN CONTRA</div></div>
     </div>
-    <div class="gente" id="gente"></div>
+    <p class="hemi-nota">Cada asiento es un alumno del público, ordenado según su posición. No se muestran nombres.</p>
   </aside>
 </main>
 
@@ -473,12 +497,12 @@ table.rank td.num{font-family:var(--mono);text-align:right}
     document.write('<script src="contenido/semana' + ok + '.js?v=20260919a"><\/script>');
   })();
 </script>
-<script src="moderacion.js?v=20260919k"></script>
-<script src="app.js?v=20260920a"></script>
-<script src="escenas.js?v=20260920a"></script>
+<script src="moderacion.js?v=20260920b"></script>
+<script src="app.js?v=20260920b"></script>
+<script src="escenas.js?v=20260920b"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260920a"></script>
+<script type="module" src="online.js?v=20260920b"></script>
 </body>
 </html>

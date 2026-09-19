@@ -131,8 +131,7 @@ function pintarSala() {
   $("tramoLbl").textContent = `Tramo ${s.ronda + 1}/${s.totalRondas} · ${s.rondaNombre}.`;
   $("pauta").textContent = s.fase === "abierta" ? s.pauta : s.fase === "fin" ? "Terminó el debate." : "Esperando al profesor.";
   const mk = s.marcador || {};
-  $("marca").innerHTML = `<span>Sala <b style="color:${s.equipos.A.color}">${esc(mk.persuA)}</b> · <b style="color:${s.equipos.B.color}">${esc(mk.persuB)}</b></span>
-    ${mk.publicoN ? `<span>Público <b style="color:${s.equipos.A.color}">${esc(mk.publicoA)}</b> · <b style="color:${s.equipos.B.color}">${esc(mk.publicoB)}</b></span>` : ""}
+  $("marca").innerHTML = `${mk.publicoN ? `<span>Público <b style="color:${s.equipos.A.color}">${esc(mk.publicoA)}</b> · <b style="color:${s.equipos.B.color}">${esc(mk.publicoB)}</b></span>` : ""}
     <span>Jurado <b style="color:${s.equipos.A.color}">${esc(mk.rigorA)}</b> · <b style="color:${s.equipos.B.color}">${esc(mk.rigorB)}</b></span>`;
   if (J.equipo === "P") document.body.classList.toggle("es-publico", !s.veredicto);
   pintarEspera(s);
@@ -160,10 +159,11 @@ function menciones(t) {
 function burbuja(m, s) {
   const hora = new Date(m.t).toTimeString().slice(0, 5);
   if (m.tipo === "sistema") return `<div class="msg sys">${esc(m.texto)}</div>`;
+  if (m.tipo === "noticia") return `<div class="msg mod" style="--c:var(--amber);border-color:var(--amber);background:#1f1508"><div class="who">📰 Última hora<span class="hora">${hora}</span></div><div class="tx">${esc(m.texto)}</div></div>`;
   if (m.tipo === "mod") return `<div class="msg mod ${meNombran(m.texto) && J.equipo !== "P" ? "ati" : ""}"><div class="who">🎙 Moderadora<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
   if (m.tipo === "relator") {
     const d = m.datos || {};
-    return `<div class="msg rel"><div class="who">⚖ Relator · llamado a votar<span class="hora">${hora}</span></div>
+    return `<div class="msg rel"><div class="who">📣 Relator · llamado a votar<span class="hora">${hora}</span></div>
       ${d.resumenA ? `<div class="tx"><b style="color:${s.equipos.A.color}">${s.equipos.A.nombre}:</b> ${esc(d.resumenA)}</div>` : ""}
       ${d.resumenB ? `<div class="tx"><b style="color:${s.equipos.B.color}">${s.equipos.B.nombre}:</b> ${esc(d.resumenB)}</div>` : ""}
       ${d.disputa ? `<div class="tx"><b>En disputa:</b> ${esc(d.disputa)}</div>` : ""}
@@ -174,7 +174,7 @@ function burbuja(m, s) {
     const d = m.datos || {}, e = s.equipos[m.equipo];
     return `<div class="msg res" style="--c:${e.color}"><div class="res-head"><b style="color:${e.color}">${e.bandera} ${e.nombre}</b>
         <span style="color:var(--dim);font-size:12px">jurado <b style="color:${colorRigor(d.rigorMedio)}">${(+d.rigorMedio).toFixed(1)}</b>/20</span>
-        <span class="delta" style="color:${d.deltaVotos > 0 ? "var(--neon)" : d.deltaVotos < 0 ? "var(--B)" : "var(--dim)"}">${d.deltaVotos > 0 ? "+" : ""}${(+d.deltaVotos).toFixed(1)} votos</span></div>
+        ${typeof d.deltaVotos === "number" ? `<span class="delta" style="color:${d.deltaVotos > 0 ? "var(--neon)" : d.deltaVotos < 0 ? "var(--B)" : "var(--dim)"}">${d.deltaVotos > 0 ? "+" : ""}${(+d.deltaVotos).toFixed(1)} votos</span>` : ""}</div>
       ${(d.alumnos || []).map(a => `<div class="ra"><b>${esc(a.autor)}</b> <span style="color:${colorRigor(a.total)};font-weight:700">${(+a.total).toFixed(1)}</span>${a.nota ? `<span class="nt">⚖ ${esc(a.nota)}</span>` : ""}</div>`).join("")}
       ${(d.dicen || []).map(r => `<div class="dice">“${r.comentario}” (${r.delta > 0 ? "+" : ""}${r.delta})</div>`).join("")}</div>`;
   }
@@ -333,22 +333,23 @@ function ceremonia(s, v) {
   const cA = noms.filter(x => x === s.equipos.A.nombre).length, cB = noms.filter(x => x === s.equipos.B.nombre).length;
   const gG = v.ganaG || (cA > cB ? s.equipos.A.nombre : cB > cA ? s.equipos.B.nombre : "EMPATE");
   const n = v.marcN || noms.length, m = Math.max(v.marcA ?? cA, v.marcB ?? cB);
+  const haySala = v.ganaP != null;
   el.innerHTML = `<div class="ctab"><div class="k" style="color:var(--amber);font-size:14px">EL VEREDICTO</div>
-    <div class="cb" id="c1"><div class="k">La sala · votos ganados</div><div class="cg" style="color:${col(v.ganaP)}">${band(v.ganaP)}${esc(v.ganaP)}</div>
-      <div class="cs">${v.movA > 0 ? "+" : ""}${v.movA} · ${v.movB > 0 ? "+" : ""}${v.movB}</div></div>
-    ${v.pubN ? `<div class="cb" id="cP"><div class="k">El público · ${v.pubN} alumnos</div><div class="cg" style="color:${col(v.ganaU)}">${band(v.ganaU)}${esc(v.ganaU)}</div>
-      <div class="cs">${v.pubA > 0 ? "+" : ""}${v.pubA} · ${v.pubB > 0 ? "+" : ""}${v.pubB}</div></div>` : ""}
+    ${haySala ? `<div class="cb" id="c1"><div class="k">La sala · votos ganados</div><div class="cg" style="color:${col(v.ganaP)}">${band(v.ganaP)}${esc(v.ganaP)}</div>
+      <div class="cs">${v.movA > 0 ? "+" : ""}${v.movA} · ${v.movB > 0 ? "+" : ""}${v.movB}</div></div>` : ""}
     <div class="cb" id="c2"><div class="k">El jurado · rigor /20</div><div class="cg" style="color:${col(v.ganaR)}">${band(v.ganaR)}${esc(v.ganaR)}</div>
-      <div class="cs">${v.rA} · ${v.rB}</div></div></div>
+      <div class="cs">${v.rA} · ${v.rB}</div></div>
+    ${v.pubN ? `<div class="cb" id="cP"><div class="k">El público · ${v.pubN} alumno${v.pubN === 1 ? "" : "s"}</div><div class="cg" style="color:${col(v.ganaU)}">${band(v.ganaU)}${esc(v.ganaU)}</div>
+      <div class="cs">${v.pubA > 0 ? "+" : ""}${v.pubA} · ${v.pubB > 0 ? "+" : ""}${v.pubB}</div></div>` : ""}</div>
     <div class="cfin">
       <div id="cGpre">${gG !== "EMPATE" ? "Y EL DEBATE LO GANA…" : "Y EL DEBATE…"}</div>
       <div class="cb" id="cG"><div class="cg" style="color:${col(gG)}">${gG !== "EMPATE" ? "🏆 " + band(gG) + esc(gG) : "TERMINA EN EMPATE"}</div>
-        <div class="cs">${gG !== "EMPATE" ? `${m} de ${n} marcadores` : "ningún lado ganó más marcadores"}</div>
-        <div class="cmini"><span>Sala: <b style="color:${col(v.ganaP)}">${esc(v.ganaP)}</b></span>${v.pubN ? `<span>Público: <b style="color:${col(v.ganaU)}">${esc(v.ganaU)}</b></span>` : ""}<span>Jurado: <b style="color:${col(v.ganaR)}">${esc(v.ganaR)}</b></span></div></div>
+        <div class="cs">${gG !== "EMPATE" ? (n === 1 ? "decidió el jurado" : `${m} de ${n} marcadores`) : "el jurado y el público no coincidieron"}</div>
+        <div class="cmini">${haySala ? `<span>Sala: <b style="color:${col(v.ganaP)}">${esc(v.ganaP)}</b></span>` : ""}<span>Jurado: <b style="color:${col(v.ganaR)}">${esc(v.ganaR)}</b></span>${v.pubN ? `<span>Público: <b style="color:${col(v.ganaU)}">${esc(v.ganaU)}</b></span>` : ""}</div></div>
       <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>
     </div>`;
   document.body.appendChild(el);
-  const ids = v.pubN ? ["c1", "cP", "c2"] : ["c1", "c2"];
+  const ids = [haySala && "c1", "c2", v.pubN && "cP"].filter(Boolean);
   ids.forEach((id, i) => setTimeout(() => $(id)?.classList.add("on"), 2600 + i * 3000));
   const tFinal = 2600 + ids.length * 3000 + 1200;
   setTimeout(() => el.classList.add("final"), tFinal);

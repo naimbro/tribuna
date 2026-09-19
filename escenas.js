@@ -82,7 +82,6 @@ function cerrarPortada() { $("portada")?.remove(); }
 
 /* ----------------------------- 2. INTRO ----------------------------- */
 function laminasIntro() {
-  const votos = AUDIENCIA.reduce((a, p) => a + (p.votos || 1), 0);
   const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   return [
     `<div class="in-k">SEMANA ${SESION.semana} · ${escHtml(SESION.curso || "")}</div>
@@ -97,12 +96,12 @@ function laminasIntro() {
      </div>`,
     `<div class="in-k">CÓMO SE GANA</div>
      <div class="in-jueces">
-       <div><div class="in-e">🤖</div><b>LA SALA</b><span>${votos} votantes sintéticos que leen el debate y se mueven. Gana quien mueve más votos.</span></div>
-       <div><div class="in-e">🗳</div><b>EL PÚBLICO</b><span>Ustedes, los que no debaten: mueven su deslizador cuando algo los convence.</span></div>
-       <div><div class="in-e">⚖</div><b>EL JURADO</b><span>Una IA con rúbrica sobre 20: evidencia, lógica, refutación. Gana quien argumenta mejor.</span></div>
+       <div><div class="in-e">⚖</div><b>EL JURADO</b><span>Una IA que conoce las lecturas y pone nota con la rúbrica del curso, sobre 20. Premia a quien argumenta mejor.</span></div>
+       <div><div class="in-e">🗳</div><b>EL PÚBLICO</b><span>Ustedes, los que no debaten: mueven su deslizador cuando algo los convence. Premia a quien convence más.</span></div>
      </div>
      <div class="in-tramos">${RONDAS.map((r, i) => `<span><b>${i + 1}</b> ${escHtml(r.nombre)} <i class="mono">${mmss(r.seg)}</i></span>`).join("<em>›</em>")}</div>
-     <div class="in-nota">🎙 Una moderadora de IA pregunta y pasa la palabra · ⚖ un relator resume y llama a votar al final de cada tramo.</div>`
+     <div class="in-nota">Si el jurado y el público coinciden, esa bancada gana. Si no, es empate, y esa diferencia es lo más interesante del día.</div>
+     <div class="in-nota">🎙 Una moderadora de IA pregunta y pasa la palabra · un relator resume y llama a votar al final de cada tramo.</div>`
   ];
 }
 

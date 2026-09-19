@@ -8,7 +8,7 @@
       dónde sale lo que dice, le pasa la palabra a quien no ha hablado, equilibra bancadas.
    ⚖ RELATOR: al cerrar cada tramo resume las posiciones, dice a los jueces (humanos y
       digitales) qué revisar y con qué criterios, y pide el voto. Sus indicaciones llegan al
-      público en los teléfonos y también al jurado y a la audiencia sintética.
+      público en los teléfonos y al jurado.
 
    Solo la pantalla del profesor corre a los moderadores (usa el mismo motor LLM del jurado; sin
    motor, una versión simple con plantillas). Se carga ANTES de app.js: aquí solo hay funciones;
@@ -52,17 +52,18 @@ const conMenciones = t => esc(t).replace(/@([A-Za-zÁÉÍÓÚÑáéíóúñü][\
 function burbuja(m) {
   const hora = new Date(m.t).toTimeString().slice(0, 5);
   if (m.tipo === "sistema") return `<div class="msg sys">${esc(m.texto)}</div>`;
+  if (m.tipo === "noticia") return `<div class="msg noticia"><div class="who">📰 Última hora<span class="hora">${hora}</span></div><div class="tx">${esc(m.texto)}</div></div>`;
   if (m.tipo === "mod") return `<div class="msg mod"><div class="who">🎙 ${MOD_NOMBRE}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div></div>`;
   if (m.tipo === "relator") {
     const d = m.datos || {};
-    return `<div class="msg rel"><div class="who">⚖ ${REL_NOMBRE} · llamado a votar<span class="hora">${hora}</span></div>
+    return `<div class="msg rel"><div class="who">📣 ${REL_NOMBRE} · llamado a votar<span class="hora">${hora}</span></div>
       ${d.resumenA ? `<div class="tx"><b style="color:${EQUIPOS.A.color}">${EQUIPOS.A.nombre}:</b> ${esc(d.resumenA)}</div>` : ""}
       ${d.resumenB ? `<div class="tx"><b style="color:${EQUIPOS.B.color}">${EQUIPOS.B.nombre}:</b> ${esc(d.resumenB)}</div>` : ""}
       ${d.disputa ? `<div class="tx"><b>En disputa:</b> ${esc(d.disputa)}</div>` : ""}
       ${d.revisar?.length ? `<div class="tx"><b>Antes de votar, revisen:</b><ul>${d.revisar.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
       ${d.criterios?.length ? `<div class="tx"><b>Criterios:</b><ul>${d.criterios.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
       ${!d.resumenA && m.texto ? `<div class="tx">${esc(m.texto)}</div>` : ""}
-      <div class="tx pedido">🗳 Público: mueve tu posición. Jurado y audiencia: votando…</div></div>`;
+      <div class="tx pedido">🗳 Público: mueve tu posición. El jurado está evaluando…</div></div>`;
   }
   if (m.tipo === "resultado") {
     const d = m.datos || {}, e = EQUIPOS[m.equipo];
@@ -70,7 +71,7 @@ function burbuja(m) {
     return `<div class="msg res" style="--c:${e.color}">
       <div class="res-head"><span>${e.bandera}</span><b>${e.nombre}</b>
         <span class="rol">${esc(d.rondaNombre || "")} · ${d.n} participante${d.n === 1 ? "" : "s"} · jurado <b style="color:${colorRigor(d.rigorMedio)}">${(+d.rigorMedio).toFixed(1)}</b>/20</span>
-        <span class="delta ${cls}">${conSigno(d.deltaVotos)} votos</span></div>
+        ${typeof d.deltaVotos === "number" ? `<span class="delta ${cls}">${conSigno(d.deltaVotos)} votos</span>` : ""}</div>
       <div class="res-alumnos">${(d.alumnos || []).map(a => `<div class="ra"><b>${esc(a.autor)}</b>
         <span class="rg" style="color:${colorRigor(a.total)}">${(+a.total).toFixed(1)}</span>
         ${a.nota ? `<span class="nt">⚖ ${esc(a.nota)}</span>` : ""}
@@ -207,7 +208,7 @@ ${S.chat.filter(m => m.tipo === "relator" && m.ronda < S.ronda).map(m => m.texto
 ` : ""}
 RÚBRICA DEL JURADO: ${RUBRICA.map(r => r.nombre).join(", ")}.
 
-TU TAREA: antes de que voten los jueces —un público de estudiantes, una audiencia sintética y un jurado—, resume con justicia la posición de cada bancada en este tramo, nombra el punto en disputa y diles qué revisar y con qué criterios antes de votar. Eres neutral: no digas quién va ganando. En "revisar" apunta a cosas concretas que se dijeron (por ejemplo, si una afirmación tuvo respaldo o si alguien respondió una objeción). En "criterios", cómo distinguir un buen argumento de uno que solo suena bien. Sin groserías.
+TU TAREA: antes de que voten los jueces —un público de estudiantes y un jurado—, resume con justicia la posición de cada bancada en este tramo, nombra el punto en disputa y diles qué revisar y con qué criterios antes de votar. Eres neutral: no digas quién va ganando. En "revisar" apunta a cosas concretas que se dijeron (por ejemplo, si una afirmación tuvo respaldo o si alguien respondió una objeción). En "criterios", cómo distinguir un buen argumento de uno que solo suena bien. Sin groserías.
 
 Responde SOLO un JSON: {"resumenA": "máx. 35 palabras", "resumenB": "máx. 35 palabras", "disputa": "máx. 25 palabras", "revisar": ["2 o 3 cosas concretas"], "criterios": ["2 o 3 criterios"]}`;
     try {
