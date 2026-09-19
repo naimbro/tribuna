@@ -358,7 +358,8 @@ function conteo() {
 function pintarMarcador() {
   for (const k of ["A", "B"]) {
     $("nom" + k).textContent = S.debate ? `GRUPO ${S.debate[k]}` : EQUIPOS[k].nombre;
-    $("lema" + k).textContent = S.debate ? EQUIPOS[k].nombre : EQUIPOS[k].lema;
+    const gi = S.debate ? (S.clase.gruposInfo || []).find(g => g.n === S.debate[k]) : null;
+    $("lema" + k).textContent = S.debate ? EQUIPOS[k].nombre + (gi ? " · " + gi.nombre : "") : EQUIPOS[k].lema;
     $("chatBanca" + k).textContent = S.debate ? `${EQUIPOS[k].nombre} · G${S.debate[k]}` : `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}`;
   }
   const c = conteo(), P = S.publico || {};

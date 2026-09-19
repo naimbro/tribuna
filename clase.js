@@ -172,7 +172,28 @@ $("btnTerminar").onclick = terminarClase;
 
 /* ---------------- la propuesta de la moderadora ---------------- */
 
-function promptPropuesta() {
+// «Grupo 2 · Frenar por ley» si la partida formó grupos con la brújula; si no, «Grupo 2».
+function nombreGrupo(n) {
+  const g = (S.clase.gruposInfo || []).find(x => x.n === n);
+  return g ? `Grupo ${n} · ${g.nombre}` : `Grupo ${n}`;
+}
+const conBrujula = () => (S.clase.gruposInfo || []).length > 0;
+
+// Con brújula, la moción cae sobre lo que separa a los dos campos que debaten.
+function bloqueCampos(par) {
+  if (!conBrujula() || !par || par.A === null || par.B === null) return "";
+  const g = n => S.clase.gruposInfo.find(x => x.n === n);
+  if (!g(par.A) || !g(par.B)) return "";
+  const c = n => (typeof BRUJULA !== "undefined" ? BRUJULA.campos.find(x => x.id === g(n).campo) : null) || {};
+  return `LOS DOS GRUPOS QUE DEBATEN AHORA (se formaron por su posición real):
+- Grupo ${par.A}, campo «${g(par.A).nombre}»: ${c(par.A).afirma || ""}
+- Grupo ${par.B}, campo «${g(par.B).nombre}»: ${c(par.B).afirma || ""}
+La moción tiene que caer justo sobre lo que separa a esos dos campos: debe AFIRMAR la posición de uno de los dos grupos, de modo que el otro la rechace desde la suya. Nadie debe quedar defendiendo algo que no piensa.
+
+`;
+}
+
+function promptPropuesta(par) {
   const hechas = S.clase.debates.map(d => `- ${d.pregunta}`).join("\n") || "(ninguna todavía)";
   const disputas = S.chat.filter(m => m.tipo === "relator" && m.datos && m.datos.disputa).map(m => `- ${m.datos.disputa}`).slice(-5).join("\n") || "(ninguna)";
   const flojas = S.clase.debates.flatMap(d => (d.jueces || []).flatMap(j => [[j.A, j.fraseA], [j.B, j.fraseB]]))
@@ -197,13 +218,15 @@ ${flojas}
 CONCEPTOS QUE NADIE HA USADO TODAVÍA:
 ${sinUsar}
 
-TU TAREA: propone la próxima pregunta de debate. Tiene que ser una afirmación discutible de una sola línea (máximo 25 palabras), dentro del tema general, que se pueda defender a favor y en contra con el material del curso. Prefiere lo que quedó en disputa o lo que nadie ha tocado. Español de Chile, sin groserías.
+${bloqueCampos(par)}TU TAREA: propone la próxima pregunta de debate. Tiene que ser una afirmación discutible de una sola línea (máximo 25 palabras), dentro del tema general, que se pueda defender a favor y en contra con el material del curso. Prefiere lo que quedó en disputa o lo que nadie ha tocado. Español de Chile, sin groserías.
 
-Responde SOLO un JSON: {"pregunta": "…", "porQue": "máx. 20 palabras: por qué esta y por qué ahora", "mejorFavor": "máx. 20 palabras", "mejorContra": "máx. 20 palabras"}`;
+Responde SOLO un JSON: {"pregunta": "…", "porQue": "máx. 20 palabras: por qué esta y por qué ahora", "mejorFavor": "máx. 20 palabras", "mejorContra": "máx. 20 palabras"${bloqueCampos(par) ? ', "afirma": número del grupo cuya posición afirma la moción' : ""}}`;
 }
 
 async function prepararPropuesta() {
-  const par = emparejar(gruposDisponibles(), S.clase.debates);
+  // con brújula, el par más lejano en el mapa (entre los que menos han debatido)
+  const posDe = Object.fromEntries((S.clase.gruposInfo || []).map(g => [g.n, g.pos]));
+  const par = (conBrujula() && emparejarLejanos(gruposDisponibles(), S.clase.debates, posDe)) || emparejar(gruposDisponibles(), S.clase.debates);
   const base = { A: par ? par.A : null, B: par ? par.B : null };
   const escritas = typeof PREGUNTAS !== "undefined" ? PREGUNTAS : [];
   const usadas = [...S.clase.debates.map(d => d.pregunta), ...(S.clase.descartadas || [])];
@@ -217,10 +240,12 @@ async function prepararPropuesta() {
   if (S.fase === "propuesta") mostrarPropuesta();
   try {
     if (!S.motor.activo) throw new Error("sin motor LLM");
-    const j = jsonDe(await pedirLLM(promptPropuesta(), "jurado"));
+    const j = jsonDe(await pedirLLM(promptPropuesta(base), "jurado"));
     const pregunta = String(j.pregunta || "").trim().slice(0, 300);
     if (!pregunta || !limpiaFrase(pregunta)) throw new Error("pregunta vacía o inválida");
-    S.clase.propuesta = { ...base, estado: "lista", pregunta, porQue: String(j.porQue || "").slice(0, 200),
+    // el grupo cuya posición afirma la moción defiende A FAVOR; si no lo dice, queda el emparejamiento
+    const lados = conBrujula() && +j.afirma === base.B ? { A: base.B, B: base.A } : base;
+    S.clase.propuesta = { ...lados, estado: "lista", pregunta, porQue: String(j.porQue || "").slice(0, 200),
       mejorFavor: String(j.mejorFavor || "").slice(0, 200), mejorContra: String(j.mejorContra || "").slice(0, 200), fuente: "ia" };
   } catch (e) {
     console.warn("propuesta:", e);
@@ -238,7 +263,7 @@ function mostrarPropuesta() {
   let el = $("propuesta");
   if (!el) { el = document.createElement("div"); el.id = "propuesta"; document.querySelector("main .col").appendChild(el); }
   const gs = Array.from({ length: S.clase.grupos }, (_, i) => i + 1);
-  const sel = (id, v) => `<select id="${id}">${gs.map(g => `<option value="${g}" ${g === v ? "selected" : ""}>Grupo ${g}</option>`).join("")}</select>`;
+  const sel = (id, v) => `<select id="${id}">${gs.map(g => `<option value="${g}" ${g === v ? "selected" : ""}>${esc(nombreGrupo(g))}</option>`).join("")}</select>`;
   const faltan = p.A === null || p.B === null;
   // sin emparejamiento (menos de dos grupos con gente) los selectores igual proponen dos grupos
   // distintos: el conectado primero, y el profesor puede simular al otro desde su pantalla
@@ -253,7 +278,7 @@ function mostrarPropuesta() {
     <textarea id="prTexto" rows="2" maxlength="300" placeholder="Escribe la pregunta del debate">${esc(p.pregunta || "")}</textarea>
     ${p.porQue ? `<div class="pr-porque">${esc(p.porQue)}</div>` : ""}
     ${p.mejorFavor || p.mejorContra ? `<div class="pr-lados"><div style="--c:var(--A)"><b>A favor</b>${esc(p.mejorFavor)}</div><div style="--c:var(--B)"><b>En contra</b>${esc(p.mejorContra)}</div></div>` : ""}
-    <div class="pr-grupos"><span style="color:var(--A)">A FAVOR</span>${sel("prA", defA)}<span style="color:var(--B)">EN CONTRA</span>${sel("prB", defB)}</div>
+    <div class="pr-grupos"><span style="color:var(--A)">A FAVOR</span>${sel("prA", defA)}<span style="color:var(--B)">EN CONTRA</span>${sel("prB", defB)}<button class="btn sm" id="prCambiar" title="Intercambiar A FAVOR y EN CONTRA">⇄ lados</button></div>
     <div class="pr-error" id="prError"></div>
     <div class="pr-acc">
       <button class="btn pri" id="prPublicar">Publicar</button>
@@ -263,6 +288,7 @@ function mostrarPropuesta() {
   const detener = () => { clearInterval(cuentaPropuesta); $("prCuenta").textContent = ""; };
   el.onpointerdown = detener; el.onfocusin = detener;
   $("prPublicar").onclick = publicarPropuestaActual;
+  $("prCambiar").onclick = () => { const a = $("prA").value; $("prA").value = $("prB").value; $("prB").value = a; };
   $("prOtra").onclick = () => {
     if (p.pregunta) (S.clase.descartadas = S.clase.descartadas || []).push(p.pregunta);   // no volver a proponerla
     S.clase.propuesta = null; prepararPropuesta();
