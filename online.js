@@ -31,6 +31,9 @@ const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, 
 
 /* ---------- lo que ve el alumno: estado público de la sala ---------- */
 function estadoPublico() {
+  const r1 = v => (v === null || v === undefined ? null : +(+v).toFixed(1));
+  const U = S.clase.ultimo;
+  const orac = rankingOraculos(S.clase.oraculos || {}).filter(o => o.predicciones);
   const R = tramoActual();
   return {
     profeUid: ON.uid, profeEmail: ON.email, actualizado: Date.now(), creada: ON.creada || null,
@@ -46,11 +49,19 @@ function estadoPublico() {
       puntaje: f.puntaje === null ? null : +f.puntaje.toFixed(1) })),
     debates: S.clase.debates.map(d => ({ n: d.n, pregunta: d.pregunta, A: d.A, B: d.B,
       ganador: d.res ? d.res.ganador : null,
-      puntajeA: d.res ? +d.res.A.puntaje.toFixed(1) : null, puntajeB: d.res ? +d.res.B.puntaje.toFixed(1) : null })),
-    ultimo: S.clase.ultimo ? { n: S.clase.ultimo.n, pregunta: S.clase.ultimo.pregunta, A: S.clase.ultimo.A, B: S.clase.ultimo.B,
-      ganador: S.clase.ultimo.res.ganador,
-      resA: { jurado: +S.clase.ultimo.res.A.jurado.toFixed(1), publico: S.clase.ultimo.res.A.publico === null ? null : +S.clase.ultimo.res.A.publico.toFixed(1), puntaje: +S.clase.ultimo.res.A.puntaje.toFixed(1) },
-      resB: { jurado: +S.clase.ultimo.res.B.jurado.toFixed(1), publico: S.clase.ultimo.res.B.publico === null ? null : +S.clase.ultimo.res.B.publico.toFixed(1), puntaje: +S.clase.ultimo.res.B.puntaje.toFixed(1) } } : null,
+      puntajeA: d.res ? r1(d.res.A.puntaje) : null, puntajeB: d.res ? r1(d.res.B.puntaje) : null,
+      totalA: d.panel ? r1(d.panel.A.total) : null, totalB: d.panel ? r1(d.panel.B.total) : null,
+      votosA: d.publico ? d.publico.A : null, votosB: d.publico ? d.publico.B : null,
+      jueces: (d.jueces || []).map(j => ({ emoji: j.emoji, nombre: j.nombre, A: j.A, B: j.B, fraseA: j.fraseA || "", fraseB: j.fraseB || "" })) })),
+    ultimo: U ? { n: U.n, pregunta: U.pregunta, A: U.A, B: U.B, ganador: U.res.ganador,
+      resA: { jurado: r1(U.res.A.jurado), publico: r1(U.res.A.publico), puntaje: r1(U.res.A.puntaje) },
+      resB: { jurado: r1(U.res.B.jurado), publico: r1(U.res.B.publico), puntaje: r1(U.res.B.puntaje) },
+      panel: U.panel ? { A: r1(U.panel.A.total), B: r1(U.panel.B.total), ganador: U.panel.ganador } : null,
+      publico: U.publico ? { A: U.publico.A, B: U.publico.B, n: U.publico.n, ganador: U.publico.ganador } : null,
+      jueces: (U.jueces || []).map(j => ({ id: j.id, nombre: j.nombre, emoji: j.emoji, A: j.A, B: j.B, fraseA: j.fraseA || "", fraseB: j.fraseB || "" })) } : null,
+    conteoVotos: { A: S.publico.A || 0, B: S.publico.B || 0, n: S.publico.n || 0, elegibles: S.publico.elegibles || 0 },
+    oraculos: orac.slice(0, 10).map(o => ({ uid: o.uid, nombre: o.nombre, puntos: o.puntos, aciertos: o.aciertos, predicciones: o.predicciones, puesto: o.puesto })),
+    oraculoDe: Object.fromEntries(orac.map(o => [o.uid, { puntos: o.puntos, puesto: o.puesto }])),
     fase: S.fase, ronda: S.ronda, totalRondas: TRAMOS.length,
     rondaNombre: R.nombre, rol: R.rol, pauta: R.pauta, seg: R.seg,
     abreEn: S.abreEn || null,                                   // epoch ms; el alumno calcula el reloj
@@ -79,10 +90,10 @@ function estadoPublico() {
 
 function resumenFinal() {
   const r = S.clase.ranking || [];
-  const mejor = mejorIntervencion(S.historial.map(h => ({ autor: h.autor, grupo: h.grupo, debate: h.debate, total: h.ev.rubrica.total })));
+  const ors = rankingOraculos(S.clase.oraculos || {}).filter(o => o.predicciones).slice(0, 3);
   return { campeon: r[0] && r[0].debates ? r[0].grupo : null,
            ranking: r.map(f => ({ grupo: f.grupo, puesto: f.puesto, puntaje: f.puntaje === null ? null : +f.puntaje.toFixed(1) })),
-           mejor: mejor ? { autor: mejor.autor, grupo: mejor.grupo, debate: mejor.debate, total: +mejor.total.toFixed(1) } : null };
+           oraculos: ors.map(o => ({ nombre: o.nombre, puntos: o.puntos, puesto: o.puesto })) };
 }
 
 // Estado completo para restaurar la pestaña del profesor (incluye evaluaciones y memorias).
@@ -150,6 +161,7 @@ function activarOnline() {
   onSnapshot(collectionJugadores(), snap => {
     ON.jugadores = {};
     snap.forEach(d => ON.jugadores[d.id] = d.data());
+    if (S.publico) S.publico.elegibles = elegibles();
     pintarBarraOnline(); pintarFeed(); actualizarPortada(ON.jugadores);
   });
 
@@ -199,16 +211,18 @@ function irA(etapa) {
    mueve un votante entre dos fotos es efecto de lo que se reveló entre ellas: si se acerca a
    A FAVOR suma a A, si se acerca a EN CONTRA suma a B. Misma medida que la sala sintética
    (voto suave: tanh(pos/12)), así los dos marcadores de votos son comparables. */
-// El público del debate n: cada votante parte en 0; su posición final es su voto (voto suave).
+// El voto del debate n: una respuesta binaria y una predicción por votante.
+const elegibles = () => !S.debate ? 0 : Object.values(ON.jugadores)
+  .filter(j => j.grupo > 0 && j.grupo !== S.debate.A && j.grupo !== S.debate.B).length;
 let desuscribirVotos = null;
 function suscribirVotos(n) {
   desuscribirVotos?.();
   desuscribirVotos = onSnapshot(query(collection(db, "salas", ON.codigo, "votos"), where("debate", "==", n)), snap => {
     const votantes = [];
-    snap.forEach(d => { const x = d.data(); if (typeof x.pos === "number") votantes.push({ uid: x.uid, nombre: x.nombre, email: x.email, grupo: x.grupo, inicial: 0, final: x.pos, aporte: 0 }); });
-    const v = votosSuaves(votantes.map(x => x.final));
-    S.publico = { A: v.A, B: v.B, n: v.n, votantes };
-    pintarMarcador(); publicar();
+    snap.forEach(d => { const x = d.data(); votantes.push({ uid: x.uid, nombre: x.nombre, email: x.email, grupo: x.grupo, voto: x.voto ?? null, prediccion: x.prediccion ?? null }); });
+    const v = votoPublico(votantes.map(x => x.voto));
+    S.publico = { A: v.A, B: v.B, n: v.n, elegibles: elegibles(), votantes };
+    pintarMarcador(); if (typeof actualizarVotacion === "function") actualizarVotacion(); publicar();
   });
 }
 
@@ -270,7 +284,9 @@ async function restaurar(codigo) {
     if (priv.clase) S.clase = { ...S.clase, ...priv.clase };
     S.debate = priv.debate || null; S.tramo = priv.tramo || 0;
     // un tramo abierto vuelve pausado (se reanuda con el botón); una votación, sin reloj
-    S.fase = priv.fase === "abierta" ? "listo" : priv.fase === "cerrando" ? "votando" : priv.fase || "propuesta";
+    S.fase = priv.fase === "abierta" ? "listo"
+      : ["cerrando", "veredictoPublico", "veredictoJueces"].includes(priv.fase) ? "votando"
+      : priv.fase || "propuesta";
     S.ronda = priv.ronda; S.seq = priv.seq || 0; S.shocks = priv.shocks || [];
     S.historial = priv.historial; S.turnos = priv.turnos || []; S.votoInicial = priv.votoInicial || S.votoInicial; S.iniPos = priv.iniPos || S.iniPos;
     S.abreEn = null;
