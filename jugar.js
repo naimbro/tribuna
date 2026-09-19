@@ -179,7 +179,13 @@ function pintarSala() {
   // brújula: la repetición del cierre; y si el profesor la apaga, quien no tiene grupo elige a mano
   const bj = s.brujula;
   if (bj && bj.activa && bj.fase === "repetir" && BJ.mio && !BJ.mio.repeticion && $("brujula").classList.contains("oculto")) mostrarBrujula("repetir");
-  if (!J.grupo && !$("pBancada").classList.contains("oculto")) return;          // eligiendo grupo a mano
+  if (!J.grupo && !$("pBancada").classList.contains("oculto")) {
+    if (!(bj && bj.activa)) return;                                             // eligiendo grupo a mano
+    // el profesor volvió a encender la brújula: de los botones de grupo a la espera con su campo
+    $("pBancada").classList.add("oculto");
+    $("pJuego").classList.remove("oculto"); $("estado").classList.remove("oculto");
+    $("espera").dataset.clave = "";
+  }
   if (!J.grupo && s.etapa === "portada" && !(bj && bj.activa)) { mostrarBancadas(); return; }
   pintarVotar(s);
   pintarEntre(s);
@@ -471,13 +477,18 @@ async function guardarBrujula(modo) {
     else pintarSala();
   } catch (e) { $("brujula").insertAdjacentHTML("beforeend", `<p class="aviso">No se guardó: ${esc(e.code || e.message)}</p>`); }
 }
+// el mapa público es anónimo y ya trae mi punto: se quita uno igual para no dibujarlo dos veces
+function sinMiPunto(mapa, mio) {
+  const i = mapa.findIndex(p => p.campo === mio.campo && Math.abs(p.x - mio.pos.x) < .01 && Math.abs(p.y - mio.pos.y) < .01);
+  return i < 0 ? mapa : mapa.filter((_, k) => k !== i);
+}
 function resultadoBrujula(s) {
   const b = s.brujula, mio = BJ.mio;
   if (!b || !mio) return "";
   const c = b.campos.find(x => x.id === mio.campo) || {};
   return `<div class="k">Tu campo</div><div class="bj-campo" style="color:${c.color}">${esc(c.nombre || mio.campo)}</div>
     <p style="color:var(--dim);max-width:340px">${esc(c.afirma || "")}</p>
-    ${mapaSvg({ puntos: [...(s.mapa || []).map(p => ({ ...p, color: (b.campos.find(x => x.id === p.campo) || {}).color || "#7d8fa1" })),
+    ${mapaSvg({ puntos: [...sinMiPunto(s.mapa || [], mio).map(p => ({ ...p, color: (b.campos.find(x => x.id === p.campo) || {}).color || "#7d8fa1" })),
       { ...mio.pos, color: c.color || "#fff", yo: true }], campos: b.campos, ejes: b.ejes, tam: 320, chico: true })}`;
 }
 
