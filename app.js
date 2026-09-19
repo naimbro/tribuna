@@ -793,6 +793,7 @@ function lanzarEvento() {
   tick(`Noticia lanzada al debate: ${ev.titular.slice(0, 70)}…`);
 }
 
+let _ac = null;                // el AudioContext se crea con el primer gesto (los navegadores lo exigen)
 function audioCtx() {
   if (!_ac) { try { _ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
   if (_ac.state === "suspended") _ac.resume().catch(() => {});
