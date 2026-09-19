@@ -241,8 +241,42 @@ function pintarChat() {
 }
 
 /* ---------- escribir (bancadas) ---------- */
+/* ---------- telemetría de escritura (antitrampa, como en ml2) ----------
+   Por mensaje: pegados y su largo, salidas de la app mientras se escribe, inserciones de golpe
+   (teclados que no avisan el pegado), cuánto tardó y una huella del largo cada 2 s. Se guarda
+   aparte (salas/{codigo}/telemetria), solo lo lee el profesor y nunca entra en un puntaje. */
+const TEL = { r: null };
+function registroNuevo() {
+  return { abre: Date.now(), primera: null, pegados: [], salidas: 0, msFuera: 0, ocultoDesde: null, maxInsercion: 0, largoPrev: 0, huella: [], tipos: new Set() };
+}
+function registro() { return TEL.r || (TEL.r = registroNuevo()); }
+setInterval(() => {
+  const tx = $("tx");
+  if (!TEL.r || !tx || tx.disabled) return;
+  if (TEL.r.huella.length < 300) TEL.r.huella.push(tx.value.length);
+}, 2000);
+document.addEventListener("visibilitychange", () => {
+  const tx = $("tx");
+  const escribiendo = tx && !tx.disabled && !$("caja").classList.contains("oculto");
+  if (!escribiendo) return;
+  const r = registro();
+  if (document.hidden) { r.salidas++; r.ocultoDesde = Date.now(); }
+  else if (r.ocultoDesde) { r.msFuera += Date.now() - r.ocultoDesde; r.ocultoDesde = null; }
+});
+
 function prepararCaja() {
   const tx = $("tx");
+  tx.addEventListener("paste", e => {
+    const txt = (e.clipboardData && e.clipboardData.getData("text")) || "";
+    registro().pegados.push({ ms: Date.now() - registro().abre, chars: txt.length });
+  });
+  tx.addEventListener("beforeinput", e => { if (e.inputType) registro().tipos.add(e.inputType); });
+  tx.addEventListener("input", () => {
+    const r = registro(), largo = tx.value.length;
+    if (r.primera === null && largo > 0) r.primera = Date.now();
+    r.maxInsercion = Math.max(r.maxInsercion, largo - r.largoPrev);
+    r.largoPrev = largo;
+  });
   tx.oninput = () => { tx.style.height = "auto"; tx.style.height = Math.min(140, tx.scrollHeight) + "px"; pintarCaja(); sugerir(); };
   tx.onclick = tx.onkeyup = sugerir;
   tx.onblur = () => setTimeout(() => { $("sugiere").innerHTML = ""; $("sugiere").classList.remove("on"); }, 200);
@@ -313,6 +347,16 @@ async function enviar() {
     await setDoc(doc(db, "salas", J.codigo, "mensajes", id),
       { tipo: "alumno", uid: J.uid, nombre: J.nombre, email: J.email, grupo: J.grupo, equipo: rolEn(J.sala),
         debate: J.sala.debate.n, tramo: J.sala.tramo, ronda: J.sala.ronda, texto: texto.slice(0, 1500), t: Date.now() });
+    // la telemetría del mensaje va aparte y solo la lee el profesor; si falla, el mensaje igual salió
+    const r = registro(), ahora = Date.now();
+    setDoc(doc(db, "salas", J.codigo, "telemetria", id), {
+      uid: J.uid, nombre: J.nombre, grupo: J.grupo, debate: J.sala.debate.n, msg: id, t: ahora,
+      largoFinal: texto.length, msComposicion: r.primera ? ahora - r.primera : 0,
+      pegados: r.pegados.slice(0, 30), maxInsercion: r.maxInsercion,
+      salidas: r.salidas, msFuera: r.msFuera + (r.ocultoDesde ? ahora - r.ocultoDesde : 0),
+      huella: r.huella, tipos: [...r.tipos].slice(0, 12)
+    }).catch(() => {});
+    TEL.r = null;
     $("tx").value = ""; $("tx").style.height = "auto"; $("sugiere").innerHTML = "";
     $("notaCaja").textContent = ""; $("notaCaja").classList.remove("ati");
     $("pJuego").scrollTop = $("pJuego").scrollHeight;

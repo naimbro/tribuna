@@ -119,6 +119,14 @@ service cloud.firestore {
           && request.resource.data.pos >= -100 && request.resource.data.pos <= 100;
       }
 
+      // Telemetría de escritura (antitrampa): cada alumno registra cómo escribió sus mensajes; solo
+      // la lee el profesor de la sala. Nunca entra en un puntaje.
+      match /telemetria/{id} {
+        allow read: if esProfe(codigo);
+        allow create: if conSesion() && esJugador(codigo) && request.resource.data.uid == request.auth.uid
+          && request.resource.data.largoFinal is int && request.resource.data.largoFinal <= 2000;
+      }
+
       // Rotación: el voto binario y la predicción de cada votante en cada debate. Solo en la
       // ventana de votación y solo quien no está debatiendo.
       match /votos/{id} {
