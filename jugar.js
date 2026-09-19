@@ -18,11 +18,19 @@ const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
 const db = HAY_FIREBASE ? getFirestore(app) : null;
 
-const J = { uid: null, email: null, foto: null, fbListo: false, codigo: null, nombre: "", equipo: null, sala: null, chat: [], reloj: null, primera: true };
+const J = { uid: null, email: null, foto: null, fbListo: false, codigo: null, nombre: "", equipo: null, grupo: null, sala: null, chat: [], reloj: null, primera: true };
 const google = new GoogleAuthProvider();
 const colorRigor = t => t >= 14 ? "var(--neon)" : t >= 9 ? "var(--amber)" : "var(--B)";
 const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 let subs = [];
+
+// En la rotación el rol cambia en cada debate: "A" o "B" si mi grupo fue llamado, "P" si voto.
+const rolEn = s => {
+  if (!s || s.modo !== "rotacion") return J.equipo;
+  if (!s.debate || !J.grupo) return null;
+  return J.grupo === s.debate.A ? "A" : J.grupo === s.debate.B ? "B" : "P";
+};
+
 
 /* ---------- entrar ---------- */
 const guardado = JSON.parse(localStorage.getItem("tribuna_jugador") || "{}");
@@ -46,32 +54,35 @@ $("btnEntrar").onclick = async () => {
     localStorage.setItem("tribuna_jugador", JSON.stringify({ codigo, nombre }));
     history.replaceState(null, "", `?sala=${codigo}`);
     const yo = await getDoc(doc(db, "salas", codigo, "jugadores", J.uid));
-    if (yo.exists() && yo.data().equipo) { J.equipo = yo.data().equipo; await entrarAlJuego(); return; }
-    // llegó: aparece en la portada del profesor (foto y nombre) mientras elige dónde participar
+    // llegó: aparece en la portada del profesor (foto y nombre) mientras elige su grupo
+    if (yo.exists() && yo.data().grupo > 0) { J.grupo = yo.data().grupo; await entrarAlJuego(); return; }
     if (!yo.exists()) await setDoc(doc(db, "salas", codigo, "jugadores", J.uid),
-      { nombre, email: J.email, foto: J.foto || "", equipo: "", unido: Date.now() });
+      { nombre, email: J.email, foto: J.foto || "", grupo: 0, equipo: "", unido: Date.now() });
     mostrarBancadas();
   } catch (e) { $("errEntrar").textContent = "No se pudo entrar: " + e.message; }
 };
 
 function mostrarBancadas() {
-  ["pEntrar", "pJuego", "estado", "caja", "voto", "espera", "fb"].forEach(id => $(id).classList.add("oculto"));
+  ["pEntrar", "pJuego", "estado", "caja", "voto", "espera", "fb", "entre"].forEach(id => $(id)?.classList.add("oculto"));
   $("pBancada").classList.remove("oculto");
-  $("mocion1").textContent = J.sala.mocion;
-  $("btnA").textContent = `${J.sala.equipos.A.bandera} ${J.sala.equipos.A.nombre}`;
-  $("btnB").textContent = `${J.sala.equipos.B.bandera} ${J.sala.equipos.B.nombre}`;
-  $("btnA").onclick = () => elegir("A");
-  $("btnB").onclick = () => elegir("B");
-  $("btnP").onclick = () => elegir("P");
+  $("mocion1").textContent = J.sala.temaGeneral || J.sala.tema;
+  const N = J.sala.grupos || 6;
+  $("grupos").innerHTML = Array.from({ length: N }, (_, i) => i + 1)
+    .map(g => `<button class="btn" data-g="${g}" style="flex:1 0 30%">Grupo ${g}</button>`).join("");
+  $("grupos").onclick = e => { const g = +e.target.dataset?.g; if (g) elegirGrupo(g); };
 }
 
-async function elegir(k) {
-  J.equipo = k;
-  // merge: conserva `unido` (el orden de llegada en la portada)
-  await setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { nombre: J.nombre, email: J.email, foto: J.foto || "", equipo: k }, { merge: true });
-  if (k === "P") {
-    const yo = await getDoc(doc(db, "salas", J.codigo, "publico", J.uid)).catch(() => null);
-    if (!yo || !yo.exists()) await guardarPos(0, true);   // el público parte indeciso: esa es su base
+async function elegirGrupo(g) {
+  try {
+    await setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid),
+      { nombre: J.nombre, email: J.email, foto: J.foto || "", grupo: g, equipo: "" }, { merge: true });
+    J.grupo = g;
+  } catch (e) {
+    // fuera de la portada ya no se puede cambiar de grupo: se vuelve al que tiene en el servidor
+    const yo = await getDoc(doc(db, "salas", J.codigo, "jugadores", J.uid)).catch(() => null);
+    const actual = yo && yo.exists() ? yo.data().grupo : 0;
+    if (actual > 0) { J.grupo = actual; alert(`El debate ya empezó: solo el profesor puede cambiarte de grupo. Sigues en el Grupo ${actual}.`); }
+    else { alert("No se pudo elegir el grupo: " + e.code); return; }
   }
   await entrarAlJuego();
 }
@@ -81,11 +92,12 @@ async function entrarAlJuego() {
   subs.forEach(u => u()); subs = [];
   $("pEntrar").classList.add("oculto"); $("pBancada").classList.add("oculto");
   $("pJuego").classList.remove("oculto"); $("estado").classList.remove("oculto");
-  const esPublico = J.equipo === "P";
-  document.body.classList.toggle("es-publico", esPublico);
-  $("caja").classList.toggle("oculto", esPublico);
-  $("voto").classList.toggle("oculto", !esPublico);
   subs.push(onSnapshot(doc(db, "salas", J.codigo), snap => { J.sala = snap.data(); pintarSala(); }));
+  // el profesor puede moverme de grupo: el rol y lo que escribo dependen de mi grupo actual
+  subs.push(onSnapshot(doc(db, "salas", J.codigo, "jugadores", J.uid), snap => {
+    const g = snap.data()?.grupo;
+    if (g > 0 && g !== J.grupo) { J.grupo = g; J.debateVisto = null; pintarSala(); }
+  }));
   subs.push(onSnapshot(query(collection(db, "salas", J.codigo, "mensajes"), orderBy("t")), snap => {
     const antes = new Set(J.chat.map(m => m.id));
     J.chat = []; snap.forEach(d => J.chat.push({ ...d.data(), id: d.id }));
@@ -94,7 +106,7 @@ async function entrarAlJuego() {
     if (!J.primera) avisarNuevos(nuevos);
     J.primera = false;
   }, e => { $("pJuego").innerHTML = `<div class="sep">No se pudo leer la conversación (${esc(e.code)}).</div>`; }));
-  if (esPublico) prepararVoto(); else prepararCaja();
+  prepararCaja(); prepararVoto();
   // ¿ya dejó su feedback en esta sala? (o lo saltó en este teléfono)
   J.fbListo = localStorage.getItem("tribuna_fb_" + J.codigo) === "1";
   if (!J.fbListo) getDoc(doc(db, "salas", J.codigo, "feedback", J.uid))
@@ -110,12 +122,12 @@ const meNombran = t => {
 
 function avisarNuevos(nuevos) {
   for (const m of nuevos) {
-    if (m.tipo === "mod" && meNombran(m.texto) && J.equipo !== "P") {
+    if (m.tipo === "mod" && meNombran(m.texto) && (rolEn(J.sala) === "A" || rolEn(J.sala) === "B")) {
       navigator.vibrate?.([120, 60, 120]);
       $("notaCaja").textContent = "🎙 La moderadora te pregunta a ti. Responde abajo.";
       $("notaCaja").classList.add("ati");
     }
-    if (m.tipo === "relator" && J.equipo === "P") {
+    if (m.tipo === "relator" && rolEn(J.sala) === "P") {
       navigator.vibrate?.(150);
       $("voto").classList.add("pide");
       $("avisoVoto").textContent = "⚖ El relator pide votar: lee su resumen, revisa lo que indica y ajusta tu posición.";
@@ -125,15 +137,26 @@ function avisarNuevos(nuevos) {
 
 function pintarSala() {
   const s = J.sala; if (!s) return;
-  const eq = J.equipo === "P" ? { bandera: "🗳", nombre: "PÚBLICO", color: "#a78bfa" } : s.equipos[J.equipo];
-  $("miBancada").textContent = `${eq.bandera} ${eq.nombre}`;
-  $("miBancada").style.color = eq.color; $("miBancada").style.borderColor = eq.color;
-  $("tramoLbl").textContent = `Tramo ${s.ronda + 1}/${s.totalRondas} · ${s.rondaNombre}.`;
-  $("pauta").textContent = s.fase === "abierta" ? s.pauta : s.fase === "fin" ? "Terminó el debate." : "Esperando al profesor.";
-  const mk = s.marcador || {};
-  $("marca").innerHTML = `${mk.publicoN ? `<span>Público <b style="color:${s.equipos.A.color}">${esc(mk.publicoA)}</b> · <b style="color:${s.equipos.B.color}">${esc(mk.publicoB)}</b></span>` : ""}
-    <span>Jurado <b style="color:${s.equipos.A.color}">${esc(mk.rigorA)}</b> · <b style="color:${s.equipos.B.color}">${esc(mk.rigorB)}</b></span>`;
-  if (J.equipo === "P") document.body.classList.toggle("es-publico", !s.veredicto);
+  const rol = rolEn(s);
+  const colorRol = { A: s.equipos.A.color, B: s.equipos.B.color, P: "#a78bfa" }[rol] || "var(--dim)";
+  $("miBancada").textContent = `Grupo ${J.grupo || "?"}${rol === "A" ? ` · ${s.equipos.A.nombre}` : rol === "B" ? ` · ${s.equipos.B.nombre}` : rol === "P" ? " · votas" : ""}`;
+  $("miBancada").style.color = colorRol; $("miBancada").style.borderColor = colorRol;
+  const d = s.debate;
+  $("tramoLbl").textContent = d ? `Debate ${d.n} · ${s.tramo === 1 ? "Réplica" : "Apertura"}.` : "Rotación.";
+  $("pauta").textContent = d ? `«${d.pregunta}» — Grupo ${d.A} a favor, Grupo ${d.B} en contra.` : "Esperando la primera pregunta.";
+  $("marca").innerHTML = "";
+  const debatiendo = rol === "A" || rol === "B";
+  $("caja").classList.toggle("oculto", !debatiendo);
+  $("voto").classList.toggle("oculto", rol !== "P");
+  document.body.classList.toggle("es-publico", rol === "P" && !s.veredicto);
+  // cambio de debate: mi grupo fue llamado → aviso; si voto → deslizador al centro
+  if (d && J.debateVisto !== d.n) {
+    J.debateVisto = d.n;
+    if (debatiendo) { navigator.vibrate?.([120, 60, 120]); $("notaCaja").textContent = `🎙 Tu grupo debate ${s.equipos[rol].nombre}. Escribe cuando se abra el tramo.`; $("notaCaja").classList.add("ati"); }
+    if (rol === "P") { $("rngPos").value = 0; $("lblPos").textContent = "indeciso"; J.votoDe = null; }
+  }
+  if (rol === "P" && d && J.votoDe !== d.n && (s.fase === "abierta" || s.fase === "votando")) { J.votoDe = d.n; guardarVoto(0); }
+  pintarEntre(s);
   pintarEspera(s);
   pintarFeedback(s);
   if (s.veredicto && !J.ceremoniaVista && J.fbListo) { J.ceremoniaVista = true; ceremonia(s, s.veredicto); }
@@ -147,6 +170,10 @@ function pintarReloj() {
     const resta = Math.max(0, s.seg - Math.floor((Date.now() - s.abreEn) / 1000));
     el.textContent = `${String(Math.floor(resta / 60)).padStart(2, "0")}:${String(resta % 60).padStart(2, "0")}`;
     el.classList.toggle("urgente", resta <= 20);
+  } else if (s.fase === "votando" && s.finVoto) {
+    const resta = Math.max(0, Math.ceil((s.finVoto - Date.now()) / 1000));
+    el.textContent = `0:${String(resta).padStart(2, "0")}`;
+    el.classList.toggle("urgente", resta <= 10);
   } else { el.textContent = ""; el.classList.remove("urgente"); }
 }
 
@@ -160,7 +187,7 @@ function burbuja(m, s) {
   const hora = new Date(m.t).toTimeString().slice(0, 5);
   if (m.tipo === "sistema") return `<div class="msg sys">${esc(m.texto)}</div>`;
   if (m.tipo === "noticia") return `<div class="msg mod" style="--c:var(--amber);border-color:var(--amber);background:#1f1508"><div class="who">📰 Última hora<span class="hora">${hora}</span></div><div class="tx">${esc(m.texto)}</div></div>`;
-  if (m.tipo === "mod") return `<div class="msg mod ${meNombran(m.texto) && J.equipo !== "P" ? "ati" : ""}"><div class="who">🎙 Moderadora<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
+  if (m.tipo === "mod") return `<div class="msg mod ${meNombran(m.texto) && rolEn(J.sala) !== "P" ? "ati" : ""}"><div class="who">🎙 Moderadora<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
   if (m.tipo === "relator") {
     const d = m.datos || {};
     return `<div class="msg rel"><div class="who">📣 Relator · llamado a votar<span class="hora">${hora}</span></div>
@@ -204,8 +231,8 @@ function prepararCaja() {
   pintarCaja();
 }
 function pintarCaja() {
-  if (J.equipo === "P" || !J.sala) return;
-  const abierta = J.sala.fase === "abierta";
+  if (!J.sala) return;
+  const abierta = J.sala.fase === "abierta" && (rolEn(J.sala) === "A" || rolEn(J.sala) === "B");
   $("tx").disabled = !abierta;
   $("tx").placeholder = abierta ? "Escribe a la conversación…" : "La conversación se abre cuando el profesor abra el tramo.";
   $("btnEnviar").disabled = !abierta || !$("tx").value.trim();
@@ -218,7 +245,8 @@ async function enviar() {
   const id = "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   try {
     await setDoc(doc(db, "salas", J.codigo, "mensajes", id),
-      { tipo: "alumno", uid: J.uid, nombre: J.nombre, email: J.email, equipo: J.equipo, texto: texto.slice(0, 1500), t: Date.now(), ronda: J.sala.ronda });
+      { tipo: "alumno", uid: J.uid, nombre: J.nombre, email: J.email, grupo: J.grupo, equipo: rolEn(J.sala),
+        debate: J.sala.debate.n, tramo: J.sala.tramo, ronda: J.sala.ronda, texto: texto.slice(0, 1500), t: Date.now() });
     $("tx").value = ""; $("tx").style.height = "auto";
     $("notaCaja").textContent = ""; $("notaCaja").classList.remove("ati");
     $("pJuego").scrollTop = $("pJuego").scrollHeight;
@@ -228,12 +256,11 @@ async function enviar() {
 
 /* ---------- público: posición frente a la moción ---------- */
 const describePos = v => { const a = Math.abs(v); if (a <= 8) return "indeciso"; const lado = v > 0 ? "a favor" : "en contra"; return (a > 60 ? "muy " : a > 25 ? "" : "algo ") + lado; };
-// La primera vez se guarda también la base (inicial + desde): así cuenta lo que se mueva aunque
-// entre con un tramo ya abierto, antes de la próxima foto del profesor.
-async function guardarPos(v, primera = false) {
-  await setDoc(doc(db, "salas", J.codigo, "publico", J.uid),
-    { pos: Math.round(v), nombre: J.nombre, email: J.email, actualizado: Date.now(), ...(primera ? { inicial: Math.round(v), desde: Date.now() } : {}) },
-    { merge: true });
+async function guardarVoto(v) {
+  const s = J.sala; if (!s || !s.debate) return;
+  const n = s.debate.n;
+  await setDoc(doc(db, "salas", J.codigo, "votos", `${n}_${J.uid}`),
+    { uid: J.uid, debate: n, pos: Math.round(v), nombre: J.nombre, email: J.email, grupo: J.grupo, t: Date.now() });
 }
 function prepararVoto() {
   const r = $("rngPos");
@@ -241,39 +268,35 @@ function prepararVoto() {
   r.oninput = () => {
     pinta();
     clearTimeout(J.guardandoPos);
-    J.guardandoPos = setTimeout(() => guardarPos(+r.value).then(() => { $("avisoVoto").textContent = "✓ guardado"; $("voto").classList.remove("pide"); })
+    J.guardandoPos = setTimeout(() => guardarVoto(+r.value)
+      .then(() => { $("avisoVoto").textContent = "✓ guardado"; $("voto").classList.remove("pide"); })
       .catch(e => $("avisoVoto").textContent = "No se guardó: " + e.code), 300);
   };
-  subs.push(onSnapshot(doc(db, "salas", J.codigo, "publico", J.uid), snap => {
-    const d = snap.data(); if (d && document.activeElement !== r) { r.value = d.pos; pinta(); }
-  }));
   pinta();
 }
 
 /* ---------- espera: portada e intro ---------- */
 const iniciales = n => String(n || "?").trim().split(/\s+/).slice(0, 2).map(x => x[0] || "").join("").toUpperCase();
 function miRol(s) {
-  return J.equipo === "P" ? { nombre: "PÚBLICO", color: "#a78bfa", bandera: "🗳" } : s.equipos[J.equipo];
+  return { nombre: `GRUPO ${J.grupo || "?"}`, color: "#22e58a", bandera: "👥" };
 }
 function pintarEspera(s) {
   const el = $("espera");
   if (s.etapa !== "portada" && s.etapa !== "intro") { el.classList.add("oculto"); el.dataset.clave = ""; return; }
   el.classList.remove("oculto");
   const r = miRol(s);
-  const clave = s.etapa + "|" + J.equipo;
+  const clave = s.etapa + "|" + J.grupo;
   if (el.dataset.clave === clave) return;           // no repintar en cada cambio de la sala
   el.dataset.clave = clave;
   const av = `<div class="av" style="--c:${r.color};--t:92px">${J.foto ? `<img src="${esc(J.foto)}" referrerpolicy="no-referrer" alt="">` : `<span>${iniciales(J.nombre)}</span>`}</div>`;
-  const papel = J.equipo === "P"
-    ? "Eres <b>público</b>: lee la conversación y mueve tu deslizador cada vez que algo te convenza. Cuenta cuánto te mueve cada bancada."
-    : `Debates <b style="color:${r.color}">${esc(r.nombre)}</b>: escribe en la conversación cuando se abra cada tramo. La moderadora puede preguntarte a ti por tu nombre; respóndele con argumentos y lecturas del curso.`;
+  const papel = `Estás en el <b>Grupo ${J.grupo}</b>. Cuando la moderadora lo llame, tu grupo debate A FAVOR o EN CONTRA de la pregunta: escribe en la conversación y responde lo que te pregunten, con argumentos y lecturas del curso. Mientras debaten otros, lees y mueves tu deslizador cuando algo te convenza.`;
   el.innerHTML = s.etapa === "portada"
     ? `${av}<h1 style="margin-top:14px">¡Estás dentro, ${esc(J.nombre.split(" ")[0])}!</h1>
        <span class="chip" style="--c:${r.color}">${r.bandera} ${esc(r.nombre)}</span>
        <p style="color:var(--dim);margin-top:18px;max-width:340px">Mira la pantalla del curso. El debate empieza cuando el profesor lo diga.</p>
        <button class="link" id="esCambiar">cambiar de rol</button>`
-    : `<div class="k">Semana ${s.semana} · la moción</div>
-       <div class="es-mocion">«${esc(s.mocion)}»</div>
+    : `<div class="k">Semana ${s.semana} · tema general</div>
+       <div class="es-mocion">«${esc(s.temaGeneral || s.tema)}»</div>
        <div class="es-lados">
          <div style="--c:${s.equipos.A.color}"><b>${s.equipos.A.bandera} ${esc(s.equipos.A.nombre)}</b>${esc(s.equipos.A.lema || "Defiende la moción.")}</div>
          <div style="--c:${s.equipos.B.color}"><b>${s.equipos.B.bandera} ${esc(s.equipos.B.nombre)}</b>${esc(s.equipos.B.lema || "Rechaza la moción.")}</div>
@@ -310,7 +333,7 @@ async function enviarFeedback() {
   try {
     await setDoc(doc(db, "salas", J.codigo, "feedback", J.uid), {
       nota: FB.nota, comentario: $("fbTx").value.trim().slice(0, 300),
-      nombre: J.nombre, email: J.email, equipo: J.equipo, t: Date.now()
+      nombre: J.nombre, email: J.email, grupo: J.grupo, equipo: "", t: Date.now()
     });
     listoFeedback();
   } catch (e) { $("fbAviso").textContent = "No se envió: " + e.code; $("fbEnviar").textContent = "Enviar y ver el veredicto"; fbBoton(); }
@@ -322,42 +345,38 @@ function listoFeedback() {
   pintarSala();
 }
 
+// Entre dos debates: la moderadora prepara la pregunta, o el resultado del que terminó.
+function pintarEntre(s) {
+  const el = $("entre");
+  const toca = s.modo === "rotacion" && s.etapa == null && (s.fase === "propuesta" || s.fase === "resultado" || s.fase === "cerrando");
+  el.classList.toggle("oculto", !toca);
+  if (!toca) return;
+  const u = s.ultimo, mio = (s.ranking || []).find(f => f.grupo === J.grupo);
+  const res = (g, r) => `<div style="--c:${g === u.A ? s.equipos.A.color : s.equipos.B.color}"><b>Grupo ${g}</b>${r.puntaje} pts<br><small>jurado ${r.jurado} · público ${r.publico ?? "—"}</small></div>`;
+  el.innerHTML = (u && s.fase !== "propuesta" ? `
+      <div class="k">Debate ${u.n} · resultado</div>
+      <div class="es-mocion" style="font-size:17px">«${esc(u.pregunta)}»</div>
+      <div class="es-lados">${res(u.A, u.resA)}${res(u.B, u.resB)}</div>
+      <h1 style="margin-top:14px">${u.ganador ? `Gana el Grupo ${u.ganador === "A" ? u.A : u.B}` : "Empate"}</h1>`
+    : `<div class="k">Rotación</div><h1>La moderadora prepara la próxima pregunta…</h1>`) +
+    (mio && mio.puesto ? `<div class="es-papel">Tu grupo va <b>#${mio.puesto}</b> con ${mio.puntaje} puntos.</div>`
+      : J.grupo ? `<div class="es-papel">Tu grupo todavía no debate.</div>` : "");
+}
+
 /* ---------- el ganador, en grande ---------- */
 function ceremonia(s, v) {
-  const col = n => n === s.equipos.A.nombre ? s.equipos.A.color : n === s.equipos.B.nombre ? s.equipos.B.color : "var(--txt)";
-  const band = n => n === s.equipos.A.nombre ? s.equipos.A.bandera + " " : n === s.equipos.B.nombre ? s.equipos.B.bandera + " " : "";
+  if (!v.ranking) return;                      // salas antiguas sin ranking: no hay ceremonia de rotación
   const el = document.createElement("div");
   el.id = "ceremonia";
-  // salas anteriores a la declaración final: el ganador se calcula con los marcadores
-  const noms = [v.ganaP, v.pubN ? v.ganaU : null, v.ganaR].filter(x => x != null);
-  const cA = noms.filter(x => x === s.equipos.A.nombre).length, cB = noms.filter(x => x === s.equipos.B.nombre).length;
-  const gG = v.ganaG || (cA > cB ? s.equipos.A.nombre : cB > cA ? s.equipos.B.nombre : "EMPATE");
-  const n = v.marcN || noms.length, m = Math.max(v.marcA ?? cA, v.marcB ?? cB);
-  const haySala = v.ganaP != null;
-  el.innerHTML = `<div class="ctab"><div class="k" style="color:var(--amber);font-size:14px">EL VEREDICTO</div>
-    ${haySala ? `<div class="cb" id="c1"><div class="k">La sala · votos ganados</div><div class="cg" style="color:${col(v.ganaP)}">${band(v.ganaP)}${esc(v.ganaP)}</div>
-      <div class="cs">${v.movA > 0 ? "+" : ""}${v.movA} · ${v.movB > 0 ? "+" : ""}${v.movB}</div></div>` : ""}
-    <div class="cb" id="c2"><div class="k">El jurado · rigor /20</div><div class="cg" style="color:${col(v.ganaR)}">${band(v.ganaR)}${esc(v.ganaR)}</div>
-      <div class="cs">${v.rA} · ${v.rB}</div></div>
-    ${v.pubN ? `<div class="cb" id="cP"><div class="k">El público · ${v.pubN} alumno${v.pubN === 1 ? "" : "s"}</div><div class="cg" style="color:${col(v.ganaU)}">${band(v.ganaU)}${esc(v.ganaU)}</div>
-      <div class="cs">${v.pubA > 0 ? "+" : ""}${v.pubA} · ${v.pubB > 0 ? "+" : ""}${v.pubB}</div></div>` : ""}</div>
-    <div class="cfin">
-      <div id="cGpre">${gG !== "EMPATE" ? "Y EL DEBATE LO GANA…" : "Y EL DEBATE…"}</div>
-      <div class="cb" id="cG"><div class="cg" style="color:${col(gG)}">${gG !== "EMPATE" ? "🏆 " + band(gG) + esc(gG) : "TERMINA EN EMPATE"}</div>
-        <div class="cs">${gG !== "EMPATE" ? (n === 1 ? "decidió el jurado" : `${m} de ${n} marcadores`) : "el jurado y el público no coincidieron"}</div>
-        <div class="cmini">${haySala ? `<span>Sala: <b style="color:${col(v.ganaP)}">${esc(v.ganaP)}</b></span>` : ""}<span>Jurado: <b style="color:${col(v.ganaR)}">${esc(v.ganaR)}</b></span>${v.pubN ? `<span>Público: <b style="color:${col(v.ganaU)}">${esc(v.ganaU)}</b></span>` : ""}</div></div>
-      <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>
-    </div>`;
+  const mio = v.ranking.find(f => f.grupo === J.grupo);
+  el.innerHTML = `<div class="k" style="color:var(--amber);font-size:14px">EL RANKING DE LA CLASE</div>
+    <div class="cb" id="cG"><div class="cg" style="color:var(--amber)">${v.campeon ? `🏆 Grupo ${v.campeon}` : "Sin debates"}</div>
+      <div class="cs">${mio && mio.puesto ? `Tu grupo terminó #${mio.puesto} con ${mio.puntaje} puntos` : "Tu grupo no alcanzó a debatir"}</div>
+      ${v.mejor ? `<div class="cmini">Mejor intervención: <b>${esc(v.mejor.autor)}</b> · Grupo ${v.mejor.grupo} · ${v.mejor.total}/20</div>` : ""}</div>
+    <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>`;
   document.body.appendChild(el);
-  const ids = [haySala && "c1", "c2", v.pubN && "cP"].filter(Boolean);
-  ids.forEach((id, i) => setTimeout(() => $(id)?.classList.add("on"), 2600 + i * 3000));
-  const tFinal = 2600 + ids.length * 3000 + 1200;
-  setTimeout(() => el.classList.add("final"), tFinal);
-  setTimeout(() => {
-    $("cGpre")?.remove(); $("cG")?.classList.add("on"); navigator.vibrate?.([80, 60, 200]);
-    confeti(gG !== "EMPATE" ? [col(gG), "#ffffff", "#f5b301"] : [s.equipos.A.color, s.equipos.B.color, "#f5b301"]);
-  }, tFinal + 2800);
-  setTimeout(() => $("c3")?.classList.add("on"), tFinal + 4400);
+  setTimeout(() => { $("cG")?.classList.add("on"); navigator.vibrate?.([80, 60, 200]); confeti(["#f5b301", "#ffffff", "#38bdf8"]); }, 1500);
+  setTimeout(() => $("c3")?.classList.add("on"), 3500);
   $("c3").onclick = () => el.remove();
 }
 

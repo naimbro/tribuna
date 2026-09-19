@@ -23,6 +23,8 @@ function postChat(m) {
   m.id = m.id || ("m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
   m.t = m.t || Date.now();
   m.ronda = m.ronda ?? S.ronda;
+  m.debate = m.debate ?? (S.debate ? S.debate.n : 0);
+  m.tramo = m.tramo ?? S.tramo;
   if (typeof window.chatRemoto === "function") return window.chatRemoto(m);   // en línea: Firestore
   recibirChat([m]);
 }
@@ -93,7 +95,8 @@ function participantes() {
   const out = new Map();
   const roster = typeof window.rosterRemoto === "function" ? window.rosterRemoto() : [];
   for (const r of roster) out.set(r.nombre, { nombre: r.nombre, equipo: r.equipo, n: 0 });
-  for (const m of S.chat) if (m.tipo === "alumno" && (m.equipo === "A" || m.equipo === "B")) {
+  // solo quienes escriben en el debate en curso (en otro debate su grupo pudo tener otro lado)
+  for (const m of S.chat) if (m.tipo === "alumno" && (m.equipo === "A" || m.equipo === "B") && (!S.debate || m.debate === S.debate.n)) {
     const p = out.get(m.nombre) || { nombre: m.nombre, equipo: m.equipo, n: 0 };
     if (m.ronda === S.ronda) p.n++;
     out.set(m.nombre, p);
@@ -111,15 +114,20 @@ function transcripcionChat(filtro = () => true, max = 40) {
 
 /* ---------- 🎙 la moderadora ---------- */
 function abrirTramoChat() {
-  const R = RONDAS[S.ronda];
+  const R = tramoActual();
   S.mod = { ultimo: Date.now(), nuevos: 0, enCurso: false, ultimoAlumno: 0, abre: Date.now() };
   const ps = participantes();
   const a = ps.filter(p => p.equipo === "A").map(p => "@" + p.nombre), b = ps.filter(p => p.equipo === "B").map(p => "@" + p.nombre);
   const quien = (arr, def) => arr.length ? arr[Math.floor(Math.random() * arr.length)] : def;
-  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto:
-    `Abrimos el tramo ${S.ronda + 1}: ${R.nombre}. ${R.pauta} ` +
-    (S.ronda === 0 ? `${quien(a, EQUIPOS.A.nombre)}, ¿cuál es la tesis de tu bancada? Y ${quien(b, EQUIPOS.B.nombre)}, la de la suya.`
-                   : `${quien(b, EQUIPOS.B.nombre)} y ${quien(a, EQUIPOS.A.nombre)}: arranquen respondiendo lo más fuerte que dijo el otro lado.`) });
+  const d = S.debate;
+  if (d && S.tramo === 0) {
+    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto:
+      `Debate ${d.n}: «${d.pregunta}». Grupo ${d.A} defiende ${EQUIPOS.A.nombre}; Grupo ${d.B}, ${EQUIPOS.B.nombre}. ` +
+      `${quien(a, "Grupo " + d.A)}, ¿cuál es la tesis de tu grupo? Y ${quien(b, "Grupo " + d.B)}, la del suyo. Tienen ${Math.round(R.seg / 60)} minutos.` });
+  } else {
+    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto:
+      `Réplica. ${quien(b, "Grupo " + (d ? d.B : ""))} y ${quien(a, "Grupo " + (d ? d.A : ""))}: respondan lo más fuerte que dijo el otro grupo. Conceder un punto válido suma.` });
+  }
 }
 
 // Se llama cada pocos segundos y cuando llega un mensaje. Decide si la moderadora interviene.
@@ -139,16 +147,16 @@ function moderadorTalvez(forzar = false) {
 }
 
 function promptModerador() {
-  const R = RONDAS[S.ronda];
+  const R = tramoActual();
   const ps = participantes();
   const lista = k => ps.filter(p => p.equipo === k).map(p => `${p.nombre} (${p.n} mensajes en este tramo)`).join(", ") || "(nadie aún)";
   return `Eres la moderadora de un debate universitario en vivo, en un chat grupal. Curso: "${SESION.curso}", semana ${SESION.semana}: ${SESION.tema}.
-MOCIÓN: "${SESION.mocion}". ${EQUIPOS.A.nombre} la defiende; ${EQUIPOS.B.nombre} la rechaza.
+MOCIÓN: "${mocionActual()}". ${ladoNombre("A")} la defiende; ${ladoNombre("B")} la rechaza.
 TRAMO ACTUAL: ${R.nombre}. Pauta: ${R.pauta}
 
 PARTICIPANTES
-- ${EQUIPOS.A.nombre}: ${lista("A")}
-- ${EQUIPOS.B.nombre}: ${lista("B")}
+- ${ladoNombre("A")}: ${lista("A")}
+- ${ladoNombre("B")}: ${lista("B")}
 
 CONCEPTOS Y LECTURAS DEL CURSO (SOLO PARA TI, para juzgar si lo que dicen está bien; NO los nombres en tu intervención si el participante no los nombró antes):
 ${CONCEPTOS.map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n")}
@@ -193,12 +201,12 @@ function moderadorSimple() {
 
 /* ---------- ⚖ el relator ---------- */
 async function relatorPideVoto() {
-  const R = RONDAS[S.ronda];
-  const delTramo = m => m.ronda === S.ronda;
+  const R = tramoActual();
+  const delTramo = m => S.debate ? m.debate === S.debate.n : m.ronda === S.ronda;
   let d = null;
   if (S.motor.activo) {
     const prompt = `Eres el relator de un debate universitario en vivo. Curso: "${SESION.curso}", semana ${SESION.semana}.
-MOCIÓN: "${SESION.mocion}". ${EQUIPOS.A.nombre} la defiende; ${EQUIPOS.B.nombre} la rechaza. Acaba de terminar el tramo "${R.nombre}" (${R.pauta}).
+MOCIÓN: "${mocionActual()}". ${ladoNombre("A")} la defiende; ${ladoNombre("B")} la rechaza. Acaba de terminar el debate ${S.debate ? S.debate.n : ""}: «${mocionActual()}» (apertura y réplica).
 
 LO QUE SE DIJO EN ESTE TRAMO:
 ${transcripcionChat(delTramo, 60) || "(nadie escribió)"}
@@ -223,7 +231,7 @@ Responde SOLO un JSON: {"resumenA": "máx. 35 palabras", "resumenB": "máx. 35 p
   }
   if (!d) {
     const n = k => S.chat.filter(m => m.tipo === "alumno" && m.equipo === k && delTramo(m)).length;
-    d = { resumenA: `${n("A")} mensajes en este tramo.`, resumenB: `${n("B")} mensajes en este tramo.`, disputa: SESION.mocion,
+    d = { resumenA: `${n("A")} mensajes en este tramo.`, resumenB: `${n("B")} mensajes en este tramo.`, disputa: mocionActual(),
           revisar: ["Si las afirmaciones empíricas citaron alguna lectura del curso.", "Si cada bancada respondió el argumento más fuerte del otro lado."],
           criterios: ["Evidencia atribuida por sobre el tono.", "Reconocer lo válido del rival suma."] };
   }
@@ -242,10 +250,11 @@ function prepararCompositor() {
   const enviar = () => {
     const t = $("chatTx").value.trim();
     if (!t) return;
-    if (S.fase !== "abierta") { tick("Abre el tramo para que la conversación cuente."); return; }
-    // "@Nombre: texto" simula a un alumno; si no, escribe el profesor por esa bancada
+    if (S.fase !== "abierta") { tick("Publica una pregunta y abre el tramo para que la conversación cuente."); return; }
+    // "@Nombre: texto" simula a un alumno del grupo que está en el lado elegido
+    const grupo = S.debate ? S.debate[banca] : null;
     for (const p of partirCaja(t, "(profesor)"))
-      postChat({ tipo: "alumno", nombre: p.autor, equipo: banca, uid: "sim:" + p.autor, texto: p.texto });
+      postChat({ tipo: "alumno", nombre: p.autor, equipo: banca, grupo, uid: "sim:" + p.autor, texto: p.texto });
     $("chatTx").value = "";
   };
   $("chatEnviar").onclick = enviar;

@@ -115,7 +115,7 @@ cuando termina el resultado ya está lista.
 4. Lado: A FAVOR para el grupo que menos veces lo ha tenido.
 
 **Mensajes de la moderadora:** anuncio, preguntas durante los tramos, paso a la réplica y
-cierre. Los escribe el modelo con las reglas actuales. Nunca sugiere conceptos, autores ni
+cierre. El anuncio, el paso a la réplica y el cierre usan plantillas, para que salgan al instante. Las intervenciones durante los tramos las escribe el modelo con las reglas actuales. Nunca sugiere conceptos, autores ni
 lecturas que los alumnos no hayan mencionado.
 
 **Controles del profesor sobre la propuesta:**

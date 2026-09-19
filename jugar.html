@@ -119,15 +119,11 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 <!-- 2. elegir rol -->
 <section id="pBancada" class="pant oculto">
   <div class="card">
-    <div class="k">Moción</div>
+    <div class="k">Tema general</div>
     <p id="mocion1" style="font-weight:600"></p>
-    <h1>¿Dónde participas?</h1>
-    <div class="fila">
-      <button class="btn A" id="btnA"></button>
-      <button class="btn B" id="btnB"></button>
-    </div>
-    <button class="btn P" id="btnP">🗳 PÚBLICO — no debato, voto</button>
-    <p class="aviso">Las bancadas conversan en un mismo chat, con una moderadora de IA que pregunta y pasa la palabra. El público lee y marca cuánto lo convence cada lado.</p>
+    <h1>Elige tu grupo</h1>
+    <div id="grupos" class="fila" style="flex-wrap:wrap"></div>
+    <p class="aviso">Tu grupo debate cuando la moderadora lo llama y vota cuando debaten otros.</p>
   </div>
 </section>
 
@@ -151,6 +147,9 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
   </div>
 </div>
 
+<!-- entre dos debates: la moderadora prepara la pregunta, o el resultado del que terminó -->
+<div id="entre" class="capa oculto"></div>
+
 <!-- 3. la conversación -->
 <div id="estado" class="estado oculto">
   <div><b id="tramoLbl"></b> <span id="pauta"></span></div>
@@ -173,6 +172,6 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
   <div class="nota-caja" id="avisoVoto"></div>
 </div>
 
-<script type="module" src="jugar.js?v=20260920b"></script>
+<script type="module" src="jugar.js?v=20260921c"></script>
 </body>
 </html>

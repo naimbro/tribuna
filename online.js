@@ -12,7 +12,7 @@
    ===================================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy }
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy, where }
   from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-functions.js";
 import { firebaseConfig } from "./firebase-config.js?v=20260918a";
@@ -31,14 +31,27 @@ const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, 
 
 /* ---------- lo que ve el alumno: estado público de la sala ---------- */
 function estadoPublico() {
-  const R = RONDAS[S.ronda];
+  const R = tramoActual();
   return {
     profeUid: ON.uid, profeEmail: ON.email, actualizado: Date.now(), creada: ON.creada || null,
     curso: SESION.curso || "", semana: SESION.semana, tema: SESION.tema, mocion: SESION.mocion,
     etapa: S.etapa || null,                                     // "portada" → "intro" → null (debate)
     equipos: { A: { nombre: EQUIPOS.A.nombre, bandera: EQUIPOS.A.bandera, color: EQUIPOS.A.color, lema: EQUIPOS.A.lema || "" },
                B: { nombre: EQUIPOS.B.nombre, bandera: EQUIPOS.B.bandera, color: EQUIPOS.B.color, lema: EQUIPOS.B.lema || "" } },
-    fase: S.fase, ronda: S.ronda, totalRondas: RONDAS.length,
+    modo: "rotacion", grupos: S.clase.grupos, temaGeneral: S.clase.tema || SESION.tema,
+    debate: S.debate ? { n: S.debate.n, pregunta: S.debate.pregunta, A: S.debate.A, B: S.debate.B } : null,
+    tramo: S.tramo, finVoto: S.fase === "votando" ? S.finVoto || null : null,
+    ranking: (S.clase.ranking || []).map(f => ({ grupo: f.grupo, debates: f.debates, puesto: f.puesto, distincion: f.distincion,
+      jurado: f.jurado === null ? null : +f.jurado.toFixed(1), publico: f.publico === null ? null : +f.publico.toFixed(1),
+      puntaje: f.puntaje === null ? null : +f.puntaje.toFixed(1) })),
+    debates: S.clase.debates.map(d => ({ n: d.n, pregunta: d.pregunta, A: d.A, B: d.B,
+      ganador: d.res ? d.res.ganador : null,
+      puntajeA: d.res ? +d.res.A.puntaje.toFixed(1) : null, puntajeB: d.res ? +d.res.B.puntaje.toFixed(1) : null })),
+    ultimo: S.clase.ultimo ? { n: S.clase.ultimo.n, pregunta: S.clase.ultimo.pregunta, A: S.clase.ultimo.A, B: S.clase.ultimo.B,
+      ganador: S.clase.ultimo.res.ganador,
+      resA: { jurado: +S.clase.ultimo.res.A.jurado.toFixed(1), publico: S.clase.ultimo.res.A.publico === null ? null : +S.clase.ultimo.res.A.publico.toFixed(1), puntaje: +S.clase.ultimo.res.A.puntaje.toFixed(1) },
+      resB: { jurado: +S.clase.ultimo.res.B.jurado.toFixed(1), publico: S.clase.ultimo.res.B.publico === null ? null : +S.clase.ultimo.res.B.publico.toFixed(1), puntaje: +S.clase.ultimo.res.B.puntaje.toFixed(1) } } : null,
+    fase: S.fase, ronda: S.ronda, totalRondas: TRAMOS.length,
     rondaNombre: R.nombre, rol: R.rol, pauta: R.pauta, seg: R.seg,
     abreEn: S.abreEn || null,                                   // epoch ms; el alumno calcula el reloj
     marcador: {
@@ -54,25 +67,22 @@ function estadoPublico() {
     feed: S.historial.map(h => ({
       orden: h.orden, turnoOrden: h.turnoOrden,
       equipo: h.equipo, autor: h.autor, autorEmail: h.autorEmail || "", ronda: h.ronda, rondaNombre: h.rondaNombre, rolNombre: h.rolNombre,
-      texto: h.texto, rubrica: h.ev.rubrica, banderas: h.ev.banderas, nota: h.ev.nota || null,
+      debate: h.debate || null, grupo: h.grupo || null, rubrica: h.ev.rubrica, banderas: h.ev.banderas, nota: h.ev.nota || null,
       conceptos: h.ev.conceptos.map(c => c.etiqueta)
     })),
     shocks: S.shocks.map(x => ({ titular: x.titular, ronda: x.ronda, swing: x.swing })),
     // el ganador llega a los teléfonos cuando el profesor lo revela, no antes
-    veredicto: S.fase === "fin" && S.veredictoRevelado ? resumenVeredicto() : null,
+    veredicto: S.fase === "fin" && S.veredictoRevelado ? resumenFinal() : null,
     ticker: $("ticker").textContent, motor: $("modoLbl").textContent
   };
 }
 
-function resumenVeredicto() {
-  const { rA, rB, P, gG, a, b, n } = marcadores();
-  return {
-    rA: +rA.toFixed(1), rB: +rB.toFixed(1),
-    ganaG: gG ? EQUIPOS[gG].nombre : "EMPATE", marcA: a, marcB: b, marcN: n,
-    pubN: P.n, pubA: decima(P.A), pubB: decima(P.B),
-    ganaU: !P.n ? null : empatanEnVotos(P.A, P.B) ? "EMPATE" : P.A > P.B ? EQUIPOS.A.nombre : EQUIPOS.B.nombre,
-    ganaR: Math.abs(rA - rB) < 0.05 ? "EMPATE" : rA > rB ? EQUIPOS.A.nombre : EQUIPOS.B.nombre
-  };
+function resumenFinal() {
+  const r = S.clase.ranking || [];
+  const mejor = mejorIntervencion(S.historial.map(h => ({ autor: h.autor, grupo: h.grupo, debate: h.debate, total: h.ev.rubrica.total })));
+  return { campeon: r[0] && r[0].debates ? r[0].grupo : null,
+           ranking: r.map(f => ({ grupo: f.grupo, puesto: f.puesto, puntaje: f.puntaje === null ? null : +f.puntaje.toFixed(1) })),
+           mejor: mejor ? { autor: mejor.autor, grupo: mejor.grupo, debate: mejor.debate, total: +mejor.total.toFixed(1) } : null };
 }
 
 // Estado completo para restaurar la pestaña del profesor (incluye evaluaciones y memorias).
@@ -80,7 +90,7 @@ function estadoPrivado() {
   return {
     ronda: S.ronda, fase: S.fase, etapa: S.etapa || null, seq: S.seq, votoInicial: S.votoInicial, iniPos: S.iniPos,
     historial: S.historial, turnos: S.turnos, shocks: S.shocks, abreEn: S.abreEn || null,
-    publicoSnaps: S.publicoSnaps || [], publicoBase: S.publicoBase || {},
+    clase: S.clase, debate: S.debate, tramo: S.tramo, finVoto: S.finVoto || null,
     audiencia: Object.fromEntries(AUDIENCIA.map(p => [p.id, { pos: p.pos, memoria: p.memoria || [], ultimo: p.ultimo || "" }]))
   };
 }
@@ -116,37 +126,25 @@ function activarOnline() {
   // relator, resultados y lo que escriba por una bancada) y los alumnos desde el teléfono.
   window.chatRemoto = m => setDoc(doc(db, "salas", ON.codigo, "mensajes", m.id), limpio(m))
     .catch(e => tick("No se pudo publicar en la conversación: " + e.code));
-  window.rosterRemoto = () => Object.values(ON.jugadores).filter(j => j.equipo === "A" || j.equipo === "B")
-    .map(j => ({ nombre: j.nombre, equipo: j.equipo }));
   let primeraCarga = true;
   onSnapshot(query(collection(db, "salas", ON.codigo, "mensajes"), orderBy("t")), snap => {
     const lista = []; snap.forEach(d => lista.push({ ...d.data(), id: d.id }));
     recibirChat(lista, primeraCarga); primeraCarga = false;
   });
-  envolver("abrirRonda", () => { S.abreEn = Date.now(); fotoPublico(); });
-  envolver("cerrarRonda", () => {
-    S.abreEn = null;
-    if (S.fase !== "abierta") tick(`Ronda ${S.ronda + 1} cerrada y revelada. ${S.fase === "fin" ? "Se acabó el debate: el profesor mostrará el veredicto." : "Espera a que el profesor abra la siguiente."}`);
-  });
-  envolver("siguienteRonda");
-  envolver("veredicto");
-  envolver("ceremonia", () => fotoPublico());
+  envolver("abrirRonda", () => { S.abreEn = Date.now(); });   // el teléfono calcula el reloj desde abreEn
+  envolver("cerrarRonda");
+  window.publicarEstado = publicar;
+  window.jugadoresSala = () => ON.jugadores;
+  window.gruposConectados = () => [...new Set(Object.values(ON.jugadores).map(j => j.grupo).filter(g => g > 0))].sort((a, b) => a - b);
+  window.rosterRemoto = () => !S.debate ? [] : Object.values(ON.jugadores)
+    .filter(j => j.grupo === S.debate.A || j.grupo === S.debate.B)
+    .map(j => ({ nombre: j.nombre, equipo: j.grupo === S.debate.A ? "A" : "B", grupo: j.grupo }));
+  window.moverAlumno = (uid, grupo) => setDoc(doc(db, "salas", ON.codigo, "jugadores", uid), { grupo }, { merge: true })
+    .catch(e => tick("No se pudo mover al alumno: " + e.code));
+  window.alCambiarDebate = n => suscribirVotos(n);
   envolver("lanzarEvento");
   envolver("pintarMarcador");
   envolver("guardarMotor");
-
-  // El público: sus posiciones en vivo
-  onSnapshot(collection(db, "salas", ON.codigo, "publico"), snap => {
-    ON.publico = {};
-    S.publicoBase = S.publicoBase || {};
-    snap.forEach(d => {
-      const x = d.data(); if (typeof x.pos !== "number") return;
-      ON.publico[d.id] = x;
-      // la base de cada votante: la que guardó al entrar (quienes entraron antes de este cambio partieron en 0)
-      if (!S.publicoBase[d.id]) S.publicoBase[d.id] = { t: x.desde || Date.now(), pos: typeof x.inicial === "number" ? x.inicial : 0 };   // todos entran en 0 (indeciso)
-    });
-    calcPublico(); pintarBarraOnline(); publicar();
-  });
 
   // Quiénes están en la sala
   onSnapshot(collectionJugadores(), snap => {
@@ -164,6 +162,9 @@ function activarOnline() {
   $("btnIntro").onclick = () => irA("intro");
   if (S.etapa === "portada") irA("portada");
   else if (S.etapa === "intro") irA("intro");
+  else if (S.fase === "propuesta") mostrarPropuesta();     // se recargó con una propuesta pendiente
+  // restaurar corre antes que activarOnline: la suscripción a los votos del debate en curso va aquí
+  if (S.debate) suscribirVotos(S.debate.n);
 
   pintarBarraOnline();
   $("btnEjemplo").style.display = "none";        // en línea escriben los alumnos, no el botón
@@ -186,7 +187,10 @@ function irA(etapa) {
   cerrarPortada();
   if (etapa === "portada") { mostrarPortada(urlJugar(), ON.codigo, () => irA("intro")); actualizarPortada(ON.jugadores); }
   if (etapa === "intro") mostrarIntro(() => irA(null));
-  if (etapa === null) tick("Comienza el debate. Abre el primer tramo cuando estén listos.");
+  if (etapa === null) {
+    tick("Comienza la rotación: revisa la primera pregunta de la moderadora.");
+    if (S.fase === "propuesta" && !S.debate) mostrarPropuesta();
+  }
   publicar();
 }
 
@@ -195,32 +199,17 @@ function irA(etapa) {
    mueve un votante entre dos fotos es efecto de lo que se reveló entre ellas: si se acerca a
    A FAVOR suma a A, si se acerca a EN CONTRA suma a B. Misma medida que la sala sintética
    (voto suave: tanh(pos/12)), así los dos marcadores de votos son comparables. */
-function fotoPublico() {
-  S.publicoSnaps = S.publicoSnaps || [];
-  S.publicoSnaps.push({ t: Date.now(), ronda: S.ronda, pos: Object.fromEntries(Object.entries(ON.publico).map(([u, d]) => [u, d.pos])) });
-  calcPublico();
-}
-function calcPublico() {
-  const suave = v => Math.tanh(v / ESCALA_VOTO);
-  let A = 0, B = 0; const aporte = {}, inicial = {}, final = {};
-  // por votante: su base (al entrar) → sus posiciones en cada foto posterior → la de ahora
-  for (const [u, d] of Object.entries(ON.publico)) {
-    const base = S.publicoBase?.[u];
-    const seq = [];
-    if (base) seq.push(base.pos);
-    for (const f of S.publicoSnaps || []) if (f.pos[u] !== undefined && (!base || f.t > base.t)) seq.push(f.pos[u]);
-    seq.push(d.pos);
-    inicial[u] = seq[0]; final[u] = d.pos;
-    for (let i = 0; i + 1 < seq.length; i++) {
-      const dd = suave(seq[i + 1]) - suave(seq[i]);
-      if (dd > 0) A += dd; else B -= dd;
-      aporte[u] = (aporte[u] || 0) + dd;
-    }
-  }
-  const votantes = Object.entries(ON.publico).map(([u, d]) => ({
-    uid: u, nombre: d.nombre, email: d.email, inicial: inicial[u] ?? d.pos, final: final[u] ?? d.pos, aporte: aporte[u] || 0 }));
-  S.publico = { A: decima(A), B: decima(B), n: Object.keys(ON.publico).length, votantes };
-  pintarMarcador();
+// El público del debate n: cada votante parte en 0; su posición final es su voto (voto suave).
+let desuscribirVotos = null;
+function suscribirVotos(n) {
+  desuscribirVotos?.();
+  desuscribirVotos = onSnapshot(query(collection(db, "salas", ON.codigo, "votos"), where("debate", "==", n)), snap => {
+    const votantes = [];
+    snap.forEach(d => { const x = d.data(); if (typeof x.pos === "number") votantes.push({ uid: x.uid, nombre: x.nombre, email: x.email, grupo: x.grupo, inicial: 0, final: x.pos, aporte: 0 }); });
+    const v = votosSuaves(votantes.map(x => x.final));
+    S.publico = { A: v.A, B: v.B, n: v.n, votantes };
+    pintarMarcador(); publicar();
+  });
 }
 
 /* ---------- barra de la sala: código, URL, jugadores ---------- */
@@ -233,10 +222,10 @@ function pintarBarraOnline() {
     document.querySelector(".marcador").before(bar);
   }
   const js = Object.values(ON.jugadores);
-  const nA = js.filter(j => j.equipo === "A").length, nB = js.filter(j => j.equipo === "B").length, nP = js.filter(j => j.equipo === "P").length;
+  const nG = new Set(js.map(j => j.grupo).filter(g => g > 0)).size;
   bar.innerHTML = `<b style="color:var(--neon);letter-spacing:.14em">SALA ${ON.codigo}</b>
     <span title="profesor">${ON.email || ""}</span>
-    <span>${js.length} en la sala · <span style="color:var(--A)">${EQUIPOS.A.nombre} ${nA}</span> · <span style="color:var(--B)">${EQUIPOS.B.nombre} ${nB}</span> · <span style="color:#a78bfa">PÚBLICO ${nP}</span></span>
+    <span>${js.length} en la sala · ${nG} de ${S.clase.grupos} grupos con gente</span>
     <span class="mono" style="color:var(--txt)">${urlJugar()}</span>
     ${ON.feedback ? `<span title="Feedback recibido; se lee en MIS PARTIDAS">💬 ${ON.feedback} feedback</span>` : ""}
     <a class="btn" href="admin.html" target="_blank" style="margin-left:auto;text-decoration:none;color:inherit">📋 MIS PARTIDAS</a>
@@ -249,6 +238,8 @@ async function crearSala() {
   ON.codigo = nuevoCodigo();
   ON.creada = Date.now();
   S.etapa = "portada";                  // toda sala nueva parte en la portada
+  S.clase = { grupos: ROT.GRUPOS_DEFECTO, tema: SESION.tema, debates: [], propuesta: null, evaluado: 0 };
+  S.fase = "propuesta";
   await setDoc(doc(db, "salas", ON.codigo), limpio({ ...estadoPublico(), creada: Date.now() }));
   await setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado()));
   location.href = `${location.pathname}?sala=${ON.codigo}&semana=${SESION.semana}`;
@@ -270,17 +261,24 @@ async function restaurar(codigo) {
   ON.codigo = codigo;
   ON.creada = pub.data().creada || null;
   S.etapa = priv?.etapa ?? null;
+  // salas del formato anterior (un solo debate): se ven en el panel, no se dirigen desde aquí
+  if (pub.data().modo !== "rotacion") {
+    alert(`La sala ${codigo} es del formato anterior (un solo debate). Se puede revisar en MIS PARTIDAS; para jugar, crea una sala nueva.`);
+    history.replaceState(null, "", location.pathname); return false;
+  }
   if (priv && priv.historial) {
+    if (priv.clase) S.clase = { ...S.clase, ...priv.clase };
+    S.debate = priv.debate || null; S.tramo = priv.tramo || 0;
+    // un tramo abierto vuelve pausado (se reanuda con el botón); una votación, sin reloj
+    S.fase = priv.fase === "abierta" ? "listo" : priv.fase === "cerrando" ? "votando" : priv.fase || "propuesta";
     S.ronda = priv.ronda; S.seq = priv.seq || 0; S.shocks = priv.shocks || [];
-    S.publicoSnaps = priv.publicoSnaps || []; S.publicoBase = priv.publicoBase || {};
     S.historial = priv.historial; S.turnos = priv.turnos || []; S.votoInicial = priv.votoInicial || S.votoInicial; S.iniPos = priv.iniPos || S.iniPos;
-    for (const p of AUDIENCIA) { const a = priv.audiencia?.[p.id]; if (a) { p.pos = a.pos; p.memoria = a.memoria || []; p.ultimo = a.ultimo || ""; } }
-    // una ronda que estaba abierta cuando se cerró la pestaña se vuelve a abrir a mano
-    S.fase = priv.fase === "abierta" ? "listo" : priv.fase;
     S.abreEn = null;
     pintarRonda(); pintarMarcador(); pintarFeed();
-    $("btnPrincipal").textContent = { listo: "ABRIR TRAMO", resuelta: "SIGUIENTE TRAMO", fin: S.veredictoRevelado ? "VER VEREDICTO" : "🏆 REVELAR GANADOR" }[S.fase] || "ABRIR TRAMO";
-    tick(`Sala ${codigo} restaurada: ${S.historial.length} intervenciones, ronda ${S.ronda + 1}.`);
+    $("btnPrincipal").textContent = { propuesta: "PUBLICAR PREGUNTA", listo: "▶ REANUDAR TRAMO", votando: "CERRAR VOTACIÓN",
+      resultado: "SEGUIR ▶", fin: "🏆 VER CAMPEÓN" }[S.fase] || "PUBLICAR PREGUNTA";
+    if (S.fase === "resultado") S.fase = "propuesta";
+    tick(`Sala ${codigo} restaurada: ${S.clase.debates.length} debate${S.clase.debates.length === 1 ? "" : "s"}, ${S.historial.length} intervenciones.`);
     // partidas guardadas con la versión anterior (un texto por bancada, votos en cada entrada)
     if (!S.turnos.length && S.historial.length) S.turnos = S.historial.map(h => ({
       orden: h.orden - 0.5, equipo: h.equipo, ronda: h.ronda, rondaNombre: h.rondaNombre, n: 1,
