@@ -175,6 +175,7 @@ function activarOnline() {
   if (S.etapa === "portada") irA("portada");
   else if (S.etapa === "intro") irA("intro");
   else if (S.fase === "propuesta") mostrarPropuesta();     // se recargó con una propuesta pendiente
+  else if (S.fase === "votando" && S.debate) mostrarVotacion(S.debate);   // se recargó a mitad de la votación
   // restaurar corre antes que activarOnline: la suscripción a los votos del debate en curso va aquí
   if (S.debate) suscribirVotos(S.debate.n);
 
@@ -212,6 +213,10 @@ function irA(etapa) {
    A FAVOR suma a A, si se acerca a EN CONTRA suma a B. Misma medida que la sala sintética
    (voto suave: tanh(pos/12)), así los dos marcadores de votos son comparables. */
 // El voto del debate n: una respuesta binaria y una predicción por votante.
+// quienes pueden votar en el debate en curso, con nombre (para registrar «no votó» al cerrar)
+window.listaElegibles = () => !S.debate ? [] : Object.entries(ON.jugadores)
+  .filter(([, j]) => j.grupo > 0 && j.grupo !== S.debate.A && j.grupo !== S.debate.B)
+  .map(([uid, j]) => ({ uid, nombre: j.nombre || "", email: j.email || "", grupo: j.grupo }));
 const elegibles = () => !S.debate ? 0 : Object.values(ON.jugadores)
   .filter(j => j.grupo > 0 && j.grupo !== S.debate.A && j.grupo !== S.debate.B).length;
 let desuscribirVotos = null;
@@ -222,6 +227,7 @@ function suscribirVotos(n) {
     snap.forEach(d => { const x = d.data(); votantes.push({ uid: x.uid, nombre: x.nombre, email: x.email, grupo: x.grupo, voto: x.voto ?? null, prediccion: x.prediccion ?? null }); });
     const v = votoPublico(votantes.map(x => x.voto));
     S.publico = { A: v.A, B: v.B, n: v.n, elegibles: elegibles(), votantes };
+    S.votosDe = n;                                   // la foto de votos de este debate ya llegó
     pintarMarcador(); if (typeof actualizarVotacion === "function") actualizarVotacion(); publicar();
   });
 }

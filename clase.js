@@ -82,8 +82,15 @@ async function cerrarVotacion() {
   if (S.fase !== "votando") return;
   clearInterval(S.reloj);
   const d = S.debate, reg = S.clase.debates[d.n - 1];
+  // en línea: si se acaba de restaurar la sala, esperar (hasta 5 s) la primera foto de los votos
+  if (typeof window.publicarEstado === "function")
+    for (let i = 0; i < 50 && S.votosDe !== d.n; i++) await new Promise(r => setTimeout(r, 100));
   reg.votos = (S.publico.votantes || []).map(v => ({ uid: v.uid, nombre: v.nombre || "", email: v.email || "", grupo: v.grupo || 0,
                                                     voto: v.voto || null, prediccion: v.prediccion || null }));
+  // quienes podían votar y no tocaron nada quedan registrados como «no votó»
+  const ya = new Set(reg.votos.map(v => v.uid));
+  for (const e of (typeof window.listaElegibles === "function" ? window.listaElegibles() : []))
+    if (!ya.has(e.uid)) reg.votos.push({ ...e, voto: null, prediccion: null });
   reg.publico = votoPublico(reg.votos.map(v => v.voto));
   S.fase = "veredictoPublico";
   $("btnPrincipal").textContent = "SALTAR ▶";
