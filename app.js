@@ -416,6 +416,12 @@ function pintarJueces() {
   const vs = (S.publico.votantes || []).map(v => v.final).sort((x, y) => y - x);
   $("pubN").textContent = vs.length ? `${vs.length} alumno${vs.length === 1 ? "" : "s"} votando` : "nadie votando";
   pub.innerHTML = hemiciclo(vs);
+  const t3 = $("top3");
+  if (t3) {
+    const r = (S.clase.ranking || []).filter(f => f.debates > 0).slice(0, 3);
+    t3.innerHTML = r.length ? r.map(f => `<div class="t3"><span>#${f.puesto}</span><b>Grupo ${f.grupo}</b><i>${f.puntaje.toFixed(1)}</i></div>`).join("")
+      : `<div class="vacio">El ranking aparece después del primer debate.</div>`;
+  }
 }
 
 // Asientos de un parlamento en semicírculo. A FAVOR se sienta a la izquierda (como en la barra

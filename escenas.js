@@ -174,3 +174,58 @@ function confeti(colores, ms = 5000) {
 // 📖 INTRO en la sala de control: la vuelve a mostrar (en línea, online.js la reemplaza por
 // una versión que también la muestra en los teléfonos).
 $("btnIntro").onclick = () => mostrarIntro();
+
+/* ------------------- 4. RESULTADO Y RANKING ------------------- */
+function tablaRanking(filas, antes = []) {
+  const puestoAntes = g => (antes.find(f => f.grupo === g) || {}).puesto;
+  const fmt1 = v => v === null || v === undefined ? "—" : v.toFixed(1);
+  return `<table class="rk"><tr><th></th><th>Grupo</th><th>Debates</th><th>Jurado</th><th>Público</th><th>Puntaje</th></tr>
+    ${filas.map(f => {
+      const pa = puestoAntes(f.grupo), mov = pa && f.puesto ? pa - f.puesto : 0;
+      return `<tr class="${f.debates ? "" : "sin"}"><td class="pu">${f.puesto ?? "·"}${mov > 0 ? `<i class="sube">▲${mov}</i>` : mov < 0 ? `<i class="baja">▼${-mov}</i>` : ""}</td>
+        <td><b>Grupo ${f.grupo}</b>${f.distincion === "jurado" || f.distincion === "ambos" ? ` <span class="dis">★ mejor argumentado</span>` : ""}${f.distincion === "publico" || f.distincion === "ambos" ? ` <span class="dis">♥ favorito del público</span>` : ""}</td>
+        <td>${f.debates || "sin debatir"}</td><td>${fmt1(f.jurado)}</td><td>${fmt1(f.publico)}</td><td class="pt">${fmt1(f.puntaje)}</td></tr>`;
+    }).join("")}</table>`;
+}
+
+function mostrarResultadoDebate(u, antes, despues, alTerminar) {
+  $("resultado")?.remove();
+  const r = u.res, gana = r.ganador ? u[r.ganador] : null;
+  const lado = (k, c) => `<div class="rs-lado" style="--c:${c}"><div class="rs-g">GRUPO ${u[k]}</div><div class="rs-p">${r[k].puntaje.toFixed(1)}</div>
+    <div class="rs-d">jurado ${r[k].jurado.toFixed(1)} · público ${r[k].publico === null ? "—" : r[k].publico.toFixed(1)}</div></div>`;
+  const el = document.createElement("div");
+  el.id = "resultado";
+  el.innerHTML = `<div class="rs-k">DEBATE ${u.n} · RESULTADO</div>
+    <div class="rs-q">«${escHtml(u.pregunta)}»</div>
+    <div class="rs-vs">${lado("A", EQUIPOS.A.color)}<div class="rs-x">${gana ? `GANA GRUPO ${gana}` : "EMPATE"}</div>${lado("B", EQUIPOS.B.color)}</div>
+    ${tablaRanking(despues, antes)}
+    <div class="rs-pie"><button class="btn pri" id="rsSeguir">SEGUIR ▶</button></div>`;
+  document.body.appendChild(el);
+  let hecho = false;
+  const fin = () => { if (hecho) return; hecho = true; el.remove(); alTerminar(); };
+  $("rsSeguir").onclick = fin;
+  setTimeout(fin, ROT.SEG_RESULTADO * 1000);
+}
+
+function ceremoniaRanking() {
+  S.veredictoRevelado = true;
+  const filas = (S.clase.ranking || []).filter(f => f.debates > 0);
+  const mejor = mejorIntervencion(S.historial.map(h => ({ autor: h.autor, grupo: h.grupo, debate: h.debate, total: h.ev.rubrica.total })));
+  $("ceremonia")?.remove();
+  const el = document.createElement("div");
+  el.id = "ceremonia";
+  el.innerHTML = `<div class="cer-k" id="cer0">EL RANKING DE LA CLASE</div>
+    <div class="cer-rk">${[...filas].reverse().map((f, i) => `<div class="cer-fila" id="cf${i}"><span class="n">#${f.puesto}</span><b>GRUPO ${f.grupo}</b><span class="p">${f.puntaje.toFixed(1)}</span></div>`).join("")}</div>
+    <div class="cer-bloque" id="cerG"><div class="cer-k">CAMPEÓN</div><div class="cer-g" style="color:var(--amber)">${filas[0] ? `🏆 GRUPO ${filas[0].grupo}` : "SIN DEBATES"}</div></div>
+    ${mejor ? `<div class="cer-lect" id="cerM">Mejor intervención del día: <b>${escHtml(mejor.autor)}</b>, Grupo ${mejor.grupo}, debate ${mejor.debate} · ${mejor.total.toFixed(1)}/20</div>` : ""}
+    <div class="cer-lect" id="cer3"><button class="btn" id="cerCerrar">Cerrar</button></div>`;
+  document.body.appendChild(el);
+  sonar("redoble");
+  const paso = 1100, n = filas.length;
+  filas.forEach((_, i) => setTimeout(() => { $("cf" + i)?.classList.add("on"); sonar(i === n - 1 ? "redoble" : "nota", 10 + i); }, 1500 + i * paso));
+  const tG = 1500 + n * paso + 1500;
+  setTimeout(() => { $("cerG")?.classList.add("on"); sonar("fanfarria"); setTimeout(() => sonar("aplauso"), 500); confeti(["#ffb020", "#ffffff", EQUIPOS.A.color]); }, tG);
+  setTimeout(() => { $("cerM")?.classList.add("on"); $("cer3")?.classList.add("on"); }, tG + 2000);
+  $("cerCerrar").onclick = () => el.remove();
+  window.publicarEstado?.();
+}

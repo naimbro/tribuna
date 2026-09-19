@@ -333,40 +333,18 @@ function pintarEntre(s) {
 
 /* ---------- el ganador, en grande ---------- */
 function ceremonia(s, v) {
-  const col = n => n === s.equipos.A.nombre ? s.equipos.A.color : n === s.equipos.B.nombre ? s.equipos.B.color : "var(--txt)";
-  const band = n => n === s.equipos.A.nombre ? s.equipos.A.bandera + " " : n === s.equipos.B.nombre ? s.equipos.B.bandera + " " : "";
+  if (!v.ranking) return;                      // salas antiguas sin ranking: no hay ceremonia de rotación
   const el = document.createElement("div");
   el.id = "ceremonia";
-  // salas anteriores a la declaración final: el ganador se calcula con los marcadores
-  const noms = [v.ganaP, v.pubN ? v.ganaU : null, v.ganaR].filter(x => x != null);
-  const cA = noms.filter(x => x === s.equipos.A.nombre).length, cB = noms.filter(x => x === s.equipos.B.nombre).length;
-  const gG = v.ganaG || (cA > cB ? s.equipos.A.nombre : cB > cA ? s.equipos.B.nombre : "EMPATE");
-  const n = v.marcN || noms.length, m = Math.max(v.marcA ?? cA, v.marcB ?? cB);
-  const haySala = v.ganaP != null;
-  el.innerHTML = `<div class="ctab"><div class="k" style="color:var(--amber);font-size:14px">EL VEREDICTO</div>
-    ${haySala ? `<div class="cb" id="c1"><div class="k">La sala · votos ganados</div><div class="cg" style="color:${col(v.ganaP)}">${band(v.ganaP)}${esc(v.ganaP)}</div>
-      <div class="cs">${v.movA > 0 ? "+" : ""}${v.movA} · ${v.movB > 0 ? "+" : ""}${v.movB}</div></div>` : ""}
-    <div class="cb" id="c2"><div class="k">El jurado · rigor /20</div><div class="cg" style="color:${col(v.ganaR)}">${band(v.ganaR)}${esc(v.ganaR)}</div>
-      <div class="cs">${v.rA} · ${v.rB}</div></div>
-    ${v.pubN ? `<div class="cb" id="cP"><div class="k">El público · ${v.pubN} alumno${v.pubN === 1 ? "" : "s"}</div><div class="cg" style="color:${col(v.ganaU)}">${band(v.ganaU)}${esc(v.ganaU)}</div>
-      <div class="cs">${v.pubA > 0 ? "+" : ""}${v.pubA} · ${v.pubB > 0 ? "+" : ""}${v.pubB}</div></div>` : ""}</div>
-    <div class="cfin">
-      <div id="cGpre">${gG !== "EMPATE" ? "Y EL DEBATE LO GANA…" : "Y EL DEBATE…"}</div>
-      <div class="cb" id="cG"><div class="cg" style="color:${col(gG)}">${gG !== "EMPATE" ? "🏆 " + band(gG) + esc(gG) : "TERMINA EN EMPATE"}</div>
-        <div class="cs">${gG !== "EMPATE" ? (n === 1 ? "decidió el jurado" : `${m} de ${n} marcadores`) : "el jurado y el público no coincidieron"}</div>
-        <div class="cmini">${haySala ? `<span>Sala: <b style="color:${col(v.ganaP)}">${esc(v.ganaP)}</b></span>` : ""}<span>Jurado: <b style="color:${col(v.ganaR)}">${esc(v.ganaR)}</b></span>${v.pubN ? `<span>Público: <b style="color:${col(v.ganaU)}">${esc(v.ganaU)}</b></span>` : ""}</div></div>
-      <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>
-    </div>`;
+  const mio = v.ranking.find(f => f.grupo === J.grupo);
+  el.innerHTML = `<div class="k" style="color:var(--amber);font-size:14px">EL RANKING DE LA CLASE</div>
+    <div class="cb" id="cG"><div class="cg" style="color:var(--amber)">${v.campeon ? `🏆 Grupo ${v.campeon}` : "Sin debates"}</div>
+      <div class="cs">${mio && mio.puesto ? `Tu grupo terminó #${mio.puesto} con ${mio.puntaje} puntos` : "Tu grupo no alcanzó a debatir"}</div>
+      ${v.mejor ? `<div class="cmini">Mejor intervención: <b>${esc(v.mejor.autor)}</b> · Grupo ${v.mejor.grupo} · ${v.mejor.total}/20</div>` : ""}</div>
+    <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>`;
   document.body.appendChild(el);
-  const ids = [haySala && "c1", "c2", v.pubN && "cP"].filter(Boolean);
-  ids.forEach((id, i) => setTimeout(() => $(id)?.classList.add("on"), 2600 + i * 3000));
-  const tFinal = 2600 + ids.length * 3000 + 1200;
-  setTimeout(() => el.classList.add("final"), tFinal);
-  setTimeout(() => {
-    $("cGpre")?.remove(); $("cG")?.classList.add("on"); navigator.vibrate?.([80, 60, 200]);
-    confeti(gG !== "EMPATE" ? [col(gG), "#ffffff", "#f5b301"] : [s.equipos.A.color, s.equipos.B.color, "#f5b301"]);
-  }, tFinal + 2800);
-  setTimeout(() => $("c3")?.classList.add("on"), tFinal + 4400);
+  setTimeout(() => { $("cG")?.classList.add("on"); navigator.vibrate?.([80, 60, 200]); confeti(["#f5b301", "#ffffff", "#38bdf8"]); }, 1500);
+  setTimeout(() => $("c3")?.classList.add("on"), 3500);
   $("c3").onclick = () => el.remove();
 }
 

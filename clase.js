@@ -123,6 +123,7 @@ function mostrarResultado() {
   const antes = S.clase.ranking || [];
   S.clase.ranking = ranking(S.clase.grupos, S.clase.debates);
   S.clase.ultimo = { n: d.n, pregunta: d.pregunta, A: d.A, B: d.B, res: reg.res };
+  pintarMarcador();                                     // la columna derecha muestra el ranking nuevo
   S.fase = "resultado";
   sonar(reg.res.ganador ? "fanfarria" : "whoosh");
   publicarEstado();
@@ -148,6 +149,7 @@ function terminarClase() {
   S.fase = "fin";
   S.clase.ranking = ranking(S.clase.grupos, S.clase.debates);
   $("propuesta")?.remove();
+  pintarMarcador();
   $("btnPrincipal").textContent = "🏆 VER CAMPEÓN";
   tick("Clase terminada. Los teléfonos piden feedback; revela al campeón cuando quieras.");
   publicarEstado();
@@ -159,15 +161,8 @@ function accionPrincipal() {
   else if (S.fase === "listo") abrirRonda();                 // tramo restaurado tras cerrar la pestaña
   else if (S.fase === "abierta") cerrarRonda();
   else if (S.fase === "votando") cerrarVotacion();
-  else if (S.fase === "resultado") { $("resultado")?.remove(); S.fase = "resultado"; mostrarResultadoSeguir(); }
+  else if (S.fase === "resultado") $("rsSeguir")?.click();
   else if (S.fase === "fin") { if (typeof ceremoniaRanking === "function") ceremoniaRanking(); }
-}
-function mostrarResultadoSeguir() {
-  const d = S.debate;
-  S.fase = "propuesta";
-  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: `Gracias, Grupo ${d.A} y Grupo ${d.B}. Viene el próximo debate.` });
-  if (typeof mostrarPropuesta === "function") mostrarPropuesta();
-  publicarEstado();
 }
 
 $("btnPrincipal").onclick = accionPrincipal;
