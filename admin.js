@@ -145,7 +145,12 @@ function partidaHtml({ s, jugadores, feedback }) {
         <span class="mono" style="margin-left:auto;color:var(--neon)">${f.puntaje ?? "—"}</span></div></div>`).join("")}
       <h3 style="margin-top:12px">DEBATES</h3>
       ${(s.debates || []).map(d => `<div class="com"><div class="q"><b>${d.n}.</b> Grupo ${d.A} vs Grupo ${d.B}
-        <span class="mono" style="margin-left:auto">${d.puntajeA ?? "—"} · ${d.puntajeB ?? "—"}</span></div><p>${esc(d.pregunta)}</p></div>`).join("") || `<p style="color:var(--dim)">Sin debates.</p>`}
+        <span class="mono" style="margin-left:auto">${d.puntajeA ?? "—"} · ${d.puntajeB ?? "—"}</span></div><p>${esc(d.pregunta)}</p>
+        ${(d.jueces || []).length ? `<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin-top:4px">${d.jueces.map(j => `<span title="${esc(j.fraseA)} / ${esc(j.fraseB)}">${j.emoji} ${j.A ?? "—"} · ${j.B ?? "—"}</span>`).join("")}
+          <span>· jueces ${d.totalA ?? "—"} / ${d.totalB ?? "—"} · votos ${d.votosA ?? "—"} / ${d.votosB ?? "—"}</span></div>` : ""}</div>`).join("") || `<p style="color:var(--dim)">Sin debates.</p>`}
+      <h3 style="margin-top:12px">🔮 ORÁCULOS</h3>
+      ${(s.oraculos || []).map(o => `<div class="com"><div class="q"><b>#${o.puesto} ${esc(o.nombre)}</b>
+        <span style="color:var(--dim)">${o.aciertos} de ${o.predicciones} aciertos</span><span class="mono" style="margin-left:auto;color:#a78bfa">${o.puntos}</span></div></div>`).join("") || `<p style="color:var(--dim)">Sin predicciones.</p>`}
     </div>` : "";
   const coms = feedback.filter(f => (f.comentario || "").trim() || typeof f.nota === "number").sort((a, b) => (b.t || 0) - (a.t || 0));
   return `<div class="partida ${V.abiertas.has(s.codigo) ? "abierta" : ""}">

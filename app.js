@@ -660,34 +660,31 @@ function sonar(tipo, valor) {
 /* ====================== 8. EXPORTAR ================================= */
 
 function exportarCsv() {
-  // Una fila por intervención (rúbrica individual del jurado, con debate, grupo y lado), una por
-  // noticia de la sala de control y una por votante de cada debate (delta_votos = su posición
-  // final: + hacia A FAVOR, − hacia EN CONTRA; cada votante parte en 0).
-  const cab = ["ronda", "debate", "grupo", "lado", "autor", "autor_email", "palabras", "evidencia", "refutacion", "estructura",
-    "concesion", "rigor_total", "delta_votos", "conceptos", "banderas", "texto"];
-  const filas = S.historial.map(h => [h.orden,
-    h.rondaNombre, h.debate || "", h.grupo || "", EQUIPOS[h.equipo].nombre, h.autor, h.autorEmail || "", h.ev.palabras || palabras(h.texto),
-    h.ev.rubrica.evidencia, h.ev.rubrica.refutacion, h.ev.rubrica.estructura, h.ev.rubrica.concesion,
-    h.ev.rubrica.total, "",
-    h.ev.conceptos.map(c => c.id).join("|"), h.ev.banderas.join("|"),
-    h.texto.replace(/"/g, "'")
-  ]);
-  const filasNoticia = S.shocks.map(x => [x.orden,
-    x.ronda, "", "", "SALA DE CONTROL", "profesor", "", "", "", "", "", "", "",
-    "", "", "NOTICIA:" + x.id, x.titular.replace(/"/g, "'")
-  ]);
-  const filasPublico = S.clase.debates.flatMap(d => (d.votantes || []).map(v => [1e12 + d.n,
-    `Debate ${d.n}`, d.n, v.grupo || "", "PÚBLICO", v.nombre || "", v.email || "", "", "", "", "", "", "",
-    Math.round(v.final), "", "", ""]));
-  // intercaladas en el orden en que ocurrieron; el índice de orden no se exporta
-  const cuerpo = [...filas, ...filasNoticia, ...filasPublico].sort((p, q) => p[0] - q[0])
-    .map(f => f.slice(1).map(v => `"${v}"`).join(","));
-  const csv = "\ufeff" + [cab.join(","), ...cuerpo].join("\n");
+  // Una fila por mensaje de alumno, por tarjeta de juez, por votante y por grupo en cada debate.
+  const cab = ["tipo", "debate", "pregunta", "grupo", "lado", "nombre", "email", "nota", "detalle", "prediccion", "acierto"];
+  const q = t => String(t ?? "").replace(/"/g, "'");
+  const filas = [];
+  for (const d of S.clase.debates) {
+    const lado = k => EQUIPOS[k].nombre;
+    for (const m of S.chat) if (m.tipo === "alumno" && m.debate === d.n)
+      filas.push(["mensaje", d.n, d.pregunta, m.grupo || d[m.equipo] || "", lado(m.equipo), m.nombre, m.email || "", "", m.texto, "", ""]);
+    for (const j of d.jueces || []) for (const k of ["A", "B"])
+      filas.push(["juez", d.n, d.pregunta, d[k], lado(k), j.nombre, "", j[k] ?? "", j[k === "A" ? "fraseA" : "fraseB"] || "", "", ""]);
+    for (const v of d.votos || [])
+      filas.push(["voto", d.n, d.pregunta, v.grupo || "", "", v.nombre, v.email || "", "", v.voto ? `convenció: ${lado(v.voto)}` : "no votó",
+                  v.prediccion ? lado(v.prediccion) : "", v.acierto === null || v.acierto === undefined ? "" : v.acierto ? "sí" : "no"]);
+    if (d.res) for (const k of ["A", "B"])
+      filas.push(["puntaje", d.n, d.pregunta, d[k], lado(k), "", "", d.res[k].puntaje.toFixed(1),
+                  `jueces ${d.panel && d.panel[k].total !== null ? d.panel[k].total.toFixed(1) + "/30" : "—"} · público ${d.publico ? d.publico[k] + " votos" : "—"}`, "", ""]);
+  }
+  for (const o of rankingOraculos(S.clase.oraculos || {}))
+    filas.push(["oraculo", "", "", "", "", o.nombre, "", o.puntos, `${o.aciertos} de ${o.predicciones}`, "", ""]);
+  const csv = "﻿" + [cab.join(","), ...filas.map(f => f.map(v => `"${q(v)}"`).join(","))].join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   a.download = `tribuna_s${SESION.semana}_${Date.now()}.csv`;
   a.click();
-  tick("CSV exportado: una fila por intervención (rúbrica del jurado), por noticia y por votante de cada debate.");
+  tick("CSV exportado: mensajes, tarjetas de los jueces, votos con predicción, puntajes y oráculos.");
 }
 
 /* ====================== 9. MOTOR LLM (opcional) ===================== */
