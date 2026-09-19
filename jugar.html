@@ -64,10 +64,6 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 #btnEnviar:disabled{background:#1f2c26;color:var(--dim2)}
 .nota-caja{font-size:11.5px;color:var(--dim2);margin:4px 4px 0}
 .nota-caja.ati{color:var(--neon)}
-#rngPos{padding:0;height:34px;accent-color:#a78bfa;background:transparent;border:none}
-.escala{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--dim)}
-.escala b{font-size:14px;color:#a78bfa}
-#voto.pide{box-shadow:0 -6px 30px rgba(167,139,250,.35);border-top-color:#a78bfa}
 /* espera (portada / intro) y feedback: tapan la conversación */
 .capa{position:fixed;inset:0;z-index:15;background:var(--bg);overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 18px;text-align:center}
 .capa .k{margin-top:14px}
@@ -98,6 +94,12 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 @keyframes pulso{50%{opacity:.4}}
 #cG .cg{font-size:40px}
 .cmini{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:12.5px;color:var(--dim)}
+.vt-q{font-weight:700;margin:16px 0 8px}
+.vt-f{display:flex;gap:10px;width:100%;max-width:460px}
+.vt{flex:1;padding:16px 8px;border-radius:14px;border:2px solid var(--c);background:transparent;color:var(--c);font:inherit;font-weight:800;font-size:16px;cursor:pointer}
+.vt small{display:block;font-weight:600;font-size:12px;color:var(--dim);margin-top:2px}
+.vt.on{background:var(--c);color:#06121a}.vt.on small{color:#06121a}
+.vt-pie{display:flex;justify-content:space-between;width:100%;max-width:460px;margin-top:16px;color:var(--neon);font-weight:700}
 #ceremonia{position:fixed;inset:0;z-index:20;background:rgba(5,9,13,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center;padding:20px}
 #ceremonia .cb{opacity:0;transform:scale(.7);transition:all .7s cubic-bezier(.2,1.5,.4,1)}
 #ceremonia .on{opacity:1;transform:scale(1)}
@@ -172,12 +174,12 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 </div>
 
 <div id="voto" class="abajo oculto">
-  <div style="font-size:13px" id="votoTitulo">¿Dónde estás frente a la moción? Muévete cuando algo te convenza.</div>
-  <input type="range" id="rngPos" min="-100" max="100" step="1" value="0">
-  <div class="escala"><span style="color:var(--B)">Totalmente en contra</span><b id="lblPos">indeciso</b><span style="color:var(--A)">Totalmente a favor</span></div>
-  <div class="nota-caja" id="avisoVoto"></div>
+  <div class="nota-caja" id="avisoVoto">📖 Lee con atención: al final votas quién te convenció y predices a los jueces.</div>
 </div>
 
-<script type="module" src="jugar.js?v=20260921d"></script>
+<!-- votación: pantalla completa con las dos preguntas -->
+<div id="votar" class="capa oculto"></div>
+
+<script type="module" src="jugar.js?v=20260922a"></script>
 </body>
 </html>
