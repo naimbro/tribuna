@@ -172,3 +172,107 @@ function mostrarResultadoSeguir() {
 
 $("btnPrincipal").onclick = accionPrincipal;
 $("btnTerminar").onclick = terminarClase;
+
+/* ---------------- la propuesta de la moderadora ---------------- */
+
+function promptPropuesta() {
+  const hechas = S.clase.debates.map(d => `- ${d.pregunta}`).join("\n") || "(ninguna todavía)";
+  const disputas = S.chat.filter(m => m.tipo === "relator" && m.datos && m.datos.disputa).map(m => `- ${m.datos.disputa}`).slice(-5).join("\n") || "(ninguna)";
+  const flojas = S.historial.filter(h => h.ev && h.ev.nota && h.ev.rubrica.total < 10).map(h => `- ${h.ev.nota}`).slice(-5).join("\n") || "(nada)";
+  const usados = new Set(S.historial.flatMap(h => (h.ev.conceptos || []).map(c => c.id || c)));
+  const sinUsar = CONCEPTOS.filter(c => !usados.has(c.id)).map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n") || "(todos se han usado)";
+  return `Eres la moderadora de una clase de debate en rotación. Curso: "${SESION.curso}", semana ${SESION.semana}.
+TEMA GENERAL (lo fijó el profesor): "${S.clase.tema || SESION.tema}"
+
+MATERIAL DE LA SEMANA (conceptos y lecturas):
+${CONCEPTOS.map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n")}
+
+YA SE DEBATIÓ (no repitas ni reformules estas preguntas):
+${hechas}
+
+LO QUE QUEDÓ EN DISPUTA SEGÚN EL RELATOR:
+${disputas}
+
+LO QUE EL JURADO MARCÓ COMO FLOJO:
+${flojas}
+
+CONCEPTOS QUE NADIE HA USADO TODAVÍA:
+${sinUsar}
+
+TU TAREA: propone la próxima pregunta de debate. Tiene que ser una afirmación discutible de una sola línea (máximo 25 palabras), dentro del tema general, que se pueda defender a favor y en contra con el material del curso. Prefiere lo que quedó en disputa o lo que nadie ha tocado. Español de Chile, sin groserías.
+
+Responde SOLO un JSON: {"pregunta": "…", "porQue": "máx. 20 palabras: por qué esta y por qué ahora", "mejorFavor": "máx. 20 palabras", "mejorContra": "máx. 20 palabras"}`;
+}
+
+async function prepararPropuesta() {
+  const par = emparejar(gruposDisponibles(), S.clase.debates);
+  const base = { A: par ? par.A : null, B: par ? par.B : null };
+  const escritas = typeof PREGUNTAS !== "undefined" ? PREGUNTAS : [];
+  const escrita = proximaPreguntaEscrita(escritas, S.clase.debates.map(d => d.pregunta));
+  if (escrita) { S.clase.propuesta = { ...base, estado: "lista", pregunta: escrita, porQue: "Pregunta escrita por ti en el archivo de la semana.", mejorFavor: "", mejorContra: "", fuente: "escrita" }; return; }
+  S.clase.propuesta = { ...base, estado: "pensando", pregunta: "", porQue: "", mejorFavor: "", mejorContra: "", fuente: "ia" };
+  if (S.fase === "propuesta") mostrarPropuesta();
+  try {
+    if (!S.motor.activo) throw new Error("sin motor LLM");
+    const j = jsonDe(await pedirLLM(promptPropuesta(), "jurado"));
+    const pregunta = String(j.pregunta || "").trim().slice(0, 300);
+    if (!pregunta || !limpiaFrase(pregunta)) throw new Error("pregunta vacía o inválida");
+    S.clase.propuesta = { ...base, estado: "lista", pregunta, porQue: String(j.porQue || "").slice(0, 200),
+      mejorFavor: String(j.mejorFavor || "").slice(0, 200), mejorContra: String(j.mejorContra || "").slice(0, 200), fuente: "ia" };
+  } catch (e) {
+    console.warn("propuesta:", e);
+    S.clase.propuesta = { ...base, estado: "vacia", pregunta: "", porQue: "", mejorFavor: "", mejorContra: "", fuente: "ia" };
+  }
+  if (S.fase === "propuesta") mostrarPropuesta();
+}
+
+let cuentaPropuesta = null;
+
+function mostrarPropuesta() {
+  clearInterval(cuentaPropuesta);
+  const p = S.clase.propuesta;
+  if (!p) { prepararPropuesta(); return; }
+  let el = $("propuesta");
+  if (!el) { el = document.createElement("div"); el.id = "propuesta"; document.querySelector("main .col").appendChild(el); }
+  const gs = Array.from({ length: S.clase.grupos }, (_, i) => i + 1);
+  const sel = (id, v) => `<select id="${id}">${gs.map(g => `<option value="${g}" ${g === v ? "selected" : ""}>Grupo ${g}</option>`).join("")}</select>`;
+  const faltan = p.A === null || p.B === null;
+  el.innerHTML = `
+    <div class="pr-k">PRÓXIMO DEBATE · lo ves solo tú</div>
+    ${p.estado === "pensando" ? `<div class="pr-pensando">La moderadora está pensando la próxima pregunta…</div>` : ""}
+    ${p.estado === "vacia" ? `<div class="pr-aviso">La moderadora no pudo proponer una pregunta. Escribe la tuya o pide otra.</div>` : ""}
+    ${faltan ? `<div class="pr-aviso">Faltan grupos con alumnos conectados: se necesitan al menos dos.</div>` : ""}
+    <textarea id="prTexto" rows="2" maxlength="300" placeholder="Escribe la pregunta del debate">${esc(p.pregunta || "")}</textarea>
+    ${p.porQue ? `<div class="pr-porque">${esc(p.porQue)}</div>` : ""}
+    ${p.mejorFavor || p.mejorContra ? `<div class="pr-lados"><div style="--c:var(--A)"><b>A favor</b>${esc(p.mejorFavor)}</div><div style="--c:var(--B)"><b>En contra</b>${esc(p.mejorContra)}</div></div>` : ""}
+    <div class="pr-grupos"><span style="color:var(--A)">A FAVOR</span>${sel("prA", p.A)}<span style="color:var(--B)">EN CONTRA</span>${sel("prB", p.B)}</div>
+    <div class="pr-acc">
+      <button class="btn pri" id="prPublicar">Publicar</button>
+      <button class="btn" id="prOtra">Pedir otra</button>
+      <span class="pr-cuenta" id="prCuenta"></span>
+    </div>`;
+  const detener = () => { clearInterval(cuentaPropuesta); $("prCuenta").textContent = ""; };
+  el.onpointerdown = detener; el.onfocusin = detener;
+  $("prPublicar").onclick = publicarPropuestaActual;
+  $("prOtra").onclick = () => { S.clase.propuesta = null; prepararPropuesta(); };
+  const listo = p.estado === "lista" && !faltan;
+  $("btnPrincipal").textContent = "PUBLICAR PREGUNTA";
+  if (listo) {
+    let resta = ROT.SEG_PROPUESTA;
+    $("prCuenta").textContent = `se publica en ${resta} s`;
+    cuentaPropuesta = setInterval(() => {
+      resta--;
+      if (resta <= 0) { clearInterval(cuentaPropuesta); publicarPropuestaActual(); return; }
+      if ($("prCuenta")) $("prCuenta").textContent = `se publica en ${resta} s`;
+    }, 1000);
+  }
+}
+
+function publicarPropuestaActual() {
+  clearInterval(cuentaPropuesta);
+  const pregunta = ($("prTexto")?.value || S.clase.propuesta?.pregunta || "").trim();
+  const A = +($("prA")?.value || S.clase.propuesta?.A), B = +($("prB")?.value || S.clase.propuesta?.B);
+  if (!pregunta) { tick("Escribe una pregunta o pide otra a la moderadora."); return; }
+  if (!A || !B || A === B) { tick("Elige dos grupos distintos."); return; }
+  publicarDebate({ pregunta, A, B });
+}

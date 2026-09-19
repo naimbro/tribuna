@@ -230,3 +230,8 @@ const EJEMPLOS_SESION = {
     B: `El punto de desacuerdo es qué Estado. Ellos invocan uno que en la bibliografía no existe: el del modelo reprime, el de Acemoglu llega tarde, y el de Trump dijo esta semana que no va a intervenir. Nosotros no pedimos confianza en cinco personas: pedimos que cada instrumento se juzgue por su capacidad real, y hoy la capacidad está en los laboratorios.`
   }
 };
+
+/* --- Preguntas escritas por el profesor (opcional) --------------------
+   Si hay, la moderadora las propone primero, en este orden. Después genera
+   las suyas a partir del tema general, el material y lo que va pasando. */
+const PREGUNTAS = [];

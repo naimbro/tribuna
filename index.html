@@ -193,6 +193,20 @@ main{display:grid;grid-template-columns:1fr 372px;gap:0;flex:1 1 auto;min-height
 .hemi circle{transition:fill .8s}
 .hemi-nota{font-size:10.5px;color:var(--dim2);text-align:center;margin:8px 14px 12px}
 .msg.noticia{align-self:center;max-width:92%;background:#1f1508;border:1px solid var(--amber);--c:var(--amber)}
+main .col{position:relative}
+#propuesta{position:absolute;left:14px;right:14px;bottom:88px;z-index:20;background:#0f1822;border:1px solid var(--amber);border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55)}
+#propuesta .pr-k{font-size:10.5px;letter-spacing:.2em;color:var(--amber);margin-bottom:8px}
+#propuesta textarea{width:100%;background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:10px;font:600 17px/1.35 system-ui;resize:none}
+#propuesta .pr-porque{color:var(--dim);font-size:12.5px;margin:6px 0}
+#propuesta .pr-lados{display:flex;gap:8px;margin:8px 0}
+#propuesta .pr-lados div{flex:1;border-top:2px solid var(--c);background:var(--panel);border-radius:8px;padding:7px 9px;font-size:12px;color:var(--dim)}
+#propuesta .pr-lados b{display:block;color:var(--c);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+#propuesta .pr-grupos{display:flex;gap:8px;align-items:center;font-size:11px;letter-spacing:.12em;margin:8px 0}
+#propuesta select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:5px 8px}
+#propuesta .pr-acc{display:flex;gap:8px;align-items:center}
+#propuesta .pr-cuenta{margin-left:auto;color:var(--amber);font-family:var(--mono);font-size:12.5px}
+#propuesta .pr-pensando{color:var(--dim);animation:pulso 1.4s infinite;margin-bottom:6px}
+#propuesta .pr-aviso{color:var(--amber);font-size:12.5px;margin-bottom:6px}
 /* ceremonia del ganador */
 #ceremonia{position:fixed;inset:0;z-index:60;background:radial-gradient(900px 500px at 50% 40%,#0f1c26 0%,rgba(3,6,9,.98) 70%);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;text-align:center}
@@ -495,13 +509,13 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   (function () {
     const pedida = +new URLSearchParams(location.search).get("semana");
     const ok = SESIONES.some(x => x.semana === pedida) ? pedida : SESIONES[0].semana;
-    document.write('<script src="contenido/semana' + ok + '.js?v=20260919a"><\/script>');
+    document.write('<script src="contenido/semana' + ok + '.js?v=20260921a"><\/script>');
   })();
 </script>
 <script src="rotacion.js?v=20260921a"></script>
 <script src="moderacion.js?v=20260921b"></script>
 <script src="app.js?v=20260921b"></script>
-<script src="clase.js?v=20260921a"></script>
+<script src="clase.js?v=20260921b"></script>
 <script src="escenas.js?v=20260920b"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
