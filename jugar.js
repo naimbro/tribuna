@@ -55,7 +55,12 @@ $("btnEntrar").onclick = async () => {
     history.replaceState(null, "", `?sala=${codigo}`);
     const yo = await getDoc(doc(db, "salas", codigo, "jugadores", J.uid));
     // llegó: aparece en la portada del profesor (foto y nombre) mientras elige su grupo
-    if (yo.exists() && yo.data().grupo > 0) { J.grupo = yo.data().grupo; await entrarAlJuego(); return; }
+    if (yo.exists() && yo.data().grupo > 0) {
+      J.grupo = yo.data().grupo;
+      // si volvió con otro nombre, su ficha se actualiza: el voto debe llevar el mismo nombre que la ficha
+      if (yo.data().nombre !== nombre) await setDoc(doc(db, "salas", codigo, "jugadores", J.uid), { nombre, email: J.email }, { merge: true });
+      await entrarAlJuego(); return;
+    }
     if (!yo.exists()) await setDoc(doc(db, "salas", codigo, "jugadores", J.uid),
       { nombre, email: J.email, foto: J.foto || "", grupo: 0, equipo: "", unido: Date.now() });
     mostrarBancadas();
@@ -107,6 +112,7 @@ async function entrarAlJuego() {
     J.chat = []; snap.forEach(d => J.chat.push({ ...d.data(), id: d.id }));
     const nuevos = J.chat.filter(m => !antes.has(m.id));
     pintarChat();
+    if (J.sala) pintarVotar(J.sala);                  // el resumen del relator llega con la votación ya abierta
     if (!J.primera) avisarNuevos(nuevos);
     J.primera = false;
   }, e => { $("pJuego").innerHTML = `<div class="sep">No se pudo leer la conversación (${esc(e.code)}).</div>`; }));
@@ -182,7 +188,7 @@ function pintarReloj() {
     el.classList.toggle("urgente", resta <= 20);
   } else if (s.fase === "votando" && s.finVoto) {
     const resta = Math.max(0, Math.ceil((s.finVoto - Date.now()) / 1000));
-    el.textContent = `0:${String(resta).padStart(2, "0")}`;
+    el.textContent = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, "0")}`;
     el.classList.toggle("urgente", resta <= 10);
     if ($("vtReloj")) $("vtReloj").textContent = el.textContent;
   } else { el.textContent = ""; el.classList.remove("urgente"); }
@@ -298,6 +304,13 @@ async function enviar() {
 }
 
 /* ---------- votar: quién te convenció y a quién elegirá el jurado ---------- */
+// El resumen del relator de este debate, compacto, sobre las preguntas: es lo que pide revisar antes de votar.
+function relatorDe(n) {
+  const m = [...J.chat].reverse().find(x => x.tipo === "relator" && x.debate === n);
+  if (!m || !m.datos) return "";
+  const x = m.datos;
+  return `<div class="vt-rel">📣 <b>Relator:</b> ${esc(x.disputa || "")}${x.revisar && x.revisar.length ? `<br><b>Revisen:</b> ${x.revisar.map(esc).join(" · ")}` : ""}</div>`;
+}
 const VOTO = {};                        // por debate: { voto, prediccion } de este teléfono
 // Tras recargar el teléfono, el voto guardado se recupera del servidor (si no, el próximo toque
 // borraría la otra respuesta y no se sabría si acertó).
@@ -322,10 +335,11 @@ function pintarVotar(s) {
   const boton = (campo, k) => `<button class="vt ${mio[campo] === k ? "on" : ""}" data-c="${campo}" data-k="${k}" style="--c:${s.equipos[k].color}">${esc(s.equipos[k].nombre)}<small>Grupo ${d[k]}</small></button>`;
   el.innerHTML = `<div class="k">Debate ${d.n} · vota</div>
     <div class="es-mocion" style="font-size:17px">«${esc(d.pregunta)}»</div>
+    ${relatorDe(d.n)}
     <div class="vt-q">¿Quién te convenció?</div><div class="vt-f">${boton("voto", "A")}${boton("voto", "B")}</div>
     <div class="vt-q">¿A quién elegirá el jurado?</div><div class="vt-f">${boton("prediccion", "A")}${boton("prediccion", "B")}</div>
     <div class="vt-pie"><span>${mio.voto && mio.prediccion ? "✓ Listo" : ""}</span><span class="mono" id="vtReloj"></span></div>
-    <div class="aviso" id="vtError"></div>`;
+    <div class="aviso" id="vtError">${esc(mio.error || "")}</div>`;
   el.onclick = async e => {
     const b = e.target.closest("button.vt"); if (!b) return;
     mio[b.dataset.c] = b.dataset.k;
@@ -334,7 +348,8 @@ function pintarVotar(s) {
     try {
       await setDoc(doc(db, "salas", J.codigo, "votos", `${d.n}_${J.uid}`),
         { uid: J.uid, debate: d.n, voto: mio.voto, prediccion: mio.prediccion, nombre: J.nombre, email: J.email, grupo: J.grupo, t: Date.now() }, { merge: true });
-    } catch (err) { if ($("vtError")) $("vtError").textContent = "No se guardó: " + err.code; }
+      mio.error = "";
+    } catch (err) { mio.error = "No se guardó: " + err.code; if ($("vtError")) $("vtError").textContent = mio.error; }
   };
   pintarReloj();
 }
@@ -424,7 +439,7 @@ function pintarEntre(s) {
   if (s.fase === "votando") {
     const c = s.conteoVotos || {};
     el.innerHTML = `<div class="k">Debate ${d.n}</div><h1>La sala está votando tu debate</h1>
-      <p style="color:var(--dim)">${(c.A || 0) + (c.B || 0)} de ${c.elegibles || "?"} votaron.</p>` + pie;
+      <p style="color:var(--dim)">${(c.A || 0) + (c.B || 0)} de ${c.elegibles ?? "?"} votaron.</p>` + pie;
     return;
   }
   if (s.fase === "veredictoPublico" || s.fase === "veredictoJueces") {

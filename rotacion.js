@@ -104,8 +104,10 @@ function acumularOraculos(registro, votantes, ganador) {
 }
 
 function rankingOraculos(registro) {
+  // solo quienes han predicho al menos una vez ocupan un puesto
   return Object.values(registro || {})
-    .map(o => ({ ...o, tasa: o.predicciones ? o.aciertos / o.predicciones : 0 }))
+    .filter(o => o.predicciones > 0)
+    .map(o => ({ ...o, tasa: o.aciertos / o.predicciones }))
     .sort((a, b) => b.puntos - a.puntos || b.tasa - a.tasa || String(a.nombre).localeCompare(String(b.nombre)))
     .map((o, i) => ({ ...o, puesto: i + 1 }));
 }

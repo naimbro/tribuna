@@ -293,7 +293,7 @@ function actualizarVotacion() {
   $("vbcA").textContent = a; $("vbcB").textContent = b;
   if (S.fase === "votando") {
     const resta = S.finVoto ? Math.max(0, Math.ceil((S.finVoto - Date.now()) / 1000)) : 0;
-    $("vbPie").textContent = `${a + b} de ${P.elegibles || "?"} votaron · 0:${String(resta).padStart(2, "0")}`;
+    $("vbPie").textContent = `${a + b} de ${P.elegibles ?? "?"} votaron · ${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, "0")}`;
   }
 }
 

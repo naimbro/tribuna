@@ -165,7 +165,7 @@ test("rankingOraculos: ordena por puntos, luego tasa de acierto, luego nombre", 
     c: { uid: "c", nombre: "Bea", puntos: 2, predicciones: 2, aciertos: 2 },
     d: { uid: "d", nombre: "Dan", puntos: 0, predicciones: 0, aciertos: 0 }
   });
-  assert.deepEqual(r.map(x => x.nombre), ["Ana", "Bea", "Zoe", "Dan"]);
-  assert.deepEqual(r.map(x => x.puesto), [1, 2, 3, 4]);
+  assert.deepEqual(r.map(x => x.nombre), ["Ana", "Bea", "Zoe"]);   // Dan nunca predijo: no ocupa puesto
+  assert.deepEqual(r.map(x => x.puesto), [1, 2, 3]);
   assert.equal(r[2].tasa, 0.5);
 });

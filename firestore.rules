@@ -131,7 +131,10 @@ service cloud.firestore {
           && jugador(codigo).data.grupo != sala(codigo).data.debate.A
           && jugador(codigo).data.grupo != sala(codigo).data.debate.B
           && (request.resource.data.voto == null || request.resource.data.voto in ['A', 'B'])
-          && (request.resource.data.prediccion == null || request.resource.data.prediccion in ['A', 'B']);
+          && (request.resource.data.prediccion == null || request.resource.data.prediccion in ['A', 'B'])
+          // el nombre y el grupo son los del alumno (se ven en el ranking de oráculos)
+          && request.resource.data.nombre == jugador(codigo).data.nombre
+          && request.resource.data.grupo == jugador(codigo).data.grupo;
       }
     }
   }
