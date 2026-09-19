@@ -349,17 +349,11 @@ const persuasion = k => decima(S.turnos.filter(t => t.equipo === k).reduce((s, t
 const rigorMedio = k => { const h = S.historial.filter(x => x.equipo === k && delDebate(x)); return h.length ? h.reduce((s, x) => s + x.ev.rubrica.total, 0) / h.length : null; };
 const conSigno = n => (decima(n) > 0 ? "+" : "") + decima(n).toFixed(1);
 
-// Dónde está el público ahora: cuántos alumnos a favor, indecisos y en contra (±8 es indeciso).
-// La audiencia sintética (AUDIENCIA, sección 3) ya no juega; la usa solo pruebas/simular.js.
+// El voto del debate en curso: a favor, en contra y quienes todavía no votan.
 function conteo() {
-  let a = 0, b = 0, n = 0;
-  for (const v of S.publico.votantes || []) {
-    if (v.final > 8) a++; else if (v.final < -8) b++; else n++;
-  }
+  const P = S.publico || {}, a = P.A || 0, b = P.B || 0, n = Math.max(0, (P.elegibles || 0) - a - b);
   return { a, b, n, total: Math.max(1, a + b + n) };
 }
-
-/* ====================== 5. RENDER =================================== */
 
 function pintarMarcador() {
   for (const k of ["A", "B"]) {
@@ -367,96 +361,52 @@ function pintarMarcador() {
     $("lema" + k).textContent = S.debate ? EQUIPOS[k].nombre : EQUIPOS[k].lema;
     $("chatBanca" + k).textContent = S.debate ? `${EQUIPOS[k].nombre} · G${S.debate[k]}` : `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}`;
   }
-  const c = conteo();
-  $("rA").textContent = c.a; $("rN").textContent = c.n; $("rB").textContent = c.b;
-  const hayP = S.publico.n > 0;
-  $("vA").style.width = hayP ? (100 * c.a / c.total) + "%" : "50%";
-  $("vN").style.width = hayP ? (100 * c.n / c.total) + "%" : "0%";
-  $("vB").style.width = hayP ? (100 * c.b / c.total) + "%" : "50%";
-  const rA = rigorMedio("A"), rB = rigorMedio("B"), P = S.publico;
+  const c = conteo(), P = S.publico || {};
+  const reg = S.debate && S.clase.debates[S.debate.n - 1];
+  // las notas de los jueces no se adelantan: aparecen cuando termina su veredicto
+  const panel = reg && reg.panel && (S.fase === "resultado" || S.fase === "propuesta" || S.fase === "fin") ? reg.panel : null;
   for (const k of ["A", "B"]) {
-    const r = rigorMedio(k);
-    $("rigor" + k).textContent = r === null ? "—" : r.toFixed(1);
-    $("publico" + k).textContent = hayP ? conSigno(P[k]) : "—";
+    $("rigor" + k).textContent = panel && panel[k].total !== null ? panel[k].total.toFixed(1) : "—";
+    $("publico" + k).textContent = P.A || P.B ? String(P[k] || 0) : "—";
   }
-  // quién lidera cada marcador: el jurado (rigor) y el público (votos ganados)
-  $("rigorA").parentElement.classList.toggle("lidera", rA !== null && rB !== null && rA - rB >= 0.05);
-  $("rigorB").parentElement.classList.toggle("lidera", rA !== null && rB !== null && rB - rA >= 0.05);
-  $("publicoA").parentElement.classList.toggle("lidera", hayP && !empatanEnVotos(P.A, P.B) && P.A > P.B);
-  $("publicoB").parentElement.classList.toggle("lidera", hayP && !empatanEnVotos(P.A, P.B) && P.B > P.A);
-  // cuotas: de dónde está el público ahora (sin público, parejo)
-  const probA = hayP ? clamp((c.a + c.n * 0.5) / c.total, 0.06, 0.94) : 0.5;
+  $("rigorA").parentElement.classList.toggle("lidera", !!panel && panel.ganador === "A");
+  $("rigorB").parentElement.classList.toggle("lidera", !!panel && panel.ganador === "B");
+  $("publicoA").parentElement.classList.toggle("lidera", c.a > c.b);
+  $("publicoB").parentElement.classList.toggle("lidera", c.b > c.a);
+  $("vA").style.width = (100 * c.a / c.total) + "%";
+  $("vN").style.width = (100 * c.n / c.total) + "%";
+  $("vB").style.width = (100 * c.b / c.total) + "%";
+  const probA = c.a + c.b ? clamp((c.a + c.n * 0.5) / c.total, 0.06, 0.94) : 0.5;
   $("cuotaA").textContent = (1 / probA).toFixed(2);
   $("cuotaB").textContent = (1 / (1 - probA)).toFixed(2);
-  pintarJueces();
+  pintarColumna();
 }
 
-/* ---------- la columna derecha: EL JURADO y EL PÚBLICO ---------- */
-function pintarJueces() {
-  const jur = $("jurado"), pub = $("hemiciclo");
-  if (!jur || !pub) return;
-  // EL JURADO: cada criterio de la rúbrica, en espejo (A a la izquierda, B a la derecha)
-  const prom = (k, c) => { const h = S.historial.filter(x => x.equipo === k && delDebate(x)); return h.length ? h.reduce((s, x) => s + (x.ev.rubrica[c] || 0), 0) / h.length : null; };
-  const n = k => S.historial.filter(x => x.equipo === k && delDebate(x)).length;
-  const fmt = v => v === null ? "—" : v.toFixed(1);
-  const fila = (nombre, a, b, max, total = false) => `<div class="jr ${total ? "tot" : ""}">
-      <div class="jl">${nombre}</div>
-      <div class="jb"><span class="v" style="color:var(--A)">${fmt(a)}</span>
-        <div class="bar a"><i style="width:${a === null ? 0 : 100 * a / max}%"></i></div>
-        <div class="bar b"><i style="width:${b === null ? 0 : 100 * b / max}%"></i></div>
-        <span class="v" style="color:var(--B)">${fmt(b)}</span></div></div>`;
-  const ultima = S.historial.filter(delDebate).reverse().find(h => h.ev.nota);
-  jur.innerHTML = (n("A") + n("B") === 0
-    ? `<div class="vacio">El jurado lee cada intervención al cerrar el tramo y la puntúa con la rúbrica del curso.</div>`
-    : "") +
-    RUBRICA.map(c => fila(c.nombre, prom("A", c.id), prom("B", c.id), c.max)).join("") +
-    fila("Total", rigorMedio("A"), rigorMedio("B"), 20, true) +
-    `<div class="jn"><span style="color:var(--A)">${n("A")}</span> · <span style="color:var(--B)">${n("B")}</span> intervenciones evaluadas</div>` +
-    (ultima ? `<div class="jult"><b style="color:${EQUIPOS[ultima.equipo].color}">⚖ ${esc(ultima.autor)}</b> ${esc(ultima.ev.nota)}</div>` : "");
-  // EL PÚBLICO: un hemiciclo, un asiento por alumno, ordenados por posición y sin nombres
-  const vs = (S.publico.votantes || []).map(v => v.final).sort((x, y) => y - x);
-  $("pubN").textContent = vs.length ? `${vs.length} alumno${vs.length === 1 ? "" : "s"} votando` : "nadie votando";
-  pub.innerHTML = hemiciclo(vs);
+// Columna derecha: ranking de grupos, oráculos y las tarjetas del último panel.
+function pintarColumna() {
+  const f1 = v => (v === null || v === undefined ? "—" : v.toFixed(1));
   const t3 = $("top3");
   if (t3) {
     const r = (S.clase.ranking || []).filter(f => f.debates > 0).slice(0, 3);
-    t3.innerHTML = r.length ? r.map(f => `<div class="t3"><span>#${f.puesto}</span><b>Grupo ${f.grupo}</b><i>${f.puntaje.toFixed(1)}</i></div>`).join("")
+    t3.innerHTML = r.length ? r.map(f => `<div class="t3"><span>#${f.puesto}</span><b>Grupo ${f.grupo}</b><i>${f1(f.puntaje)}</i></div>`).join("")
       : `<div class="vacio">El ranking aparece después del primer debate.</div>`;
+  }
+  const or = $("oraculos");
+  if (or) {
+    const r = rankingOraculos(S.clase.oraculos || {}).filter(o => o.predicciones).slice(0, 5);
+    or.innerHTML = r.length ? r.map(o => `<div class="t3"><span>#${o.puesto}</span><b>${esc(o.nombre)}</b><i style="color:#a78bfa">🔮 ${o.puntos}</i></div>`).join("")
+      : `<div class="vacio">Aparecen cuando los jueces dan su primer veredicto.</div>`;
+  }
+  const up = $("ultimoPanel");
+  if (up) {
+    const u = S.clase.ultimo;
+    up.innerHTML = u && u.jueces && u.panel ? `<div class="up-q">Debate ${u.n} · Grupo ${u.A} <b>${f1(u.panel.A.total)}</b> · Grupo ${u.B} <b>${f1(u.panel.B.total)}</b></div>` +
+      u.jueces.map(j => `<div class="up-j"><span>${j.emoji}</span><i>${esc(j.nombre)}</i><b style="color:var(--A)">${j.A ?? "—"}</b><b style="color:var(--B)">${j.B ?? "—"}</b></div>`).join("")
+      : `<div class="vacio">Las tarjetas del último panel aparecen aquí.</div>`;
   }
 }
 
-// Asientos de un parlamento en semicírculo. A FAVOR se sienta a la izquierda (como en la barra
-// de arriba); el color se intensifica cuanto más convencido está cada uno.
-function hemiciclo(posiciones) {
-  const W = 330, R = 150, r0 = 62, H = R + 14, cx = W / 2, cy = H - 6;
-  const vacio = !posiciones.length;
-  const n = vacio ? 21 : posiciones.length;
-  const filas = n <= 12 ? 1 : n <= 28 ? 2 : n <= 50 ? 3 : n <= 85 ? 4 : 5;
-  const radios = Array.from({ length: filas }, (_, i) => filas === 1 ? (r0 + R) / 2 + 10 : r0 + 12 + (R - r0 - 20) * i / (filas - 1));
-  const suma = radios.reduce((a, b) => a + b, 0);
-  const cupos = radios.map(r => Math.max(1, Math.round(n * r / suma)));
-  let dif = n - cupos.reduce((a, b) => a + b, 0), i = cupos.length - 1;
-  while (dif !== 0) { cupos[i] = Math.max(1, cupos[i] + Math.sign(dif)); dif -= Math.sign(dif); i = (i - 1 + cupos.length) % cupos.length; }
-  const asientos = [];
-  let paso = Infinity;
-  radios.forEach((r, fi) => {
-    const k = cupos[fi];
-    if (k > 1) paso = Math.min(paso, Math.PI * r / (k - 1));
-    for (let j = 0; j < k; j++) {
-      const ang = k === 1 ? Math.PI / 2 : Math.PI - Math.PI * j / (k - 1);
-      asientos.push({ ang, x: cx + r * Math.cos(ang), y: cy - r * Math.sin(ang) });
-    }
-  });
-  asientos.sort((a, b) => b.ang - a.ang);
-  const rad = Math.max(3.5, Math.min(11, paso * 0.4, (R - r0) / filas * 0.42));
-  const color = v => v > 8 ? `color-mix(in srgb,var(--A) ${45 + Math.round(55 * Math.min(1, v / 70))}%,#0e141b)`
-    : v < -8 ? `color-mix(in srgb,var(--B) ${45 + Math.round(55 * Math.min(1, -v / 70))}%,#0e141b)` : "#3b4958";
-  const circ = asientos.map((a, j) => vacio
-    ? `<circle cx="${a.x.toFixed(1)}" cy="${a.y.toFixed(1)}" r="${rad.toFixed(1)}" fill="none" stroke="#243140" stroke-dasharray="2 2"/>`
-    : `<circle cx="${a.x.toFixed(1)}" cy="${a.y.toFixed(1)}" r="${rad.toFixed(1)}" fill="${color(posiciones[j])}"/>`).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${vacio ? "Nadie en el público" : `Público: ${posiciones.length} alumnos`}">${circ}
-    ${vacio ? `<text x="${cx}" y="${cy - 14}" text-anchor="middle" fill="#7d8fa1" font-size="11.5">Quienes elijan PÚBLICO se sientan aquí</text>` : ""}</svg>`;
-}
+/* ====================== 5. RENDER =================================== */
 
 const colorRigor = t => t >= 14 ? "var(--neon)" : t >= 9 ? "var(--amber)" : "var(--hot)";
 

@@ -39,111 +39,92 @@ function pasarAReplica() {
   publicarEstado();
 }
 
+// Lo que escribió cada lado en el debate (para los jueces simulados sin motor).
+function textosDelDebate(n) {
+  const t = { A: [], B: [] };
+  for (const m of S.chat) if (m.tipo === "alumno" && m.debate === n && (m.equipo === "A" || m.equipo === "B")) t[m.equipo].push(m.texto);
+  return { A: t.A.join("\n"), B: t.B.join("\n") };
+}
+
+// Los cinco jueces: con motor, cinco llamadas en paralelo; sin motor, simulados y marcados.
+function juzgar(d) {
+  const reg = S.clase.debates[d.n - 1];
+  const ctx = { ronda: "refutacion", pauta: "", dir: 1, conceptosRival: [], previas: [], ecos: [] };
+  const p = S.motor.activo ? evaluarConJueces(d)
+    : Promise.resolve(juecesSimulados(d, textosDelDebate(d.n), t => evaluarRigor(t, ctx).rubrica.total));
+  return p.then(j => (reg.jueces = j))
+    .catch(e => { console.warn("jueces:", e); return (reg.jueces = juecesDeLaSesion().map(j => ({ ...j, A: null, B: null, fraseA: "", fraseB: "" }))); });
+}
+
 function votarDebate() {
   S.fase = "votando";
-  const fin = Date.now() + ROT.SEG_VOTACION * 1000;
-  S.finVoto = fin;
+  const d = S.debate, n = d.n, reg = S.clase.debates[n - 1];
+  reg.jueces = null;
+  S.finVoto = Date.now() + ROT.SEG_VOTACION * 1000;
   $("btnPrincipal").textContent = "CERRAR VOTACIÓN";
-  const n = S.debate.n;
-  // en paralelo: el relator llama a votar, el jurado evalúa y la moderadora piensa la próxima pregunta
-  S.jurando = relatorPideVoto().then(rel => evaluarDebate(rel)).catch(e => { console.warn("evaluación:", e); });
+  relatorPideVoto().catch(e => console.warn("relator:", e));     // resume el debate en la conversación
+  S.juzgando = juzgar(d);                                          // los jueces evalúan mientras el público vota
   if (typeof prepararPropuesta === "function") prepararPropuesta();
+  mostrarVotacion(d);
   clearInterval(S.reloj);
   S.reloj = setInterval(() => {
-    const resta = Math.max(0, Math.ceil((fin - Date.now()) / 1000));
+    const resta = Math.max(0, Math.ceil((S.finVoto - Date.now()) / 1000));
     $("reloj").textContent = fmt(resta);
+    actualizarVotacion();
     if (resta <= 0 && S.fase === "votando" && S.debate && S.debate.n === n) cerrarVotacion();
   }, 500);
-  tick(`Debate ${n}: votación abierta, ${ROT.SEG_VOTACION} segundos.`);
+  tick(`Debate ${n}: el público vota (${ROT.SEG_VOTACION} s) y los jueces deliberan.`);
   publicarEstado();
 }
 
 async function cerrarVotacion() {
   if (S.fase !== "votando") return;
-  S.fase = "cerrando";
   clearInterval(S.reloj);
-  $("btnPrincipal").disabled = true; $("btnPrincipal").textContent = "EL JURADO TERMINA…";
-  await (S.jurando || evaluarDebate());
-  if (S.clase.evaluado !== S.debate.n) await evaluarDebate();
-  $("btnPrincipal").disabled = false;
-  mostrarResultado();
-}
-
-// Todo lo que escribió cada alumno en el debate (los dos tramos) es su intervención.
-function entregasDelDebate(n) {
-  const out = { A: [], B: [] }, por = new Map();
-  for (const m of S.chat) if (m.tipo === "alumno" && m.debate === n && (m.equipo === "A" || m.equipo === "B")) {
-    const k = m.equipo + "|" + (m.uid || m.nombre);
-    if (!por.has(k)) por.set(k, { equipo: m.equipo, autor: m.nombre, email: m.email || "", textos: [] });
-    por.get(k).textos.push(m.texto);
-  }
-  for (const v of por.values()) out[v.equipo].push({ autor: v.autor, email: v.email, texto: v.textos.join("\n").slice(0, 6000) });
-  return out;
-}
-
-async function evaluarDebate(relator = null) {
-  const d = S.debate;
-  if (!d || S.clase.evaluado === d.n) return;
-  const entregas = entregasDelDebate(d.n);
-  const chatTramo = transcripcionChat(m => m.debate === d.n, 80);
-  const pauta = TRAMOS.map(t => `${t.nombre}: ${t.pauta}`).join(" ");
-  const trabajos = ["A", "B"].map(async k => {
-    const ctx = { ronda: "refutacion", rondaNombre: `Debate ${d.n} (apertura y réplica)`, pauta, dir: EQUIPOS[k].dir,
-                  conceptosRival: [], previas: [], ecos: [], chatTramo, relator };
-    const evs = await Promise.all(entregas[k].map(t => S.motor.activo ? evaluarConLLM(t.texto, ctx, k) : Promise.resolve(evaluarRigor(t.texto, ctx))));
-    return { k, evs };
-  });
-  const res = await Promise.all(trabajos);
-  if (S.clase.evaluado === d.n) return;                 // otra llamada terminó primero
-  for (const { k, evs } of res) {
-    const textos = entregas[k];
-    const turnoOrden = S.seq++;
-    textos.forEach((t, i) => S.historial.push({
-      orden: S.seq++, turnoOrden, debate: d.n, grupo: d[k], equipo: k, autor: t.autor, autorEmail: t.email || "",
-      ronda: "debate", rondaNombre: `Debate ${d.n}`, rolNombre: EQUIPOS[k].nombre, texto: t.texto, ev: evs[i]
-    }));
-    const rig = evs.length ? evs.reduce((a, ev) => a + ev.rubrica.total, 0) / evs.length : 0;
-    postChat({ tipo: "resultado", equipo: k, nombre: "resultado", texto: "", datos: {
-      rondaNombre: `Debate ${d.n} · Grupo ${d[k]}`, grupo: d[k], n: textos.length, rigorMedio: +rig.toFixed(1),
-      alumnos: textos.map((t, i) => ({ autor: t.autor, total: evs[i].rubrica.total, nota: evs[i].nota || "", banderas: evs[i].banderas }))
-    } });
-    if (!textos.length) tick(`El Grupo ${d[k]} no escribió en este debate: su parte de jurado vale 0.`);
-  }
-  S.clase.evaluado = d.n;
-  pintarMarcador();
+  const d = S.debate, reg = S.clase.debates[d.n - 1];
+  reg.votos = (S.publico.votantes || []).map(v => ({ uid: v.uid, nombre: v.nombre || "", email: v.email || "", grupo: v.grupo || 0,
+                                                    voto: v.voto || null, prediccion: v.prediccion || null }));
+  reg.publico = votoPublico(reg.votos.map(v => v.voto));
+  S.fase = "veredictoPublico";
+  $("btnPrincipal").textContent = "SALTAR ▶";
   publicarEstado();
+  await mostrarVeredictoPublico(d, reg.publico);
+  S.fase = "veredictoJueces";
+  publicarEstado();
+  if (!reg.jueces) { mostrarDeliberando(d); await (S.juzgando || (S.juzgando = juzgar(d))); }
+  reg.panel = panelJueces(reg.jueces);
+  publicarEstado();
+  await mostrarVeredictoJueces(d, reg.jueces, reg.panel);
+  mostrarResultado();
 }
 
 function mostrarResultado() {
   const d = S.debate, reg = S.clase.debates[d.n - 1];
-  const notas = k => S.historial.filter(h => h.debate === d.n && h.equipo === k).map(h => h.ev.rubrica.total);
-  const posiciones = (S.publico.votantes || []).map(v => v.final);
-  reg.res = puntajeDebate({ notasA: notas("A"), notasB: notas("B"), posiciones });
-  reg.votantes = (S.publico.votantes || []).map(v => ({ ...v }));
+  reg.res = puntajeDebate({ panel: reg.panel, publico: reg.publico });
+  const g = reg.panel ? reg.panel.ganador : null;
+  reg.votos.forEach(v => { v.acierto = g && v.prediccion ? v.prediccion === g : null; });
+  S.clase.oraculos = acumularOraculos(S.clase.oraculos, reg.votos, g);
   const antes = S.clase.ranking || [];
   S.clase.ranking = ranking(S.clase.grupos, S.clase.debates);
-  S.clase.ultimo = { n: d.n, pregunta: d.pregunta, A: d.A, B: d.B, res: reg.res };
-  pintarMarcador();                                     // la columna derecha muestra el ranking nuevo
+  S.clase.ultimo = { n: d.n, pregunta: d.pregunta, A: d.A, B: d.B, res: reg.res, jueces: reg.jueces, panel: reg.panel, publico: reg.publico };
   S.fase = "resultado";
-  sonar(reg.res.ganador ? "fanfarria" : "whoosh");
+  pintarMarcador();
   publicarEstado();
   const seguir = () => {
     if (S.fase !== "resultado") return;
     S.fase = "propuesta";
-    // la moderadora agradece y la propuesta siguiente ya se generó durante la votación
     postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: `Gracias, Grupo ${d.A} y Grupo ${d.B}. Viene el próximo debate.` });
-    if (typeof mostrarPropuesta === "function") mostrarPropuesta();
+    mostrarPropuesta();
     publicarEstado();
   };
-  if (typeof mostrarResultadoDebate === "function") mostrarResultadoDebate(S.clase.ultimo, antes, S.clase.ranking, seguir);
-  else setTimeout(seguir, ROT.SEG_RESULTADO * 1000);
+  mostrarResultadoDebate(S.clase.ultimo, antes, S.clase.ranking, seguir, rankingOraculos(S.clase.oraculos));
   $("btnPrincipal").textContent = "SEGUIR ▶";
 }
 
 function terminarClase() {
-  if (S.fase === "abierta" || S.fase === "votando") {
+  if (["abierta", "listo", "votando", "veredictoPublico", "veredictoJueces"].includes(S.fase)) {
     if (!confirm("Hay un debate en curso. ¿Terminar la clase igual? Ese debate no cuenta para el ranking.")) return;
     clearInterval(S.reloj);
+    cerrarEscena();
     if (S.debate && !S.clase.debates[S.debate.n - 1].res) S.clase.debates.pop();
   }
   S.fase = "fin";
@@ -161,6 +142,7 @@ function accionPrincipal() {
   else if (S.fase === "listo") abrirRonda();                 // tramo restaurado tras cerrar la pestaña
   else if (S.fase === "abierta") cerrarRonda();
   else if (S.fase === "votando") cerrarVotacion();
+  else if (S.fase === "veredictoPublico" || S.fase === "veredictoJueces") saltarEscena();
   else if (S.fase === "resultado") $("rsSeguir")?.click();
   else if (S.fase === "fin") { if (typeof ceremoniaRanking === "function") ceremoniaRanking(); }
 }
@@ -173,8 +155,9 @@ $("btnTerminar").onclick = terminarClase;
 function promptPropuesta() {
   const hechas = S.clase.debates.map(d => `- ${d.pregunta}`).join("\n") || "(ninguna todavía)";
   const disputas = S.chat.filter(m => m.tipo === "relator" && m.datos && m.datos.disputa).map(m => `- ${m.datos.disputa}`).slice(-5).join("\n") || "(ninguna)";
-  const flojas = S.historial.filter(h => h.ev && h.ev.nota && h.ev.rubrica.total < 10).map(h => `- ${h.ev.nota}`).slice(-5).join("\n") || "(nada)";
-  const usados = new Set(S.historial.flatMap(h => (h.ev.conceptos || []).map(c => c.id || c)));
+  const flojas = S.clase.debates.flatMap(d => (d.jueces || []).flatMap(j => [[j.A, j.fraseA], [j.B, j.fraseB]]))
+    .filter(([n, f]) => n !== null && n <= 4 && f && f !== "(simulado)").map(([, f]) => `- ${f}`).slice(-5).join("\n") || "(nada)";
+  const usados = new Set(S.chat.filter(m => m.tipo === "alumno").flatMap(m => detectarConceptos(m.texto).map(c => c.id)));
   const sinUsar = CONCEPTOS.filter(c => !usados.has(c.id)).map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n") || "(todos se han usado)";
   return `Eres la moderadora de una clase de debate en rotación. Curso: "${SESION.curso}", semana ${SESION.semana}.
 TEMA GENERAL (lo fijó el profesor): "${S.clase.tema || SESION.tema}"
@@ -188,7 +171,7 @@ ${hechas}
 LO QUE QUEDÓ EN DISPUTA SEGÚN EL RELATOR:
 ${disputas}
 
-LO QUE EL JURADO MARCÓ COMO FLOJO:
+LO QUE LOS JUECES CRITICARON:
 ${flojas}
 
 CONCEPTOS QUE NADIE HA USADO TODAVÍA:
