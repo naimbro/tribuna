@@ -95,7 +95,8 @@ function participantes() {
   const out = new Map();
   const roster = typeof window.rosterRemoto === "function" ? window.rosterRemoto() : [];
   for (const r of roster) out.set(r.nombre, { nombre: r.nombre, equipo: r.equipo, n: 0 });
-  for (const m of S.chat) if (m.tipo === "alumno" && (m.equipo === "A" || m.equipo === "B")) {
+  // solo quienes escriben en el debate en curso (en otro debate su grupo pudo tener otro lado)
+  for (const m of S.chat) if (m.tipo === "alumno" && (m.equipo === "A" || m.equipo === "B") && (!S.debate || m.debate === S.debate.n)) {
     const p = out.get(m.nombre) || { nombre: m.nombre, equipo: m.equipo, n: 0 };
     if (m.ronda === S.ronda) p.n++;
     out.set(m.nombre, p);

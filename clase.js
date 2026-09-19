@@ -203,8 +203,13 @@ async function prepararPropuesta() {
   const par = emparejar(gruposDisponibles(), S.clase.debates);
   const base = { A: par ? par.A : null, B: par ? par.B : null };
   const escritas = typeof PREGUNTAS !== "undefined" ? PREGUNTAS : [];
-  const escrita = proximaPreguntaEscrita(escritas, S.clase.debates.map(d => d.pregunta));
-  if (escrita) { S.clase.propuesta = { ...base, estado: "lista", pregunta: escrita, porQue: "Pregunta escrita por ti en el archivo de la semana.", mejorFavor: "", mejorContra: "", fuente: "escrita" }; return; }
+  const usadas = [...S.clase.debates.map(d => d.pregunta), ...(S.clase.descartadas || [])];
+  const escrita = proximaPreguntaEscrita(escritas, usadas);
+  if (escrita) {
+    S.clase.propuesta = { ...base, estado: "lista", pregunta: escrita, porQue: "Pregunta escrita por ti en el archivo de la semana.", mejorFavor: "", mejorContra: "", fuente: "escrita" };
+    if (S.fase === "propuesta") mostrarPropuesta();
+    return;
+  }
   S.clase.propuesta = { ...base, estado: "pensando", pregunta: "", porQue: "", mejorFavor: "", mejorContra: "", fuente: "ia" };
   if (S.fase === "propuesta") mostrarPropuesta();
   try {
@@ -249,7 +254,10 @@ function mostrarPropuesta() {
   const detener = () => { clearInterval(cuentaPropuesta); $("prCuenta").textContent = ""; };
   el.onpointerdown = detener; el.onfocusin = detener;
   $("prPublicar").onclick = publicarPropuestaActual;
-  $("prOtra").onclick = () => { S.clase.propuesta = null; prepararPropuesta(); };
+  $("prOtra").onclick = () => {
+    if (p.pregunta) (S.clase.descartadas = S.clase.descartadas || []).push(p.pregunta);   // no volver a proponerla
+    S.clase.propuesta = null; prepararPropuesta();
+  };
   const listo = p.estado === "lista" && !faltan;
   $("btnPrincipal").textContent = "PUBLICAR PREGUNTA";
   if (listo) {

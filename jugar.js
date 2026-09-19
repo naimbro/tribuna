@@ -73,9 +73,17 @@ function mostrarBancadas() {
 }
 
 async function elegirGrupo(g) {
-  J.grupo = g;
-  await setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid),
-    { nombre: J.nombre, email: J.email, foto: J.foto || "", grupo: g, equipo: "" }, { merge: true });
+  try {
+    await setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid),
+      { nombre: J.nombre, email: J.email, foto: J.foto || "", grupo: g, equipo: "" }, { merge: true });
+    J.grupo = g;
+  } catch (e) {
+    // fuera de la portada ya no se puede cambiar de grupo: se vuelve al que tiene en el servidor
+    const yo = await getDoc(doc(db, "salas", J.codigo, "jugadores", J.uid)).catch(() => null);
+    const actual = yo && yo.exists() ? yo.data().grupo : 0;
+    if (actual > 0) { J.grupo = actual; alert(`El debate ya empezó: solo el profesor puede cambiarte de grupo. Sigues en el Grupo ${actual}.`); }
+    else { alert("No se pudo elegir el grupo: " + e.code); return; }
+  }
   await entrarAlJuego();
 }
 
@@ -85,6 +93,11 @@ async function entrarAlJuego() {
   $("pEntrar").classList.add("oculto"); $("pBancada").classList.add("oculto");
   $("pJuego").classList.remove("oculto"); $("estado").classList.remove("oculto");
   subs.push(onSnapshot(doc(db, "salas", J.codigo), snap => { J.sala = snap.data(); pintarSala(); }));
+  // el profesor puede moverme de grupo: el rol y lo que escribo dependen de mi grupo actual
+  subs.push(onSnapshot(doc(db, "salas", J.codigo, "jugadores", J.uid), snap => {
+    const g = snap.data()?.grupo;
+    if (g > 0 && g !== J.grupo) { J.grupo = g; J.debateVisto = null; pintarSala(); }
+  }));
   subs.push(onSnapshot(query(collection(db, "salas", J.codigo, "mensajes"), orderBy("t")), snap => {
     const antes = new Set(J.chat.map(m => m.id));
     J.chat = []; snap.forEach(d => J.chat.push({ ...d.data(), id: d.id }));
@@ -124,7 +137,26 @@ function avisarNuevos(nuevos) {
 
 function pintarSala() {
   const s = J.sala; if (!s) return;
-  prepararCaja(); prepararVoto();
+  const rol = rolEn(s);
+  const colorRol = { A: s.equipos.A.color, B: s.equipos.B.color, P: "#a78bfa" }[rol] || "var(--dim)";
+  $("miBancada").textContent = `Grupo ${J.grupo || "?"}${rol === "A" ? ` · ${s.equipos.A.nombre}` : rol === "B" ? ` · ${s.equipos.B.nombre}` : rol === "P" ? " · votas" : ""}`;
+  $("miBancada").style.color = colorRol; $("miBancada").style.borderColor = colorRol;
+  const d = s.debate;
+  $("tramoLbl").textContent = d ? `Debate ${d.n} · ${s.tramo === 1 ? "Réplica" : "Apertura"}.` : "Rotación.";
+  $("pauta").textContent = d ? `«${d.pregunta}» — Grupo ${d.A} a favor, Grupo ${d.B} en contra.` : "Esperando la primera pregunta.";
+  $("marca").innerHTML = "";
+  const debatiendo = rol === "A" || rol === "B";
+  $("caja").classList.toggle("oculto", !debatiendo);
+  $("voto").classList.toggle("oculto", rol !== "P");
+  document.body.classList.toggle("es-publico", rol === "P" && !s.veredicto);
+  // cambio de debate: mi grupo fue llamado → aviso; si voto → deslizador al centro
+  if (d && J.debateVisto !== d.n) {
+    J.debateVisto = d.n;
+    if (debatiendo) { navigator.vibrate?.([120, 60, 120]); $("notaCaja").textContent = `🎙 Tu grupo debate ${s.equipos[rol].nombre}. Escribe cuando se abra el tramo.`; $("notaCaja").classList.add("ati"); }
+    if (rol === "P") { $("rngPos").value = 0; $("lblPos").textContent = "indeciso"; J.votoDe = null; }
+  }
+  if (rol === "P" && d && J.votoDe !== d.n && (s.fase === "abierta" || s.fase === "votando")) { J.votoDe = d.n; guardarVoto(0); }
+  pintarEntre(s);
   pintarEspera(s);
   pintarFeedback(s);
   if (s.veredicto && !J.ceremoniaVista && J.fbListo) { J.ceremoniaVista = true; ceremonia(s, s.veredicto); }
