@@ -42,7 +42,11 @@ function recibirChat(lista, inicial = false) {
   for (const m of nuevos) {
     if (m.tipo === "alumno") {
       sonar("pop");
-      if (m.ronda === S.ronda && S.fase === "abierta") { S.mod.nuevos++; S.mod.ultimoAlumno = Date.now(); }
+      if (m.ronda === S.ronda && S.fase === "abierta") {
+        S.mod.nuevos++; S.mod.ultimoAlumno = Date.now();
+        // le escribieron a ella con @Moderadora: responde de inmediato a esa persona
+        if (/@moderadora\b/i.test(norm(m.texto))) { S.mod.pregunta = m; moderadorTalvez(true); }
+      }
     } else if (m.tipo === "mod") sonar("nota", 14);
   }
   if (typeof window.alCambiarChat === "function") window.alCambiarChat();
@@ -87,17 +91,24 @@ function burbuja(m) {
   }
   // alumno
   const e = EQUIPOS[m.equipo] || { color: "var(--dim)", nombre: "" };
-  return `<div class="msg ${m.equipo}" style="--c:${e.color}"><div class="who">${esc(m.nombre || "?")}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div></div>`;
+  return `<div class="msg ${m.equipo}" style="--c:${e.color}"><div class="who">${esc(conGrupo(m.nombre || "?", grupoDeMensaje(m)))}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div></div>`;
+}
+
+// El grupo de quien escribió: viene en el mensaje, o se deduce del lado que le tocó en ese debate.
+function grupoDeMensaje(m) {
+  if (m.grupo) return m.grupo;
+  const d = m.debate && S.clase && S.clase.debates[m.debate - 1];
+  return d && (m.equipo === "A" || m.equipo === "B") ? d[m.equipo] : 0;
 }
 
 /* ---------- quién está en la conversación ---------- */
 function participantes() {
   const out = new Map();
   const roster = typeof window.rosterRemoto === "function" ? window.rosterRemoto() : [];
-  for (const r of roster) out.set(r.nombre, { nombre: r.nombre, equipo: r.equipo, n: 0 });
+  for (const r of roster) out.set(r.nombre, { nombre: r.nombre, equipo: r.equipo, grupo: r.grupo || 0, n: 0 });
   // solo quienes escriben en el debate en curso (en otro debate su grupo pudo tener otro lado)
   for (const m of S.chat) if (m.tipo === "alumno" && (m.equipo === "A" || m.equipo === "B") && (!S.debate || m.debate === S.debate.n)) {
-    const p = out.get(m.nombre) || { nombre: m.nombre, equipo: m.equipo, n: 0 };
+    const p = out.get(m.nombre) || { nombre: m.nombre, equipo: m.equipo, grupo: grupoDeMensaje(m), n: 0 };
     if (m.ronda === S.ronda) p.n++;
     out.set(m.nombre, p);
   }
@@ -164,7 +175,12 @@ ${CONCEPTOS.map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n")}
 CONVERSACIÓN (lo último al final):
 ${transcripcionChat(m => true, 30) || "(todavía nadie ha escrito)"}
 
-TU TAREA: escribe UNA intervención breve que haga avanzar el debate. Elige lo más útil ahora:
+${S.mod && S.mod.pregunta ? `TE ESCRIBIERON DIRECTAMENTE: ${S.mod.pregunta.nombre} te dijo: "${S.mod.pregunta.texto}".
+Responde PRIMERO a esa persona (nómbrala con @${S.mod.pregunta.nombre}), en una o dos frases. Puedes aclarar las reglas, el
+tiempo, la pregunta del debate o lo que pediste antes. Si te pide argumentos, datos, lecturas o que le digas quién tiene la
+razón, NO se los des: devuélvele la pregunta para que la responda su grupo. Después, si queda espacio, sigue moderando.
+
+` : ""}TU TAREA: escribe UNA intervención breve que haga avanzar el debate. Elige lo más útil ahora:
 - "profundizar": pídele a quien hizo una afirmación gruesa que la desarrolle o la haga concreta.
 - "verificar": pregúntale de qué lectura o dato sale lo que dijo, o pídele que explique un concepto que nombró, para ver si de verdad lo sabe.
 - "pasar_pelota": dale la palabra a alguien que ha hablado poco o nada (prioriza a quien tiene 0 mensajes), idealmente respondiendo a algo concreto que dijo el otro lado.
@@ -185,6 +201,7 @@ async function intervenirModerador() {
     } catch (e) { console.warn("moderadora:", e); }
   }
   if (!texto) texto = moderadorSimple();
+  if (S.mod) S.mod.pregunta = null;
   if (texto && S.fase === "abierta") postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto });
 }
 
@@ -258,8 +275,64 @@ function prepararCompositor() {
     $("chatTx").value = "";
   };
   $("chatEnviar").onclick = enviar;
+  prepararMenciones($("chatTx"), $("chatSugiere"));
   $("chatTx").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } });
   $("btnModerar").onclick = () => { if (S.fase === "abierta") moderadorTalvez(true); else tick("La moderadora interviene con el tramo abierto."); };
   $("btnMasMin").onclick = () => { if (S.fase === "abierta") { S.finRonda += 60000; tick("+1 minuto."); } };
   setInterval(() => moderadorTalvez(false), 6000);
+}
+
+/* ---------- @menciones en el compositor del profesor ----------
+   Como en las redes sociales: al escribir @ se despliega la lista de la sala (primero quienes
+   debaten ahora), con su grupo; se elige con clic, flechas y Enter o Tab. */
+function genteParaMencionar() {
+  const por = new Map();
+  const js = typeof window.jugadoresSala === "function" ? window.jugadoresSala() : {};
+  for (const j of Object.values(js)) if (j.nombre) por.set(norm(j.nombre), { nombre: j.nombre, grupo: j.grupo || 0 });
+  for (const x of S.chat) if (x.tipo === "alumno" && x.nombre && !por.has(norm(x.nombre))) por.set(norm(x.nombre), { nombre: x.nombre, grupo: grupoDeMensaje(x) });
+  return [{ nombre: MOD_NOMBRE, grupo: 0, mod: true }, ...por.values()];
+}
+function prepararMenciones(tx, caja) {
+  let lista = [], elegida = 0, token = null;
+  const corto = n => String(n || "").trim().split(/\s+/).slice(0, 2).join(" ");
+  const cerrar = () => { lista = []; token = null; caja.classList.remove("on"); caja.innerHTML = ""; };
+  const pintar = () => {
+    const d = S.debate;
+    const lado = g => d && g.grupo === d.A ? "A FAVOR" : d && g.grupo === d.B ? "EN CONTRA" : "";
+    caja.innerHTML = lista.length ? lista.map((g, i) => `<div class="sg ${i === elegida ? "on" : ""}" data-i="${i}">
+        <span class="sg-n">${esc(g.nombre)}</span><span class="sg-g">${g.mod ? "🎙 moderadora de IA" : (g.grupo ? "grupo " + g.grupo : "") + (lado(g) ? " · " + lado(g) : "")}</span></div>`).join("")
+      : `<div class="sg-vacio">Nadie se llama así en la sala.</div>`;
+    caja.classList.add("on");
+  };
+  const insertar = g => {
+    const antes = tx.value.slice(0, tx.selectionStart);
+    const ini = antes.length - token.length - 1;
+    const texto = "@" + corto(g.nombre) + " ";
+    tx.value = tx.value.slice(0, ini) + texto + tx.value.slice(antes.length);
+    tx.focus(); tx.setSelectionRange(ini + texto.length, ini + texto.length);
+    cerrar();
+  };
+  const actualizar = () => {
+    const antes = tx.value.slice(0, tx.selectionStart ?? tx.value.length);
+    const m = antes.match(/(^|\s)@([^\s@:]{0,20})$/);
+    if (!m) return cerrar();
+    token = m[2];
+    const q = norm(token), d = S.debate;
+    const enDebate = g => d && (g.grupo === d.A || g.grupo === d.B);
+    lista = genteParaMencionar().filter(g => !q || norm(g.nombre).split(/\s+/).some(w => w.startsWith(q)))
+      .sort((a, b) => ((b.mod ? 2 : 0) + enDebate(b)) - ((a.mod ? 2 : 0) + enDebate(a)) || a.nombre.localeCompare(b.nombre)).slice(0, 8);
+    elegida = 0; pintar();
+  };
+  tx.addEventListener("input", actualizar);
+  tx.addEventListener("click", actualizar);
+  tx.addEventListener("blur", () => setTimeout(cerrar, 150));
+  // con la lista abierta, flechas eligen y Enter/Tab inserta (antes de que Enter envíe el mensaje)
+  tx.addEventListener("keydown", e => {
+    if (!caja.classList.contains("on") || !lista.length) { if (e.key === "Escape") cerrar(); return; }
+    if (e.key === "ArrowDown") { e.preventDefault(); elegida = (elegida + 1) % lista.length; pintar(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); elegida = (elegida - 1 + lista.length) % lista.length; pintar(); }
+    else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); e.stopImmediatePropagation(); insertar(lista[elegida]); }
+    else if (e.key === "Escape") cerrar();
+  }, true);
+  caja.addEventListener("pointerdown", e => { const el = e.target.closest(".sg"); if (!el) return; e.preventDefault(); insertar(lista[+el.dataset.i]); });
 }

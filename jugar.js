@@ -224,7 +224,7 @@ function burbuja(m, s) {
   }
   const e = s.equipos[m.equipo] || { color: "var(--dim)" };
   const mia = m.uid === J.uid;
-  return `<div class="msg ${m.equipo} ${mia ? "mia" : ""}" style="--c:${e.color}"><div class="who">${esc(m.nombre)}${mia ? " (tú)" : ""}<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
+  return `<div class="msg ${m.equipo} ${mia ? "mia" : ""}" style="--c:${e.color}"><div class="who">${esc(conGrupo(m.nombre, grupoDeMensaje(m)))}${mia ? " (tú)" : ""}<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
 }
 
 function pintarChat() {
@@ -245,6 +245,7 @@ function prepararCaja() {
   const tx = $("tx");
   tx.oninput = () => { tx.style.height = "auto"; tx.style.height = Math.min(140, tx.scrollHeight) + "px"; pintarCaja(); sugerir(); };
   tx.onclick = tx.onkeyup = sugerir;
+  tx.onblur = () => setTimeout(() => { $("sugiere").innerHTML = ""; $("sugiere").classList.remove("on"); }, 200);
   $("btnEnviar").onclick = enviar;
   pintarCaja();
 }
@@ -252,30 +253,46 @@ function prepararCaja() {
    Primero los del debate en curso (a quienes tiene sentido responder), después el resto.
    Se inserta nombre y primer apellido: así la mención se destaca entera y la persona la recibe. */
 const corto = n => String(n || "").trim().split(/\s+/).slice(0, 2).join(" ");
+const conGrupo = (nombre, grupo) => (grupo ? `${nombre} (grupo ${grupo})` : String(nombre || ""));
+// El grupo de quien escribió: viene en el mensaje, o se deduce del lado que le tocó en ese debate.
+function grupoDeMensaje(m) {
+  if (m.grupo) return m.grupo;
+  const d = J.sala && (J.sala.debates || []).find(x => x.n === m.debate);
+  return d && (m.equipo === "A" || m.equipo === "B") ? d[m.equipo] : 0;
+}
 function sugerir() {
   const tx = $("tx"), caja = $("sugiere");
   const antes = tx.value.slice(0, tx.selectionStart ?? tx.value.length);
   const m = antes.match(/(^|\s)@([^\s@]{0,20})$/);
-  if (!m || tx.disabled) { caja.innerHTML = ""; return; }
+  if (!m || tx.disabled) { caja.innerHTML = ""; caja.classList.remove("on"); return; }
   const q = norm(m[2]), d = J.sala && J.sala.debate;
   // la gente de la sala, más quienes escribieron en la conversación (por si alguien no tiene ficha)
   const por = new Map();
   for (const g of J.gente) if (g.nombre && g.uid !== J.uid) por.set(norm(g.nombre), { nombre: g.nombre, grupo: g.grupo });
-  for (const x of J.chat) if (x.tipo === "alumno" && x.nombre && x.uid !== J.uid && !por.has(norm(x.nombre))) por.set(norm(x.nombre), { nombre: x.nombre, grupo: x.grupo || 0 });
+  for (const x of J.chat) if (x.tipo === "alumno" && x.nombre && x.uid !== J.uid && !por.has(norm(x.nombre))) por.set(norm(x.nombre), { nombre: x.nombre, grupo: grupoDeMensaje(x) });
   const enDebate = g => d && (g.grupo === d.A || g.grupo === d.B);
-  const lista = [...por.values()]
+  const lado = g => !d ? "" : g.grupo === d.A ? "A FAVOR" : g.grupo === d.B ? "EN CONTRA" : "";
+  const color = g => !d ? "#6b7a8a" : g.grupo === d.A ? J.sala.equipos.A.color : g.grupo === d.B ? J.sala.equipos.B.color : "#6b7a8a";
+  // la moderadora siempre se puede mencionar: si le escribes, te responde
+  const lista = [{ nombre: "Moderadora", grupo: 0, mod: true }, ...por.values()]
     .filter(g => !q || norm(g.nombre).split(/\s+/).some(w => w.startsWith(q)))
-    .sort((a, b) => (enDebate(b) - enDebate(a)) || corto(a.nombre).localeCompare(corto(b.nombre)))
+    .sort((a, b) => ((b.mod ? 2 : 0) + enDebate(b)) - ((a.mod ? 2 : 0) + enDebate(a)) || a.nombre.localeCompare(b.nombre))
     .slice(0, 8);
-  caja.innerHTML = lista.map(g => `<button type="button" data-n="${esc(corto(g.nombre))}">@${esc(corto(g.nombre))}${g.grupo ? `<small>G${g.grupo}</small>` : ""}</button>`).join("");
-  caja.onclick = e => {
-    const b = e.target.closest("button"); if (!b) return;
+  caja.classList.add("on");
+  caja.innerHTML = lista.length ? lista.map(g => `<button type="button" class="sg" data-n="${esc(corto(g.nombre))}">
+      <span class="sg-av" style="--c:${g.mod ? "#b4a6ff" : color(g)}">${g.mod ? "🎙" : iniciales(g.nombre)}</span>
+      <span class="sg-n">${esc(g.nombre)}<small>${g.mod ? "moderadora de IA · te responde" : (g.grupo ? "grupo " + g.grupo : "") + (lado(g) ? " · " + lado(g) : "")}</small></span></button>`).join("")
+    : `<div class="sg-vacio">Nadie se llama así en la sala.</div>`;
+  // pointerdown (no click): así el teclado no se cierra antes de elegir
+  caja.onpointerdown = e => {
+    const b = e.target.closest("button.sg"); if (!b) return;
+    e.preventDefault();
     const ini = antes.length - m[2].length - 1;              // dónde está la @
     const resto = tx.value.slice(antes.length);
     tx.value = tx.value.slice(0, ini) + "@" + b.dataset.n + " " + resto;
     const pos = ini + b.dataset.n.length + 2;
     tx.focus(); tx.setSelectionRange(pos, pos);
-    caja.innerHTML = ""; pintarCaja();
+    caja.innerHTML = ""; caja.classList.remove("on"); pintarCaja();
   };
 }
 
@@ -478,7 +495,7 @@ function ceremonia(s, v) {
   el.innerHTML = `<div class="k" style="color:var(--amber);font-size:14px">EL RANKING DE LA CLASE</div>
     <div class="cb" id="cG"><div class="cg" style="color:var(--amber)">${v.campeon ? `🏆 Grupo ${v.campeon}` : "Sin debates"}</div>
       <div class="cs">${mio && mio.puesto ? `Tu grupo terminó #${mio.puesto} con ${mio.puntaje} puntos` : "Tu grupo no alcanzó a debatir"}</div>
-      ${v.oraculos && v.oraculos.length ? `<div class="cmini">🔮 Oráculos: ${v.oraculos.map(o => `<b>${esc(o.nombre)}</b> (${o.puntos})`).join(" · ")}</div>` : ""}
+      ${v.oraculos && v.oraculos.length ? `<div class="cmini">🔮 Oráculos: ${v.oraculos.map(o => `<b>${esc(conGrupo(o.nombre, o.grupo))}</b> (${o.puntos})`).join(" · ")}</div>` : ""}
       ${s.oraculoDe && s.oraculoDe[J.uid] ? `<div class="cmini">Tus predicciones: ${s.oraculoDe[J.uid].puntos} punto(s), #${s.oraculoDe[J.uid].puesto}</div>` : ""}</div>
     <button class="btn cb" id="c3" style="max-width:240px">Cerrar</button>`;
   document.body.appendChild(el);

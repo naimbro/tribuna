@@ -169,3 +169,14 @@ test("rankingOraculos: ordena por puntos, luego tasa de acierto, luego nombre", 
   assert.deepEqual(r.map(x => x.puesto), [1, 2, 3]);
   assert.equal(r[2].tasa, 0.5);
 });
+
+test("conGrupo: el nombre acompañado de su grupo", () => {
+  assert.equal(R.conGrupo("Naim", 1), "Naim (grupo 1)");
+  assert.equal(R.conGrupo("Naim", 0), "Naim");
+  assert.equal(R.conGrupo("Naim", null), "Naim");
+});
+
+test("acumularOraculos: guarda el grupo del votante", () => {
+  const reg = R.acumularOraculos(undefined, [{ uid: "u1", nombre: "Ana", grupo: 3, prediccion: "A" }], "A");
+  assert.equal(reg.u1.grupo, 3);
+});

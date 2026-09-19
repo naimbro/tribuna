@@ -60,7 +60,7 @@ function estadoPublico() {
       publico: U.publico ? { A: U.publico.A, B: U.publico.B, n: U.publico.n, ganador: U.publico.ganador } : null,
       jueces: (U.jueces || []).map(j => ({ id: j.id, nombre: j.nombre, emoji: j.emoji, A: j.A, B: j.B, fraseA: j.fraseA || "", fraseB: j.fraseB || "" })) } : null,
     conteoVotos: { A: S.publico.A || 0, B: S.publico.B || 0, n: S.publico.n || 0, elegibles: S.publico.elegibles || 0 },
-    oraculos: orac.slice(0, 10).map(o => ({ uid: o.uid, nombre: o.nombre, puntos: o.puntos, aciertos: o.aciertos, predicciones: o.predicciones, puesto: o.puesto })),
+    oraculos: orac.slice(0, 10).map(o => ({ uid: o.uid, nombre: o.nombre, grupo: o.grupo || 0, puntos: o.puntos, aciertos: o.aciertos, predicciones: o.predicciones, puesto: o.puesto })),
     oraculoDe: Object.fromEntries(orac.map(o => [o.uid, { puntos: o.puntos, puesto: o.puesto }])),
     fase: S.fase, ronda: S.ronda, totalRondas: TRAMOS.length,
     rondaNombre: R.nombre, rol: R.rol, pauta: R.pauta, seg: R.seg,
@@ -93,7 +93,7 @@ function resumenFinal() {
   const ors = rankingOraculos(S.clase.oraculos || {}).filter(o => o.predicciones).slice(0, 3);
   return { campeon: r[0] && r[0].debates ? r[0].grupo : null,
            ranking: r.map(f => ({ grupo: f.grupo, puesto: f.puesto, puntaje: f.puntaje === null ? null : +f.puntaje.toFixed(1) })),
-           oraculos: ors.map(o => ({ nombre: o.nombre, puntos: o.puntos, puesto: o.puesto })) };
+           oraculos: ors.map(o => ({ nombre: o.nombre, grupo: o.grupo || 0, puntos: o.puntos, puesto: o.puesto })) };
 }
 
 // Estado completo para restaurar la pestaña del profesor (incluye evaluaciones y memorias).

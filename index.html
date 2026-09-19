@@ -313,7 +313,14 @@ main .col{position:relative}
 .res-alumnos .rg{font-family:var(--mono);font-weight:700;margin-right:8px}
 .res-alumnos .nt{color:var(--amber)}
 .mencion{color:#c4b5fd}
-.compositor{display:flex;gap:8px;align-items:stretch}
+.compositor{display:flex;gap:8px;align-items:stretch;position:relative}
+.sugiere{position:absolute;left:0;right:0;bottom:calc(100% + 6px);display:none;flex-direction:column;background:#101820;border:1px solid var(--line);
+  border-radius:12px;box-shadow:0 -12px 34px rgba(0,0,0,.55);max-height:260px;overflow-y:auto;z-index:30}
+.sugiere.on{display:flex}
+.sugiere .sg{display:flex;align-items:baseline;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
+.sugiere .sg.on,.sugiere .sg:hover{background:#17222d}
+.sugiere .sg-n{font-weight:700}.sugiere .sg-g{color:var(--dim);font-size:12px;margin-left:auto}
+.sugiere .sg-vacio{padding:10px 12px;color:var(--dim);font-size:12.5px}
 .compositor .bancas{display:flex;flex-direction:column;gap:4px}
 .compositor .banca-t{opacity:.45;border-color:var(--c);color:var(--c);white-space:nowrap}
 .compositor .banca-t.on{opacity:1;background:#101820;box-shadow:inset 0 0 0 1px var(--c)}
@@ -513,6 +520,7 @@ table.rank td.num{font-family:var(--mono);text-align:right}
     <div class="mesa">
       <div class="compositor">
         <div class="bancas"><button class="btn sm banca-t" id="chatBancaA" style="--c:var(--A)"></button><button class="btn sm banca-t" id="chatBancaB" style="--c:var(--B)"></button></div>
+        <div class="sugiere" id="chatSugiere"></div>
         <textarea id="chatTx" rows="2" placeholder="Escribe por la bancada elegida (Enter envía). Para simular a varios alumnos: @Nombre: texto, un párrafo por alumno."></textarea>
         <button class="btn" id="chatEnviar">Enviar</button>
       </div>
@@ -561,15 +569,15 @@ table.rank td.num{font-family:var(--mono);text-align:right}
     document.write('<script src="contenido/semana' + ok + '.js?v=20260921a"><\/script>');
   })();
 </script>
-<script src="rotacion.js?v=20260922b"></script>
-<script src="moderacion.js?v=20260921e"></script>
-<script src="app.js?v=20260922c"></script>
+<script src="rotacion.js?v=20260922c"></script>
+<script src="moderacion.js?v=20260922b"></script>
+<script src="app.js?v=20260922d"></script>
 <script src="jueces.js?v=20260922b"></script>
 <script src="clase.js?v=20260922c"></script>
-<script src="escenas.js?v=20260922d"></script>
+<script src="escenas.js?v=20260922e"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260922c"></script>
+<script type="module" src="online.js?v=20260922d"></script>
 </body>
 </html>
