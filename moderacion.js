@@ -118,10 +118,15 @@ function abrirTramoChat() {
   const ps = participantes();
   const a = ps.filter(p => p.equipo === "A").map(p => "@" + p.nombre), b = ps.filter(p => p.equipo === "B").map(p => "@" + p.nombre);
   const quien = (arr, def) => arr.length ? arr[Math.floor(Math.random() * arr.length)] : def;
-  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto:
-    `Abrimos el tramo ${S.ronda + 1}: ${R.nombre}. ${R.pauta} ` +
-    (S.ronda === 0 ? `${quien(a, EQUIPOS.A.nombre)}, ¿cuál es la tesis de tu bancada? Y ${quien(b, EQUIPOS.B.nombre)}, la de la suya.`
-                   : `${quien(b, EQUIPOS.B.nombre)} y ${quien(a, EQUIPOS.A.nombre)}: arranquen respondiendo lo más fuerte que dijo el otro lado.`) });
+  const d = S.debate;
+  if (d && S.tramo === 0) {
+    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto:
+      `Debate ${d.n}: «${d.pregunta}». Grupo ${d.A} defiende ${EQUIPOS.A.nombre}; Grupo ${d.B}, ${EQUIPOS.B.nombre}. ` +
+      `${quien(a, "Grupo " + d.A)}, ¿cuál es la tesis de tu grupo? Y ${quien(b, "Grupo " + d.B)}, la del suyo. Tienen ${Math.round(R.seg / 60)} minutos.` });
+  } else {
+    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto:
+      `Réplica. ${quien(b, "Grupo " + (d ? d.B : ""))} y ${quien(a, "Grupo " + (d ? d.A : ""))}: respondan lo más fuerte que dijo el otro grupo. Conceder un punto válido suma.` });
+  }
 }
 
 // Se llama cada pocos segundos y cuando llega un mensaje. Decide si la moderadora interviene.
