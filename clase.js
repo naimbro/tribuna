@@ -52,7 +52,8 @@ function juzgar(d) {
   const ctx = { ronda: "refutacion", pauta: "", dir: 1, conceptosRival: [], previas: [], ecos: [] };
   const p = S.motor.activo ? evaluarConJueces(d)
     : Promise.resolve(juecesSimulados(d, textosDelDebate(d.n), t => evaluarRigor(t, ctx).rubrica.total));
-  return p.then(j => (reg.jueces = j))
+  // si el profesor saltó la deliberación, el panel ya se armó sin ellos: no se reescribe
+  return p.then(j => { if (!reg.panel) reg.jueces = j; return j; })
     .catch(e => { console.warn("jueces:", e); return (reg.jueces = juecesDeLaSesion().map(j => ({ ...j, A: null, B: null, fraseA: "", fraseB: "" }))); });
 }
 
@@ -87,13 +88,23 @@ async function cerrarVotacion() {
   S.fase = "veredictoPublico";
   $("btnPrincipal").textContent = "SALTAR ▶";
   publicarEstado();
+  // si el profesor terminó la clase (o cambió el debate) durante un veredicto, esta cadena se corta
+  const vigente = () => S.fase !== "fin" && S.debate === d && S.clase.debates[d.n - 1] === reg;
   await mostrarVeredictoPublico(d, reg.publico);
+  if (!vigente()) return;
   S.fase = "veredictoJueces";
   publicarEstado();
-  if (!reg.jueces) { mostrarDeliberando(d); await (S.juzgando || (S.juzgando = juzgar(d))); }
+  if (!reg.jueces) {
+    mostrarDeliberando(d);
+    // se puede saltar: los jueces que no alcanzaron se abstienen
+    await Promise.race([S.juzgando || (S.juzgando = juzgar(d)), new Promise(r => { ESC.rapido = false; ESC.resolver = r; })]);
+    if (!vigente()) return;
+    if (!reg.jueces) reg.jueces = juecesDeLaSesion().map(j => ({ ...j, A: null, B: null, fraseA: "", fraseB: "", simulado: false }));
+  }
   reg.panel = panelJueces(reg.jueces);
   publicarEstado();
   await mostrarVeredictoJueces(d, reg.jueces, reg.panel);
+  if (!vigente()) return;
   mostrarResultado();
 }
 
@@ -125,9 +136,11 @@ function terminarClase() {
     if (!confirm("Hay un debate en curso. ¿Terminar la clase igual? Ese debate no cuenta para el ranking.")) return;
     clearInterval(S.reloj);
     cerrarEscena();
-    if (S.debate && !S.clase.debates[S.debate.n - 1].res) S.clase.debates.pop();
+    const reg = S.debate && S.clase.debates[S.debate.n - 1];
+    if (reg && !reg.res) { S.clase.debates.pop(); S.debate = null; }
   }
   S.fase = "fin";
+  if (typeof saltarEscena === "function") saltarEscena();     // corta la espera de cualquier escena en curso
   S.clase.ranking = ranking(S.clase.grupos, S.clase.debates);
   $("propuesta")?.remove();
   pintarMarcador();

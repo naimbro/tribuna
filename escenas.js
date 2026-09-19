@@ -99,11 +99,11 @@ function laminasIntro() {
      <div class="in-jueces">
        <div><div class="in-e">🎙</div><b>LA MODERADORA LLAMA</b><span>Plantea una pregunta y llama a dos grupos: uno a favor y otro en contra.</span></div>
        <div><div class="in-e">💬</div><b>DEBATEN</b><span>Apertura (${mm(ROT.SEG_APERTURA)}) y réplica (${mm(ROT.SEG_REPLICA)}), todos en la misma conversación.</span></div>
-       <div><div class="in-e">🗳</div><b>LOS DEMÁS VOTAN</b><span>Los grupos que no debaten mueven su deslizador. Después, rotan.</span></div>
+       <div><div class="in-e">🗳</div><b>LOS DEMÁS VOTAN</b><span>Los grupos que no debaten votan quién los convenció y predicen a los jueces: cada acierto suma un punto de oráculo. Después, rotan.</span></div>
      </div>`,
     `<div class="in-k">CÓMO SE GANA</div>
      <div class="in-jueces">
-       <div><div class="in-e">⚖</div><b>EL JURADO · 50%</b><span>Una IA que conoce las lecturas pone nota con la rúbrica del curso.</span></div>
+       <div><div class="in-e">⚖</div><b>LOS JUECES · 50%</b><span>Cinco jueces de IA con perfiles distintos. Como en los clavados, se tachan la nota más alta y la más baja.</span></div>
        <div><div class="in-e">🗳</div><b>EL PÚBLICO · 50%</b><span>Los votos que el grupo gana entre quienes no debaten.</span></div>
        <div><div class="in-e">🏆</div><b>EL RANKING</b><span>Promedio de cada grupo por debate. Al final de la clase, el campeón.</span></div>
      </div>`
@@ -304,6 +304,7 @@ async function mostrarVeredictoPublico(d, pub) {
   $("vbPie").textContent = "VOTACIÓN CERRADA";
   sonar("redoble");
   await esperar(1800);
+  if (!$("escena")) return;                      // la escena se cerró (p. ej. terminó la clase)
   const g = pub.ganador;
   $("escena").classList.add("cerrada");
   if (g) $("vbf" + g).classList.add("gana");
@@ -340,14 +341,18 @@ async function mostrarVeredictoJueces(d, jueces, panel) {
   sonar("redoble");
   await esperar(1200);
   for (const j of jueces) {
+    if (!el.isConnected) return;                 // la escena se cerró (p. ej. terminó la clase)
     $("jz-" + j.id).classList.add("on");
     sonar(j.A === null && j.B === null ? "whoosh" : "nota", 12);
     await esperar(ROT.SEG_JUEZ * 1000);
   }
+  if (!el.isConnected) return;
   for (const k of ["A", "B"]) for (const id of panel[k].descartadas) $(`tj-${id}-${k}`)?.classList.add("tachada");
   sonar("whoosh");
   await esperar(1500);
+  if (!el.isConnected) return;
   await Promise.all(["A", "B"].map(k => contar($("jzt" + k), panel[k].total)));
+  if (!el.isConnected) return;
   const g = panel.ganador;
   $("jzG").innerHTML = panel.A.total === null ? "Los jueces no alcanzaron a votar"
     : g ? `GANAN LOS JUECES: <b style="color:${EQUIPOS[g].color}">GRUPO ${d[g]}</b>` : "EMPATE ENTRE LOS JUECES";

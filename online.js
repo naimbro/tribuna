@@ -283,6 +283,8 @@ async function restaurar(codigo) {
   if (priv && priv.historial) {
     if (priv.clase) S.clase = { ...S.clase, ...priv.clase };
     S.debate = priv.debate || null; S.tramo = priv.tramo || 0;
+    // un debate a medias descartado al terminar la clase ya no está en la lista: no se retoma
+    if (S.debate && S.debate.n > S.clase.debates.length) S.debate = null;
     // un tramo abierto vuelve pausado (se reanuda con el botón); una votación, sin reloj
     S.fase = priv.fase === "abierta" ? "listo"
       : ["cerrando", "veredictoPublico", "veredictoJueces"].includes(priv.fase) ? "votando"

@@ -69,17 +69,23 @@ explique la nota.
 Responde SOLO un JSON: {"A": {"nota": n, "frase": "…"}, "B": {"nota": n, "frase": "…"}}`;
 }
 
-// Los cinco en paralelo; cada uno se reintenta una vez. Uno que falla dos veces se abstiene.
+// Los cinco en paralelo; cada uno se reintenta una vez y tiene 45 s en total. Uno que falla o no
+// alcanza se abstiene: el proyector no puede quedar esperando a un juez colgado.
+const PLAZO_JUEZ_MS = 45000;
 async function evaluarConJueces(d) {
   const tr = transcripcionChat(m => m.debate === d.n, 120);
-  return Promise.all(juecesDeLaSesion().map(async juez => {
-    for (let intento = 0; intento < 2; intento++) {
-      try {
-        const r = leerJuez(jsonDe(await pedirLLM(promptJuez(juez, d, tr), "jurado")));
-        if (r) return { ...juez, ...r, simulado: false };
-      } catch (e) { console.warn(`juez ${juez.id}:`, e); }
-    }
-    return { ...juez, A: null, B: null, fraseA: "", fraseB: "", simulado: false };
+  return Promise.all(juecesDeLaSesion().map(juez => {
+    const abstencion = { ...juez, A: null, B: null, fraseA: "", fraseB: "", simulado: false };
+    const intentos = (async () => {
+      for (let intento = 0; intento < 2; intento++) {
+        try {
+          const r = leerJuez(jsonDe(await pedirLLM(promptJuez(juez, d, tr), "jurado")));
+          if (r) return { ...juez, ...r, simulado: false };
+        } catch (e) { console.warn(`juez ${juez.id}:`, e); }
+      }
+      return abstencion;
+    })();
+    return Promise.race([intentos, new Promise(r => setTimeout(() => r(abstencion), PLAZO_JUEZ_MS))]);
   }));
 }
 

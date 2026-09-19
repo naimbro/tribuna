@@ -131,6 +131,13 @@ function cursoHtml(curso, partidas) {
   </section>`;
 }
 
+// Puntaje individual (en el título de cada alumno): su grupo en el ranking y sus puntos de oráculo.
+function puntajeDe(s, j) {
+  if (s.modo !== "rotacion") return "";
+  const g = (s.ranking || []).find(f => f.grupo === j.grupo), o = (s.oraculos || []).find(x => x.uid === j.uid);
+  return `\nGrupo ${j.grupo || "?"}: ${g && g.puntaje !== null && g.puntaje !== undefined ? g.puntaje + " pts" : "sin debatir"}` + (o ? ` · 🔮 ${o.puntos}` : "");
+}
+
 function partidaHtml({ s, jugadores, feedback }) {
   const [est, cls] = estadoDe(s);
   const g = ganadorDe(s);
@@ -180,7 +187,8 @@ function partidaHtml({ s, jugadores, feedback }) {
         </div>
         <div class="caja"><h3>QUIÉNES JUGARON</h3>
           <div class="jug">${jugadores.length ? jugadores.sort((a, b) => (a.equipo || "Z").localeCompare(b.equipo || "Z")).map(j =>
-            `<div title="${esc(j.email)}"><span class="av" style="--c:${COL[j.equipo] || "var(--dim2)"}">${j.foto ? `<img src="${esc(j.foto)}" referrerpolicy="no-referrer" alt="">` : iniciales(j.nombre)}</span>${esc(j.nombre)}</div>`).join("")
+            `<div title="${esc(j.email)}${puntajeDe(s, j)}"><span class="av" style="--c:${COL[j.equipo] || "var(--dim2)"}">${j.foto ? `<img src="${esc(j.foto)}" referrerpolicy="no-referrer" alt="">` : iniciales(j.nombre)}</span>${esc(j.nombre)}${s.modo === "rotacion" ? (() => { const g = (s.ranking || []).find(f => f.grupo === j.grupo), o = (s.oraculos || []).find(x => x.uid === j.uid);
+              return ` <small style="color:var(--dim)">${g && g.puntaje != null ? g.puntaje : "—"}${o ? ` · 🔮${o.puntos}` : ""}</small>`; })() : ""}</div>`).join("")
             : `<span style="color:var(--dim)">Nadie entró.</span>`}</div>
         </div>
       </div>

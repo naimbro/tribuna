@@ -679,6 +679,16 @@ function exportarCsv() {
   }
   for (const o of rankingOraculos(S.clase.oraculos || {}))
     filas.push(["oraculo", "", "", "", "", o.nombre, "", o.puntos, `${o.aciertos} de ${o.predicciones}`, "", ""]);
+  // puntaje individual de quien debatió: el promedio de su grupo en los debates donde escribió
+  const debatio = new Map();
+  for (const d of S.clase.debates) if (d.res) for (const m of S.chat) if (m.tipo === "alumno" && m.debate === d.n && (m.equipo === "A" || m.equipo === "B")) {
+    const k = m.uid || m.nombre, x = debatio.get(k) || { nombre: m.nombre, email: m.email || "", grupo: d[m.equipo], puntajes: new Map() };
+    x.puntajes.set(d.n, d.res[m.equipo].puntaje); debatio.set(k, x);
+  }
+  for (const x of debatio.values()) {
+    const v = [...x.puntajes.values()];
+    filas.push(["debatiente", "", "", x.grupo, "", x.nombre, x.email, (v.reduce((s, y) => s + y, 0) / v.length).toFixed(1), `${v.length} debate${v.length === 1 ? "" : "s"}`, "", ""]);
+  }
   const csv = "﻿" + [cab.join(","), ...filas.map(f => f.map(v => `"${q(v)}"`).join(","))].join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
