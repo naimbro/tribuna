@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  // Sin sala ni semana, la dirección del juego abre el panel del profesor (como ml2).
+  // La pantalla del profesor se abre desde ahí: «＋ Nueva partida» o «▶ Abrir pantalla».
+  if (!location.search) location.replace("admin.html");
+</script>
 <title>TRIBUNA — prototipo</title>
 <style>
 :root{

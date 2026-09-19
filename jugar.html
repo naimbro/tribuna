@@ -33,6 +33,9 @@ input,textarea{width:100%;background:#080d12;color:var(--txt);border:1px solid v
 .fila{display:flex;gap:8px}
 .aviso{color:var(--amber);font-size:13px}
 .oculto{display:none!important}
+/* antitrampa: la pregunta y lo que dice la moderación no se pueden seleccionar (encarece pegarlo en un
+   chatbot; no lo impide: la captura de pantalla sigue funcionando). Lo que escribe cada alumno sí. */
+.msg.mod,.msg.rel,#pauta,#tramoLbl,.es-mocion,.vt-rel{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 /* conversación */
 .sep{align-self:center;font-size:10.5px;letter-spacing:.16em;color:var(--dim2);margin:12px 0 4px;text-transform:uppercase}
 .msg{max-width:84%;margin:3px 0;padding:7px 11px 8px;border-radius:14px;font-size:14.5px;line-height:1.42}
@@ -186,6 +189,6 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 <!-- votación: pantalla completa con las dos preguntas -->
 <div id="votar" class="capa oculto"></div>
 
-<script type="module" src="jugar.js?v=20260922f"></script>
+<script type="module" src="jugar.js?v=20260923a"></script>
 </body>
 </html>

@@ -61,13 +61,15 @@ async function cargar(uid) {
   const salas = []; snap.forEach(d => salas.push({ codigo: d.id, ...d.data() }));
   // jugadores y feedback de cada sala, en paralelo (son pocos por sala)
   V.partidas = await Promise.all(salas.map(async s => {
-    const [js, fb] = await Promise.all([
+    const [js, fb, tl] = await Promise.all([
       getDocs(collection(db, "salas", s.codigo, "jugadores")).catch(() => null),
-      getDocs(collection(db, "salas", s.codigo, "feedback")).catch(() => null)
+      getDocs(collection(db, "salas", s.codigo, "feedback")).catch(() => null),
+      getDocs(collection(db, "salas", s.codigo, "telemetria")).catch(() => null)
     ]);
+    const telemetria = []; tl?.forEach(d => telemetria.push(d.data()));
     const jugadores = []; js?.forEach(d => jugadores.push({ uid: d.id, ...d.data() }));
     const feedback = []; fb?.forEach(d => feedback.push({ uid: d.id, ...d.data() }));
-    return { s, jugadores, feedback };
+    return { s, jugadores, feedback, telemetria };
   }));
   pintar();
 }
@@ -138,7 +140,22 @@ function puntajeDe(s, j) {
   return `\nGrupo ${j.grupo || "?"}: ${g && g.puntaje !== null && g.puntaje !== undefined ? g.puntaje + " pts" : "sin debatir"}` + (o ? ` · 🔮 ${o.puntos}` : "");
 }
 
-function partidaHtml({ s, jugadores, feedback }) {
+// Antitrampa: cómo escribió cada alumno. Descriptivo: nunca entra en el puntaje (telemetria.js).
+function telemetriaHtml(telemetria) {
+  if (!telemetria || !telemetria.length) return "";
+  const r = resumenTelemetria(telemetria);
+  const conSenales = r.filter(x => x.senales.length);
+  return `<div class="caja" style="margin-top:14px"><h3>CÓMO ESCRIBIERON · antitrampa</h3>
+    <p style="color:var(--dim);font-size:12px;margin:-4px 0 10px">Pegados, salidas de la app, inserciones de golpe y velocidad de cada mensaje.
+      Es información para que juzgues tú: no cambia ningún puntaje.</p>
+    ${conSenales.length ? conSenales.map(x => `<div class="com"><div class="q"><b>${esc(x.nombre)}${x.grupo ? ` (grupo ${x.grupo})` : ""}</b>
+        <span style="color:var(--dim)">${x.mensajes} mensaje${x.mensajes === 1 ? "" : "s"}</span></div>
+        <p style="color:var(--amber)">${x.senales.map(esc).join("<br>")}</p></div>`).join("")
+      : `<p style="color:var(--dim)">Sin señales: ${r.length} alumno${r.length === 1 ? "" : "s"} escribieron ${telemetria.length} mensaje${telemetria.length === 1 ? "" : "s"} sin pegar textos largos ni salir de la app.</p>`}
+  </div>`;
+}
+
+function partidaHtml({ s, jugadores, feedback, telemetria }) {
   const [est, cls] = estadoDe(s);
   const g = ganadorDe(s);
   const n = r => jugadores.filter(j => j.equipo === r).length;
@@ -192,6 +209,7 @@ function partidaHtml({ s, jugadores, feedback }) {
             : `<span style="color:var(--dim)">Nadie entró.</span>`}</div>
         </div>
       </div>
+      ${telemetriaHtml(telemetria)}
       <div class="acc">
         <a class="btn" href="index.html?sala=${s.codigo}&semana=${s.semana}" target="_blank">▶ Abrir pantalla</a>
         <button class="btn" data-txt="${s.codigo}">⬇ Conversación (.txt)</button>
@@ -239,7 +257,7 @@ onAuthStateChanged(auth, user => {
     $("btnG").onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch(e => alert("No se pudo entrar: " + e.code));
     return;
   }
-  $("yo").innerHTML = `${esc(user.email)} · <a href="index.html">pantalla del profesor</a> · <a href="#" id="salir">salir</a>`;
+  $("yo").innerHTML = `${esc(user.email)} · <a href="index.html?semana=${(typeof SESIONES !== "undefined" && SESIONES.length) ? SESIONES[SESIONES.length - 1].semana : 7}">pantalla del profesor</a> · <a href="#" id="salir">salir</a>`;
   $("salir").onclick = e => { e.preventDefault(); signOut(auth); };
   cargar(user.uid).catch(e => $("main").innerHTML = `<div class="aviso">No se pudieron cargar las partidas: ${esc(e.message)}</div>`);
 });
