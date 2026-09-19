@@ -43,37 +43,46 @@ function mostrarPortada(url, codigo, alEmpezar) {
         <div class="po-url mono">${escHtml(url.replace(/^https?:\/\//, ""))}</div>
       </div>
       <div class="po-sala">
-        <div class="po-tema">${escHtml(SESION.tema)}</div>
+        <div class="po-cfg">
+          <label>Tema general <input id="poTema" value="${escHtml(S.clase.tema || SESION.tema)}"></label>
+          <label>Grupos <select id="poGrupos">${Array.from({ length: ROT.GRUPOS_MAX - ROT.GRUPOS_MIN + 1 }, (_, i) => i + ROT.GRUPOS_MIN)
+            .map(g => `<option ${g === S.clase.grupos ? "selected" : ""}>${g}</option>`).join("")}</select></label>
+        </div>
         <div class="po-cuenta" id="poCuenta"></div>
         <div class="po-gente" id="poGente"><div class="po-vacio">Esperando a los primeros…</div></div>
       </div>
     </div>
     <div class="po-pie">
-      <span>Entren con su cuenta de Google y elijan: debatir <b style="color:${EQUIPOS.A.color}">${EQUIPOS.A.nombre}</b>, debatir <b style="color:${EQUIPOS.B.color}">${EQUIPOS.B.nombre}</b> o ser <b style="color:#a78bfa">PÚBLICO</b>.</span>
+      <span>Entren con su cuenta de Google y elijan un grupo. Cada grupo debate y vota por turnos.</span>
       <button class="btn pri" id="poEmpezar">EMPEZAR ▶</button>
     </div>`;
   document.body.appendChild(el);
   $("poEmpezar").onclick = alEmpezar;
+  $("poTema").onchange = e => { S.clase.tema = e.target.value.trim().slice(0, 200) || SESION.tema; window.publicarEstado?.(); };
+  $("poGrupos").onchange = e => { S.clase.grupos = +e.target.value; window.publicarEstado?.(); actualizarPortada(window.jugadoresSala?.() || {}); };
   PORTADA.primera = true;
 }
 
 function actualizarPortada(jugadores) {
   const g = $("poGente"); if (!g) return;
   const lista = Object.entries(jugadores).map(([uid, j]) => ({ uid, ...j })).sort((a, b) => (a.unido || 0) - (b.unido || 0));
-  const n = r => lista.filter(j => j.equipo === r).length;
-  const eligiendo = lista.filter(j => !["A", "B", "P"].includes(j.equipo)).length;
-  $("poCuenta").innerHTML = `<b>${lista.length}</b> en la sala
-    <span style="color:${EQUIPOS.A.color}">● ${EQUIPOS.A.nombre} ${n("A")}</span>
-    <span style="color:${EQUIPOS.B.color}">● ${EQUIPOS.B.nombre} ${n("B")}</span>
-    <span style="color:#a78bfa">● PÚBLICO ${n("P")}</span>
-    ${eligiendo ? `<span style="color:var(--dim)">● eligiendo ${eligiendo}</span>` : ""}`;
-  if (!lista.length) { g.innerHTML = `<div class="po-vacio">Esperando a los primeros…</div>`; return; }
+  const N = S.clase.grupos;
+  const enGrupo = g => lista.filter(j => j.grupo === g);
+  const sinGrupo = lista.filter(j => !(j.grupo > 0));
+  $("poCuenta").innerHTML = `<b>${lista.length}</b> en la sala${sinGrupo.length ? ` <span style="color:var(--dim)">· ${sinGrupo.length} eligiendo</span>` : ""}`;
   let nuevos = 0;
-  g.innerHTML = lista.map(j => {
+  const cara = j => {
     const nuevo = !PORTADA.vistos.has(j.uid);
     if (nuevo) { PORTADA.vistos.add(j.uid); nuevos++; }
-    return `<div class="po-j ${nuevo && !PORTADA.primera ? "llega" : ""}">${avatarHtml(j, 66)}<div class="po-n">${escHtml(j.nombre)}</div></div>`;
-  }).join("");
+    return `<div class="po-j ${nuevo && !PORTADA.primera ? "llega" : ""}" data-uid="${j.uid}" title="Clic para mover de grupo">${avatarHtml({ ...j, equipo: "" }, 50)}<div class="po-n">${escHtml(j.nombre)}</div></div>`;
+  };
+  g.innerHTML = `<div class="po-grupos">${Array.from({ length: N }, (_, i) => i + 1).map(k =>
+      `<div class="po-g"><div class="po-gk">GRUPO ${k} <span>${enGrupo(k).length}</span></div>${enGrupo(k).map(cara).join("")}</div>`).join("")}</div>
+    ${sinGrupo.length ? `<div class="po-sin">${sinGrupo.map(cara).join("")}</div>` : ""}`;
+  g.querySelectorAll(".po-j").forEach(el => el.onclick = () => {
+    const destino = +prompt(`¿A qué grupo mueves a ${el.textContent.trim()}? (1 a ${N})`);
+    if (destino >= 1 && destino <= N) window.moverAlumno?.(el.dataset.uid, destino);
+  });
   if (nuevos && !PORTADA.primera) sonar("pop");
   PORTADA.primera = false;
 }
@@ -82,26 +91,22 @@ function cerrarPortada() { $("portada")?.remove(); }
 
 /* ----------------------------- 2. INTRO ----------------------------- */
 function laminasIntro() {
-  const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const mm = s => `${Math.round(s / 60)} min`;
   return [
-    `<div class="in-k">SEMANA ${SESION.semana} · ${escHtml(SESION.curso || "")}</div>
-     <div class="in-tema">${escHtml(SESION.tema)}</div>`,
-    `<div class="in-k">LA MOCIÓN</div>
-     <div class="in-mocion">«${escHtml(SESION.mocion)}»</div>`,
-    `<div class="in-k">LAS POSICIONES</div>
-     <div class="in-vs">
-       <div class="in-lado" style="--c:${EQUIPOS.A.color}"><div class="in-b">${EQUIPOS.A.bandera}</div><div class="in-n">${EQUIPOS.A.nombre}</div><div class="in-l">${escHtml(EQUIPOS.A.lema || "Defiende la moción.")}</div></div>
-       <div class="in-x">VS</div>
-       <div class="in-lado" style="--c:${EQUIPOS.B.color}"><div class="in-b">${EQUIPOS.B.bandera}</div><div class="in-n">${EQUIPOS.B.nombre}</div><div class="in-l">${escHtml(EQUIPOS.B.lema || "Rechaza la moción.")}</div></div>
+    `<div class="in-k">SEMANA ${SESION.semana} · TEMA GENERAL</div>
+     <div class="in-tema">${escHtml(S.clase.tema || SESION.tema)}</div>`,
+    `<div class="in-k">CÓMO FUNCIONA</div>
+     <div class="in-jueces">
+       <div><div class="in-e">🎙</div><b>LA MODERADORA LLAMA</b><span>Plantea una pregunta y llama a dos grupos: uno a favor y otro en contra.</span></div>
+       <div><div class="in-e">💬</div><b>DEBATEN</b><span>Apertura (${mm(ROT.SEG_APERTURA)}) y réplica (${mm(ROT.SEG_REPLICA)}), todos en la misma conversación.</span></div>
+       <div><div class="in-e">🗳</div><b>LOS DEMÁS VOTAN</b><span>Los grupos que no debaten mueven su deslizador. Después, rotan.</span></div>
      </div>`,
     `<div class="in-k">CÓMO SE GANA</div>
      <div class="in-jueces">
-       <div><div class="in-e">⚖</div><b>EL JURADO</b><span>Una IA que conoce las lecturas y pone nota con la rúbrica del curso, sobre 20. Premia a quien argumenta mejor.</span></div>
-       <div><div class="in-e">🗳</div><b>EL PÚBLICO</b><span>Ustedes, los que no debaten: mueven su deslizador cuando algo los convence. Premia a quien convence más.</span></div>
-     </div>
-     <div class="in-tramos">${RONDAS.map((r, i) => `<span><b>${i + 1}</b> ${escHtml(r.nombre)} <i class="mono">${mmss(r.seg)}</i></span>`).join("<em>›</em>")}</div>
-     <div class="in-nota">Si el jurado y el público coinciden, esa bancada gana. Si no, es empate, y esa diferencia es lo más interesante del día.</div>
-     <div class="in-nota">🎙 Una moderadora de IA pregunta y pasa la palabra · un relator resume y llama a votar al final de cada tramo.</div>`
+       <div><div class="in-e">⚖</div><b>EL JURADO · 50%</b><span>Una IA que conoce las lecturas pone nota con la rúbrica del curso.</span></div>
+       <div><div class="in-e">🗳</div><b>EL PÚBLICO · 50%</b><span>Los votos que el grupo gana entre quienes no debaten.</span></div>
+       <div><div class="in-e">🏆</div><b>EL RANKING</b><span>Promedio de cada grupo por debate. Al final de la clase, el campeón.</span></div>
+     </div>`
   ];
 }
 

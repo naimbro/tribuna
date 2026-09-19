@@ -207,6 +207,15 @@ main .col{position:relative}
 #propuesta .pr-cuenta{margin-left:auto;color:var(--amber);font-family:var(--mono);font-size:12.5px}
 #propuesta .pr-pensando{color:var(--dim);animation:pulso 1.4s infinite;margin-bottom:6px}
 #propuesta .pr-aviso{color:var(--amber);font-size:12.5px;margin-bottom:6px}
+.po-cfg{display:flex;gap:18px;margin:6px 0 12px;color:var(--dim);font-size:13px;flex-wrap:wrap}
+.po-cfg input{background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:600 18px system-ui;width:min(560px,50vw);display:block;margin-top:4px}
+.po-cfg select{background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:600 18px system-ui;display:block;margin-top:4px}
+.po-grupos{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;width:100%}
+.po-g{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;min-height:110px}
+.po-gk{width:100%;font-size:12px;letter-spacing:.2em;color:var(--neon)}
+.po-gk span{float:right;color:var(--dim)}
+.po-g .po-j{width:64px;cursor:pointer}
+.po-sin{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;opacity:.7}
 /* ceremonia del ganador */
 #ceremonia{position:fixed;inset:0;z-index:60;background:radial-gradient(900px 500px at 50% 40%,#0f1c26 0%,rgba(3,6,9,.98) 70%);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;text-align:center}
@@ -516,10 +525,10 @@ table.rank td.num{font-family:var(--mono);text-align:right}
 <script src="moderacion.js?v=20260921b"></script>
 <script src="app.js?v=20260921b"></script>
 <script src="clase.js?v=20260921b"></script>
-<script src="escenas.js?v=20260920b"></script>
+<script src="escenas.js?v=20260921a"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260921b"></script>
+<script type="module" src="online.js?v=20260921c"></script>
 </body>
 </html>

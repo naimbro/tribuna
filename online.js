@@ -134,6 +134,7 @@ function activarOnline() {
   envolver("abrirRonda", () => { S.abreEn = Date.now(); });   // el teléfono calcula el reloj desde abreEn
   envolver("cerrarRonda");
   window.publicarEstado = publicar;
+  window.jugadoresSala = () => ON.jugadores;
   window.gruposConectados = () => [...new Set(Object.values(ON.jugadores).map(j => j.grupo).filter(g => g > 0))].sort((a, b) => a - b);
   window.rosterRemoto = () => !S.debate ? [] : Object.values(ON.jugadores)
     .filter(j => j.grupo === S.debate.A || j.grupo === S.debate.B)
