@@ -253,9 +253,27 @@ function escena(clase) {
   const el = document.createElement("div");
   el.id = "escena"; el.className = "escena " + clase;
   document.body.appendChild(el);
+  botonEscena(clase === "votacion" ? "CERRAR VOTACIÓN ▶" : "SALTAR ▶");
   return el;
 }
-function cerrarEscena() { $("escena")?.remove(); }
+function cerrarEscena() { $("escena")?.remove(); $("esSig")?.remove(); }
+
+// Las escenas tapan el botón principal: cada una trae el suyo, abajo a la derecha, que hace lo
+// mismo (cerrar la votación o saltar el veredicto). También sirven → y Enter.
+function botonEscena(texto) {
+  let b = $("esSig");
+  if (!b) {
+    b = document.createElement("button");
+    b.id = "esSig"; b.className = "btn pri";
+    b.onclick = () => { if (typeof accionPrincipal === "function") accionPrincipal(); };
+    document.body.appendChild(b);
+  }
+  b.textContent = texto;
+}
+document.addEventListener("keydown", e => {
+  if (!$("escena") || e.target.closest?.("input,textarea,select")) return;
+  if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); if (typeof accionPrincipal === "function") accionPrincipal(); }
+});
 const fmtNota = v => (v === null || v === undefined ? "—" : Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 // Contador animado con setTimeout (requestAnimationFrame se detiene en pestañas en segundo plano)
@@ -302,6 +320,7 @@ async function mostrarVeredictoPublico(d, pub) {
   ESC.rapido = false;
   actualizarVotacion();
   $("vbPie").textContent = "VOTACIÓN CERRADA";
+  botonEscena("SALTAR ▶");
   sonar("redoble");
   await esperar(1800);
   if (!$("escena")) return;                      // la escena se cerró (p. ej. terminó la clase)
