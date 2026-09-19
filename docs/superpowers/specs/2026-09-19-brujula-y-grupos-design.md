@@ -36,11 +36,12 @@ Hay éxito si se cumplen tres condiciones:
 | Brújula | Corta y dentro de TRIBUNA, no la de ml2. |
 | Mecánica del debate | Se mantiene: dos lados, jueces, voto del público y oráculos. |
 | Exposición | El mapa es anónimo. Quedar en un grupo sí revela el campo, porque eso es el diseño. |
+| Opcionalidad | La brújula es opcional al comienzo y al final. El profesor decide en cada partida. |
 
 ## 3. Contenido: la brújula de cada semana
 
 Cada archivo de semana puede definir `BRUJULA`. Si no la define, el juego funciona como hoy, con
-elección de grupo a mano.
+elección de grupo a mano. Aunque la defina, usarla es opcional en cada partida (sección 4).
 
 ```js
 const BRUJULA = {
@@ -74,8 +75,12 @@ adentro, guardarraíles sin freno, y ni freno ni ley.
 
 ## 4. Flujo
 
-1. **Portada.** Igual que hoy, más el mapa vacío del plano, con los centros de los campos
-   rotulados.
+1. **Portada.** Tiene un interruptor **«Usar brújula»**, encendido por defecto si la semana
+   trae `BRUJULA` y oculto si no la trae. El profesor lo cambia antes de que entren los alumnos.
+   - **Encendido:** la portada muestra el mapa vacío del plano, con los centros de los campos
+     rotulados, y los pasos 2 a 4 aplican.
+   - **Apagado:** la portada es la de hoy, los alumnos eligen grupo a mano y los debates siguen el
+     emparejamiento de hoy. Los pasos 2 a 4 no aplican, y la repetición del cierre tampoco.
 2. **Brújula en el teléfono.** Después de entrar con Google, el alumno ve una pregunta por
    pantalla, con opciones grandes. Al contestar la quinta ve «Tu campo: Frenar por ley», su punto
    en un mini-mapa y la frase del campo. Puede rehacer la brújula mientras la sala está en la
@@ -104,7 +109,8 @@ adentro, guardarraíles sin freno, y ni freno ni ley.
    - **Panel de propuesta:** muestra «Grupo 2 · Frenar por ley — A FAVOR» contra «Grupo 5 · Ni
      freno ni ley — EN CONTRA». El profesor puede intercambiar los lados con un botón, además de lo
      que ya puede hacer hoy.
-6. **Cierre, opcional.** Antes de «Terminar clase», el profesor puede apretar «REPETIR BRÚJULA».
+6. **Cierre, opcional.** Solo si la partida usó la brújula. Antes de «Terminar clase», el profesor
+   puede apretar «REPETIR BRÚJULA»; si no lo aprieta, el cierre es el de siempre.
    Los teléfonos contestan de nuevo las mismas 5 preguntas y el proyector muestra el mapa con una
    flecha por alumno, desde su punto inicial al final, más el conteo por campo antes y después.
    Después sigue el cierre de siempre: feedback y ceremonia.
@@ -196,7 +202,8 @@ alumno.
 - **La moderadora no dice cuál grupo afirma la moción:** A FAVOR queda para el grupo más cercano
   al centro del campo del que habla la moción. Si tampoco se puede, se usa el orden del
   emparejamiento. El profesor puede intercambiar los lados.
-- **Semana sin `BRUJULA`:** elección de grupo a mano, como hoy.
+- **Semana sin `BRUJULA`, o brújula apagada en la portada:** elección de grupo a mano, como hoy.
+- **El profesor apaga la brújula con respuestas ya dadas:** las respuestas quedan guardadas pero no se usan; los alumnos pasan a elegir grupo a mano.
 
 ## 11. Pruebas
 
