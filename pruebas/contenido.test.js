@@ -33,3 +33,102 @@ test("semana 7: brújula de 5 preguntas con opciones en los dos ejes y 4 campos"
 test("semana 5: sin brújula, el juego queda con la elección a mano", () => {
   assert.equal(cargar("contenido/semana5.js"), null);
 });
+
+/* --- MGT300, clase 7 (archivo semana307.js) ---------------------------- */
+
+// Carga completa de un archivo de semana: los bloques opcionales quedan en null.
+function cargarSesion(archivo) {
+  const ctx = {};
+  vm.createContext(ctx);
+  const opc = ["BRUJULA", "JUECES", "EJEMPLOS_SESION", "PREGUNTAS"]
+    .map(k => `${k}: typeof ${k} === 'undefined' ? null : ${k}`).join(", ");
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", archivo), "utf8") +
+    `\n;this.S = { SESION, RONDAS, RUBRICA, CONCEPTOS, FUENTES, AUDIENCIA, EVENTOS, EQUIPOS, ${opc} };`, ctx);
+  return ctx.S;
+}
+
+const SEMANAS = ["contenido/semana5.js", "contenido/semana7.js", "contenido/semana307.js"];
+
+test("toda semana: los pesos `mueve` y los `efecto` apuntan a ids que existen", () => {
+  for (const archivo of SEMANAS) {
+    const s = cargarSesion(archivo);
+    const conceptos = new Set(s.CONCEPTOS.map(c => c.id));
+    const bloques = new Set(s.AUDIENCIA.map(p => p.id));
+    for (const p of s.AUDIENCIA)
+      for (const k of Object.keys(p.mueve))
+        assert.ok(conceptos.has(k), `${archivo}: ${p.id}.mueve.${k} no es un concepto`);
+    for (const e of s.EVENTOS)
+      for (const k of Object.keys(e.efecto))
+        assert.ok(bloques.has(k), `${archivo}: evento ${e.id} mueve a "${k}", que no es un bloque`);
+  }
+});
+
+test("toda semana: las dos invariantes de la audiencia del README", () => {
+  const INDECISO = 8;                                   // |pos| <= 8 es estar indeciso (app.js)
+  for (const archivo of SEMANAS) {
+    const { AUDIENCIA } = cargarSesion(archivo);
+    const suma = f => AUDIENCIA.filter(f).reduce((n, p) => n + p.votos, 0);
+    const favor = suma(p => p.pos > INDECISO), contra = suma(p => p.pos < -INDECISO);
+    const indecisos = suma(p => Math.abs(p.pos) <= INDECISO);
+    // 1. votación inicial apretada y con muchos indecisos
+    assert.ok(Math.abs(favor - contra) <= 3, `${archivo}: abre ${favor}–${contra}, no está apretada`);
+    assert.ok(indecisos >= favor + contra, `${archivo}: sólo ${indecisos} indecisos`);
+    // 2. al menos un bloque grande premia poco la rúbrica, para que los marcadores diverjan
+    assert.ok(AUDIENCIA.some(p => p.votos >= 5 && p.peso_rigor <= 0.5),
+      `${archivo}: ningún bloque grande con peso_rigor bajo`);
+  }
+});
+
+test("clase 7 de MGT300: curso propio, ejemplos, jueces y conceptos de los dos textos", () => {
+  const s = cargarSesion("contenido/semana307.js");
+  assert.equal(s.SESION.semana, 307);
+  assert.match(s.SESION.curso, /^MGT300/);
+  // el manifiesto la ofrece y su curso coincide con el del archivo
+  const man = {};
+  vm.createContext(man);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "contenido/sesiones.js"), "utf8") + "\n;this.SESIONES = SESIONES;", man);
+  const fila = man.SESIONES.find(x => x.semana === 307);
+  assert.ok(fila, "semana 307 no está en contenido/sesiones.js");
+  assert.equal(fila.curso, s.SESION.curso);
+  assert.equal(new Set(man.SESIONES.map(x => x.semana)).size, man.SESIONES.length, "hay semanas repetidas");
+  // sólo se juzga lo leído: cada concepto dice de qué documento sale
+  assert.ok(s.CONCEPTOS.length >= 12);
+  for (const c of s.CONCEPTOS) {
+    assert.ok(c.id && c.etiqueta && c.fuente && c.claves.length, c.id);
+    assert.ok([-1, 0, 1].includes(c.lado), `${c.id}: lado ${c.lado}`);
+    assert.match(c.fuente, /La Tercera|NYT|Exposición|Guía de lectura/, `${c.id}: fuente sin documento`);
+  }
+  assert.ok(s.CONCEPTOS.some(c => /La Tercera/.test(c.fuente)), "ningún concepto del reportaje");
+  assert.ok(s.CONCEPTOS.filter(c => /NYT/.test(c.fuente)).length >= 6, "menos de 6 conceptos del mapa del NYT");
+  // los cinco jueces premian nombrar a una persona real y decir qué instrumento pide
+  assert.equal(s.JUECES.length, 5);
+  for (const j of s.JUECES) assert.match(j.valora, /instrumento/, j.id);
+  // los ejemplos separan los marcadores: la arenga no atribuye, el manual sí
+  for (const r of ["apertura", "refutacion", "cierre"])
+    for (const k of ["A", "B"]) assert.ok(s.EJEMPLOS_SESION[r][k].length > 200, `${r}.${k}`);
+  assert.ok(s.PREGUNTAS.length >= 3, "faltan mociones semilla para la moderadora");
+});
+
+test("clase 7 de MGT300: brújula de 5 preguntas, dos ejes y 4 campos chilenos", () => {
+  const b = cargar("contenido/semana307.js");
+  assert.ok(b, "semana307.js no define BRUJULA");
+  assert.equal(b.preguntas.length, 5);
+  for (const p of b.preguntas) {
+    assert.equal(p.opciones.length, 4, p.id);
+    // cada pregunta puntúa en un solo eje, y sus opciones van de un extremo al otro
+    const eje = typeof p.opciones[0].x === "number" ? "x" : "y";
+    const vs = p.opciones.map(o => o[eje]);
+    assert.ok(vs.every(v => typeof v === "number"), `${p.id}: opciones en ejes distintos`);
+    assert.ok(vs.every((v, i) => i === 0 || v > vs[i - 1]), `${p.id}: opciones desordenadas`);
+    assert.ok(vs[0] < 0 && vs[3] > 0, `${p.id}: no cubre los dos extremos`);
+    for (const o of p.opciones) assert.ok(o.texto.length > 40, `${p.id}: opción muy corta`);
+  }
+  const ejes = b.preguntas.map(p => typeof p.opciones[0].x === "number" ? "x" : "y");
+  assert.ok(ejes.filter(e => e === "x").length >= 2 && ejes.filter(e => e === "y").length >= 2,
+    "un eje queda con menos de dos preguntas");
+  assert.equal(b.campos.length, 4);
+  for (const c of b.campos) assert.ok(c.id && c.nombre && c.afirma && c.color && c.centro, c.id);
+  // cada combinación extrema cae en un campo distinto
+  const extremos = [0, 3].flatMap(i => [0, 3].map(j => Object.fromEntries(b.preguntas.map(p => [p.id, typeof p.opciones[0].x === "number" ? i : j]))));
+  assert.equal(new Set(extremos.map(r => B.campoDe(B.posicion(r, b.preguntas), b.campos))).size, 4);
+});
