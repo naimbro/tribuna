@@ -153,3 +153,58 @@ test("mapaSvg: solo los puntos nuevos llevan la animación de llegada", () => {
   assert.equal((s.match(/class="pt nuevo"/g) || []).length, 1);
   assert.equal((s.match(/class="pt"/g) || []).length, 1);
 });
+
+/* --- formarGruposEnK: k-means balanceado, con k elegido por el profesor ---
+   Portado de armarCampos() de ml2-master-game: semillas lejanas, cupos exactos
+   y dos refinamientos. Los campos del contenido dejan de decidir el grupo y
+   pasan a ser solo la etiqueta del centroide. */
+
+test("formarGruposEnK: k grupos con tamaños que difieren a lo más en uno", () => {
+  const xs = Array.from({ length: 11 }, (_, i) => al("u" + i, "ley", -8 + i * 1.6, 5 - i));
+  const { grupos } = B.formarGruposEnK(xs, campos, 3);
+  assert.equal(grupos.length, 3);
+  assert.deepEqual(grupos.map(g => g.miembros.length).sort(), [3, 4, 4]);
+});
+
+test("formarGruposEnK: dos nubes lejanas con k=2 no se mezclan", () => {
+  const izq = ["a", "b", "c"].map((u, i) => al(u, "ley", -8 + i * 0.2, 5));
+  const der = ["d", "e", "f"].map((u, i) => al(u, "nada", 8 - i * 0.2, -5));
+  const { de } = B.formarGruposEnK([...izq, ...der], campos, 2);
+  assert.equal(new Set(["a", "b", "c"].map(u => de[u])).size, 1, "la nube izquierda se partió");
+  assert.equal(new Set(["d", "e", "f"].map(u => de[u])).size, 1, "la nube derecha se partió");
+  assert.notEqual(de.a, de.d, "las dos nubes cayeron en el mismo grupo");
+});
+
+test("formarGruposEnK: cada grupo se etiqueta con el campo más cercano a su centroide", () => {
+  const xs = [...["a", "b", "c"].map((u, i) => al(u, "ley", -6 + i * 0.1, 5)),
+              ...["d", "e", "f"].map((u, i) => al(u, "nada", 6 - i * 0.1, -5))];
+  const { grupos } = B.formarGruposEnK(xs, campos, 2);
+  assert.deepEqual(grupos.map(g => g.campo).sort(), ["ley", "nada"]);
+});
+
+test("formarGruposEnK: mismas posiciones, mismos grupos (sin azar)", () => {
+  const xs = Array.from({ length: 13 }, (_, i) => al("u" + i, "ley", Math.sin(i) * 9, Math.cos(i) * 9));
+  assert.deepEqual(B.formarGruposEnK(xs, campos, 4), B.formarGruposEnK(xs, campos, 4));
+});
+
+test("formarGruposEnK: k mayor que la cantidad de alumnos se recorta", () => {
+  const xs = ["a", "b", "c", "d"].map((u, i) => al(u, "ley", -6 + i, 5));
+  assert.equal(B.formarGruposEnK(xs, campos, 9).grupos.length, 4);
+});
+
+test("formarGruposEnK: nunca más de 10 grupos (la regla admite grupo 1..10)", () => {
+  const xs = Array.from({ length: 40 }, (_, i) => al("u" + i, "ley", (i % 20) - 10, 5 - (i % 7)));
+  assert.equal(B.formarGruposEnK(xs, campos, 15).grupos.length, 10);
+});
+
+test("formarGruposEnK: con 2 o más alumnos nunca queda un solo grupo", () => {
+  const xs = ["a", "b", "c"].map((u, i) => al(u, "ley", -6 + i * 0.1, 5));
+  assert.equal(B.formarGruposEnK(xs, campos, 1).grupos.length, 2);
+});
+
+test("formarGruposEnK: quien no respondió la brújula queda fuera del reparto", () => {
+  const xs = [...["a", "b", "c", "d"].map((u, i) => al(u, "ley", -6 + i, 5)), { uid: "z" }];
+  const { grupos, de } = B.formarGruposEnK(xs, campos, 2);
+  assert.equal(de.z, undefined);
+  assert.equal(grupos.reduce((s, g) => s + g.miembros.length, 0), 4);
+});

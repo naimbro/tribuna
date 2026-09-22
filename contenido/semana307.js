@@ -6,14 +6,19 @@
    Los alumnos son de pregrado, no del Minor en IA. Sólo se juzga lo que
    leyeron en sala y lo que se proyectó. Dos documentos y una exposición:
 
-   1) Mapa del NYT, 18 fichas, en la traducción resumida de la guía impresa
-      (teaching/2026_mgt300_clase7_guia_lectura.html, sección 1): resumen y
-      traducción propios de E. Martin y R. Lieberman, «How A.I. Risks Are
-      Splitting Silicon Valley and Washington», NYT, 15 sep. 2026.
+   1) Mapa del NYT, 13 fichas (resumen de las 18 del original), en la
+      traducción de la guía impresa (teaching/2026_mgt300_clase7_guia_lectura.html,
+      sección 1): resumen y traducción propios de E. Martin y R. Lieberman,
+      «How A.I. Risks Are Splitting Silicon Valley and Washington», NYT,
+      15 sep. 2026.
    2) Reportaje de A. Chernin y N. Yáñez, «Entre Thiel y el Papa: la disputa
-      ideológica por regular la IA», La Tercera, 20 sep. 2026 (impreso).
-   3) Exposición de 25 min: los cuatro campos de la grilla; «el instrumento
-      que tiene el Estado determina lo que hace»; el marco chileno.
+      ideológica por regular la IA», La Tercera, 20 sep. 2026 (impreso). La guía
+      lo tabula con doce nombres chilenos.
+   3) Exposición de 25 min, «¿Quién se queda con la IA?»: empleo, reparto y la
+      reacción que ya está en la calle. De ahí sale un solo dato que este
+      archivo usa, la lámina de Pew de la brújula. El modelo de Acemoglu,
+      Gitmez y Shadmehr NO se proyectó hoy: la diapo 27 lo anuncia para la
+      clase 8.
 
    Lectura asignada que muchos no habrán hecho: Schneier & Sanders, Rewiring
    Democracy, caps. 33 y 40–42. Suma en `evidencia`; no es requisito de nada.
@@ -120,14 +125,14 @@ const CONCEPTOS = [
   /* ---- 2. La exposición (tres ideas proyectadas) --------------------- */
 
   { id: "cuatro_campos", etiqueta: "La grilla de cuatro campos: velocidad × quién pone la regla", lado: 0,
-    fuente: "Exposición, idea 1 (los cuatro campos del mapa del NYT como grilla); guía de lectura, sección «El cruce»",
+    fuente: "Guía de lectura, sección «El cruce»: dos preguntas, cuatro esquinas, dos países, con las trece fichas y los doce chilenos ubicados en el plano",
     claves: ["cuatro campos","dos preguntas distintas","frenar por ley","frenar desde adentro","guardarrailes sin freno","ni freno ni ley","quien pone la regla","a que velocidad","la grilla","el cruce","dos preguntas","cuatro esquinas","frenar sin que lo regulen","regular sin frenar"] },
 
-  { id: "instrumento", etiqueta: "El instrumento que tiene el Estado determina lo que hace", lado: 0,
-    fuente: "Exposición, idea 2 (una lámina de Acemoglu, Gitmez y Shadmehr: «impuestos u horcas»)",
-    claves: ["el instrumento determina","el instrumento que tiene","determina lo que hace","impuestos u horcas","horcas","que instrumento","con que instrumento","que instrumento pide","acemoglu","gitmez","shadmehr","un solo instrumento","la herramienta que tiene"] },
+  { id: "instrumento", etiqueta: "Qué instrumento le pide o le niega al Estado cada persona", lado: 0,
+    fuente: "Guía de lectura, cierre del cruce: «elige a uno de los veinticinco y anota en una frase qué instrumento le pide o le niega al Estado»; y la columna «qué pide» de la tabla de los doce chilenos",
+    claves: ["que instrumento","con que instrumento","que instrumento pide","le pide al estado","le niega al estado","un instrumento","el instrumento","una prohibicion","una obligacion previa","responsabilidad por dano","permiso de entrada","una cuota","un impuesto","un derecho","quien lo hace cumplir","con que facultad"] },
 
-  /* ---- 3. El mapa del NYT (18 fichas) -------------------------------- */
+  /* ---- 3. El mapa del NYT (13 fichas en la guía) --------------------- */
 
   { id: "giro_altman", etiqueta: "El giro de Altman y Musk después de Hugging Face", lado: +1,
     fuente: "Mapa NYT (guía, sección 1), fichas de Sam Altman y Elon Musk",
@@ -160,7 +165,7 @@ const CONCEPTOS = [
   /* ---- 4. La comparación entre los dos documentos -------------------- */
 
   { id: "lineas_conocidas", etiqueta: "En EE.UU. las divisiones no siguen las líneas conocidas; en Chile sí", lado: 0,
-    fuente: "Guía de lectura, observaciones de las secciones 1 y 2: el cruce de los 18 estadounidenses contra el de los 11 chilenos",
+    fuente: "Guía de lectura, observaciones de las secciones 1 y 2: el cruce de los 13 estadounidenses contra el de los 12 chilenos",
     claves: ["no siguen las lineas conocidas","lineas conocidas","sanders y hawley","un socialista y un republicano","del mismo lado","enfrentado a los ejecutivos","que financiaron su campana","los tres que mas saben","los que mas quieren frenarla","en chile si","casi todos los diputados","la regla la pone el estado","de que trata la ley","el trabajo y el reparto","los derechos individuales","limites al estado","tercera pregunta","en los dos paises","los dos textos","los dos documentos","el mapa y el reportaje"] }
 ];
 
@@ -173,11 +178,13 @@ const FUENTES = [
   "manouchehri","girardi","serrano","montalva","edwards","boric","kast","enciclica","magnifica humanitas",
   "leon xiv","thiel","palantir",
   // Mapa del NYT
-  "nyt","new york times","amodei","altman","musk","hassabis","nadella","pichai","zuckerberg","wang",
-  "huang","sacks","andreessen","horowitz","sanders","jeffries","hawley","durbin","thune","trump","johnson",
+  // (Hassabis, Alex Wang y Jeffries están en el original del NYT pero NO en las
+  // trece fichas de la guía: no se premia citar lo que nadie leyó.)
+  "nyt","new york times","amodei","altman","musk","nadella","pichai","zuckerberg",
+  "huang","sacks","andreessen","horowitz","sanders","hawley","durbin","thune","trump","johnson",
   "hugging face","anthropic","openai","nvidia",
-  // Lectura asignada y la lámina de la exposición
-  "schneier","rewiring democracy","acemoglu","gitmez","shadmehr"
+  // Lectura asignada, y el único dato de la exposición que la brújula les proyecta
+  "schneier","rewiring democracy","pew"
 ];
 
 /* --- La audiencia: seis bloques, no una masa -------------------------
@@ -390,87 +397,102 @@ Pero una obligación escrita antes de ver un solo uso se parece más a prohibir 
    moderadora las propone primero, en este orden; después genera las suyas. */
 const PREGUNTAS = [
   "Chile debe aprobar las obligaciones vinculantes de la ley de IA antes de que se construyan los centros de datos, aunque eso retrase la inversión.",
-  "Frenar el desarrollo de la IA es asunto de quienes la construyen, no del Congreso chileno.",
+  "La ley de IA debe fijar cuotas de puestos de trabajo que no se pueden reemplazar, aunque eso frene la automatización.",
   "Ninguna plataforma debería poder operar en Chile sin representante legal y sin las mismas exigencias que un puesto de comida.",
   "El mayor riesgo de la IA en Chile es un Estado que la use para vigilar, no un puñado de empresas que la controle."
 ];
 
 /* --- Brújula corta -----------------------------------------------------
-   Los dos ejes son los del mapa del NYT, que es la grilla con que los
-   alumnos marcaron las 18 fichas y los 11 diputados: x = velocidad
-   (frenar … acelerar), y = quién pone la regla (la industria se regula sola
-   … el Estado, con potestades vinculantes). Los cuatro campos son los
-   mismos, con el `afirma` escrito para el caso chileno.
-   Cuatro de las cinco escenas son del reportaje de La Tercera; la cuarta es
-   del mapa, porque es donde hay posturas reales del lado «la industria se
-   regula sola» y sin ella la sala no se dispersa en el eje y.
-   Ninguna opción está marcada como la correcta: las cuatro son posiciones
-   que alguien sostiene en alguno de los dos textos.                      */
+   Los dos ejes del mapa del NYT —velocidad y quién pone la regla— son los que
+   los alumnos marcan a lápiz en el cuadernillo, y son los que NO dispersan a
+   esta sala: la propia guía lo advierte en su cierre («si casi todos los
+   diputados quedaron en la columna "la regla la pone el Estado", entonces las
+   dos preguntas del Times no alcanzan para describir la pelea chilena») y le
+   pide a cada alumno que anote cuál sería la tercera pregunta, con una pista:
+   «para unos la ley es sobre el trabajo y el reparto de las ganancias; para
+   otros, sobre los derechos de las personas y los límites del propio Estado».
+
+   Esa tercera pregunta es el eje x de acá. El eje y es la lámina de Pew que se
+   proyectó en la exposición: la mitad de los adultos estadounidenses más
+   preocupada que entusiasmada, y el miedo apuntando a los demás antes que a
+   uno mismo.
+
+   El eje y agrupa, no argumenta. Las preguntas que lo puntúan preguntan qué
+   sentiste, no qué hay que hacer, porque lo que tiene que quedar junto es la
+   gente que llega con el mismo ánimo. La afirmación discutible de cada campo
+   —el `afirma` que recibe la moderadora en clase.js— la pone el eje x; la
+   emoción sólo le cambia el registro.
+
+   Ninguna opción está marcada como la correcta. Las del eje x salen del
+   reportaje de La Tercera; las del eje y, del reportaje y de la lámina de Pew
+   que se proyectó. En la clase en rotación los grupos los arma el k-means de
+   brujula.js con el número que el profesor elige en la portada, y los campos
+   quedan como etiqueta del centroide de cada grupo.                       */
 const BRUJULA = {
   ejes: {
-    x: { id: "velocidad", etiqueta: "Velocidad", min: "frenar", max: "acelerar" },
-    y: { id: "regla", etiqueta: "Quién pone la regla", min: "la industria se regula sola", max: "el Estado, con potestades vinculantes" }
+    x: { id: "detrata", etiqueta: "¿Sobre qué trata la ley?", min: "el trabajo y el reparto", max: "los derechos y los límites al Estado" },
+    y: { id: "animo", etiqueta: "Cómo te deja", min: "entusiasmo", max: "preocupación" }
   },
   preguntas: [
     {
       id: "p1",
-      texto: "El proyecto de ley de IA que el gobierno anterior presentó en mayo de 2024 clasificaba los usos por nivel de riesgo, al estilo europeo. Rojo Edwards dice que este mes el gobierno de Kast haría llegar una indicación sustitutiva de más de 20 artículos, con un enfoque hacia la inversión y contra la sobrerregulación. ¿Qué debería hacer la Comisión de Ciencias con ese giro?",
+      texto: "El proyecto de mayo de 2024 clasificaba los usos de la IA por nivel de riesgo, al estilo europeo. Rojo Edwards dice que este mes el gobierno de Kast haría llegar una indicación sustitutiva de más de 20 artículos, con un enfoque hacia la inversión. Dejando de lado si te gusta el giro: ¿sobre qué tendría que tratar esa ley?",
       opciones: [
-        { texto: "Dejar la sustitutiva donde está y aprobar la clasificación de riesgos que ya está escrita. No se trata de frenar la tecnología, sino de anticiparnos a consecuencias que los propios desarrolladores vienen advirtiendo.", x: -8 },
-        { texto: "Aprobar ahora una ley con límites, aunque salga más corta que la de 2024: en la Cámara ya existe consenso sobre la necesidad de poner límites a la IA y a las plataformas.", x: -4 },
-        { texto: "Recibir la sustitutiva y quedarse con cortapisas al uso: que esta gente tenga que pedir derechos de autor y, por último, pagar un fee. Regular, sí; uso indiscriminado sin regla, no.", x: 4 },
-        { texto: "La sustitutiva va en la dirección correcta. Una ley que prohíba el desarrollo o la innovación sería como pegarse un tiro en los pies.", x: 8 }
+        { texto: "Sobre quién se queda con la productividad. No sacamos nada con tener tecnología del siglo XXI y desigualdades del siglo XIX.", x: -8 },
+        { texto: "Sobre el trabajo que viene: reconversión, cuotas de puestos indispensables, y quién va a financiar la salud y las pensiones.", x: -4 },
+        { texto: "Sobre las reglas del uso: derechos de autor, por último pagar un fee, cortapisas. Regular en vez de prohibir, sin barreras al desarrollo.", x: 4 },
+        { texto: "Sobre los derechos de las personas respecto de la inteligencia artificial, no sobre cómo funciona la inteligencia artificial.", x: 8 }
       ]
     },
     {
       id: "p2",
-      texto: "Daniela Serrano dice que es inconcebible que grandes plataformas operen en Chile sin un representante legal, mientras a una persona que instala un puesto de comida se le exige una serie de permisos y requisitos. Johannes Kaiser dice que él es partidario de establecer los derechos de las personas respecto de la IA, no de regular el funcionamiento de la IA. ¿Quién debe fijar la regla de cómo opera la IA en Chile?",
+      texto: "El reportaje cuenta que esta semana la propia OpenAI reveló otros seis incidentes con agentes de IA descontrolados, en un símil al episodio de julio con el hackeo a Hugging Face. No qué habría que hacer: qué te produjo leerlo.",
       opciones: [
-        { texto: "Nadie desde el Estado. El sistema se autorregula, y si una persona lo emplea negativamente, se le sanciona. Mientras tanto, uso libre.", y: -7 },
-        { texto: "La ley fija los derechos de las personas frente a la IA y frente al Estado, no cómo funciona la IA. El que tiene que ser transparente es el Estado, no el ciudadano.", y: -3 },
-        { texto: "El Estado le pone cortapisas al uso: derechos de autor y un fee. Regular en vez de prohibir, sin ponerle barreras al desarrollo tecnológico.", y: 3 },
-        { texto: "El Estado exige representante legal y permisos, como a cualquiera que abre un negocio. No es sólo una batalla cultural: es una cuestión de soberanía.", y: 7 }
+        { texto: "Seis incidentes y ningún daño concreto. Me suena a una industria que vende miedo para que la regulen a su medida.", y: -8 },
+        { texto: "Me llama la atención, pero no me quita el sueño: toda tecnología nueva falla al principio y después se corrige.", y: -3 },
+        { texto: "Me dejó inquieto. Que lo vengan advirtiendo los propios desarrolladores es lo que más me pesa de todo esto.", y: 3 },
+        { texto: "Me asusta de verdad. Si los sistemas ya se salen de control y atacan empresas, lo que viene es de otra magnitud.", y: 8 }
       ]
     },
     {
       id: "p3",
-      texto: "Felipe Ross dice que en republicanos están a favor de construir centros de datos, porque «eso de que son una amenaza ambiental significativa es algo del pasado: hoy recirculan el agua que utilizan». Guido Girardi pregunta quién va a financiar la salud cuando los seres humanos sean desplazados. ¿Qué hace Chile con la inversión que viene?",
+      texto: "Guido Girardi pregunta quién va a financiar la salud y las pensiones cuando los seres humanos sean desplazados, porque hoy se pagan con impuestos al trabajo. Felipe Ross contesta que la rigidización del mercado laboral es lo que de verdad perjudica a los trabajadores. ¿Qué le toca hacer a la ley con el empleo?",
       opciones: [
-        { texto: "Antes de seguir abriendo la puerta, construir una institucionalidad común sudamericana que permita negociar de igual a igual con corporaciones más ricas que nuestro propio producto interno.", x: -8 },
-        { texto: "Que la inversión entre, pero con la respuesta escrita antes: hoy la salud y las pensiones se financian con impuestos al trabajo, y lo que viene es contratación por tareas y uberización.", x: -4 },
-        { texto: "Que entre. Lo ambiental es cosa del pasado, y los puestos que se creen van a estar sí o sí en un mercado laboral mucho más flexible, no heredero de la revolución industrial.", x: 4 },
-        { texto: "Que entre sin trabas. ¿Quién sabe si en las nuevas generaciones surgen talentos que permitan generar nuestra propia inteligencia artificial?", x: 8 }
+        { texto: "Fijar por ley cuotas de puestos que no se pueden reemplazar porque son indispensables, y un plan agresivo de reconversión.", x: -8 },
+        { texto: "Sentar a los trabajadores y sus sindicatos en esa conversación, y repartir la productividad en capacitación y medidas pro empleo.", x: -4 },
+        { texto: "No rigidizar. Los puestos que se creen van a nacer en un mercado laboral mucho más flexible, no heredero de la revolución industrial.", x: 4 },
+        { texto: "Nada. El problema no es la IA: es un Estado decidiendo qué puestos de trabajo pueden existir y cuáles no.", x: 8 }
       ]
     },
     {
       id: "p4",
-      texto: "En el mapa del NYT, David Sacks responde al ensayo de Dario Amodei diciendo que los laboratorios fijan la frontera tecnológica ellos mismos. La misma semana, el senador Josh Hawley le exige a Sam Altman explicaciones por escrito sobre el ataque a Hugging Face, dentro de una indagatoria formal. Traducido a Chile: ¿quién debería poner la regla?",
+      texto: "En Estados Unidos la mitad de los adultos dice que el uso creciente de la IA en la vida diaria los deja más preocupados que entusiasmados; un 38% por igual, y sólo un 10% más entusiasmados. Y el miedo apunta a los demás antes que a uno: 79% teme por los jóvenes y sólo 56% por su propia familia. ¿Y tú?",
       opciones: [
-        { texto: "Sacks y Huang tienen razón: el que construye el sistema es el único que sabe dónde está la frontera, y ninguna empresa debería estar pidiéndole al gobierno más regulación de la IA.", y: -7 },
-        { texto: "Como propone Nadella: un ritmo deliberado acordado por la propia industria, con supervisión humana de los sistemas avanzados. Se cumple al día siguiente; una ley se discute dos años.", y: -3 },
-        { texto: "Como Thune: una ley de toque liviano, con guardarraíles sólo para las amenazas de mayor consecuencia, sin frenar la innovación.", y: 3 },
-        { texto: "Como Hawley y Durbin: un sistema de IA es un producto, y si causa daño se responde ante la ley. El Congreso no puede dejar que los ejecutivos regulen su propia tecnología.", y: 7 }
+        { texto: "Entusiasmado. Lo que veo son oportunidades, y todo este pesimismo me parece sobre todo una moda.", y: -8 },
+        { texto: "Más entusiasmado que preocupado, aunque me incomoda no tener idea de en qué termina esto.", y: -3 },
+        { texto: "Más preocupado que entusiasmado. Pero no por mí: por los que vienen atrás, que la van a encontrar hecha.", y: 3 },
+        { texto: "Preocupado, y por mí también. Mi propio trabajo está en esa lista, y no en veinte años más.", y: 8 }
       ]
     },
     {
       id: "p5",
-      texto: "Daniel Manouchehri quiere un plan agresivo de reconversión laboral y, más que subsidios, cuotas de puestos de trabajo que no se debiesen reemplazar porque son indispensables. Felipe Ross responde que la rigidización del mercado laboral perjudica los intereses de los trabajadores, y que la CUT y los sindicatos tienen que reflexionar sobre qué les conviene de verdad. ¿A qué velocidad se deja avanzar la automatización?",
+      texto: "José Montalva dice que la disputa ya no va a ser entre izquierdas y derechas, sino entre la corriente tecnolibertaria de Peter Thiel y el Papa León XIV, que subordina la tecnología a la dignidad humana. Daniela Serrano dice que es inconcebible que una plataforma global opere en Chile sin representante legal mientras a un puesto de comida se le exige una lista de permisos. ¿Cuál es la pelea de fondo?",
       opciones: [
-        { texto: "Con cuotas por ley de puestos indispensables que no se pueden reemplazar, escritas antes de que llegue la ola. Más que subsidios, límites.", x: -8 },
-        { texto: "Que avance, pero con los trabajadores y sus sindicatos en esa conversación, y con la productividad repartida en mayor capacitación y medidas pro empleo.", x: -4 },
-        { texto: "Que avance. Los puestos que se creen van a nacer en un mercado laboral mucho más flexible, y rigidizarlo es lo que de verdad perjudica a los trabajadores.", x: 4 },
-        { texto: "Que avance sin trabas, protegiendo a los emprendedores, a las pymes y a la gente que quiere ganarle al sistema cumpliendo con los requisitos.", x: 8 }
+        { texto: "Quién será el dueño del futuro. Si la riqueza de la IA la produjo la humanidad completa, lo justo es un impuesto global.", x: -8 },
+        { texto: "La soberanía: que estas empresas tengan representante legal acá y cumplan requisitos como cualquiera que abre un negocio.", x: -4 },
+        { texto: "Los derechos concretos de cada persona frente a la IA: su imagen, su obra, que no la suplanten. Eso sí; el resto, no.", x: 4 },
+        { texto: "El límite al propio Estado. Lo que hay que impedir es un estado de supervigilancia masivo: el transparente tiene que ser el Estado, no el ciudadano.", x: 8 }
       ]
     }
   ],
   campos: [
-    { id: "ley", nombre: "Frenar por ley", centro: { x: -6, y: 5 }, color: "#38bdf8",
-      afirma: "Hay que frenar antes de abrir la puerta, y el freno lo tiene que poner una ley chilena con obligaciones que se puedan cobrar." },
-    { id: "adentro", nombre: "Frenar desde adentro", centro: { x: -6, y: -5 }, color: "#34d399",
-      afirma: "Hay que ir más lento, pero el freno lo ponen mejor los que construyen la tecnología que una ley escrita antes de ver un solo uso." },
-    { id: "guard", nombre: "Guardarraíles sin freno", centro: { x: 6, y: 5 }, color: "#f59e0b",
-      afirma: "Que la inversión llegue, y que el Estado le fije guardarraíles vinculantes: fácil innovar, caro vulnerar derechos." },
-    { id: "nada", nombre: "Ni freno ni ley", centro: { x: 6, y: -5 }, color: "#fb7185",
-      afirma: "Ni frenar ni legislar antes: que el desarrollo avance, y si alguien usa mal la herramienta, se le sanciona después." }
+    { id: "reparto_antes", nombre: "El reparto, antes", centro: { x: -6, y: 5 }, color: "#38bdf8",
+      afirma: "Esto nos va a pasar por encima, y el reparto hay que dejarlo escrito antes de que llegue: cuotas de puestos indispensables, reconversión pagada por el Estado, y decir de dónde va a salir la plata de la salud y las pensiones." },
+    { id: "vigilancia", nombre: "Que no nos vigilen", centro: { x: 6, y: 5 }, color: "#f59e0b",
+      afirma: "El peligro grande no es la máquina: es el Estado con la máquina. Derechos de las personas frente a la IA, sí; regular su funcionamiento, no; y el que tiene que ser transparente es el Estado, no el ciudadano honesto." },
+    { id: "repartir_llegando", nombre: "Que llegue y se reparta", centro: { x: -6, y: -5 }, color: "#34d399",
+      afirma: "La IA es buena noticia y hay que dejarla entrar; lo que exigimos es que la productividad se distribuya en capacitación y medidas pro empleo, con los trabajadores y sus sindicatos en esa conversación. Fácil innovar, caro vulnerar derechos." },
+    { id: "sin_trabas", nombre: "Que llegue sin trabas", centro: { x: 6, y: -5 }, color: "#fb7185",
+      afirma: "Que entre sin barreras al desarrollo. Cortapisas al uso si hace falta —derechos de autor, por último un fee—, pero nada escrito antes de ver un daño concreto: prohibir con la brocha se lleva puesto lo que todavía no existe." }
   ]
 };

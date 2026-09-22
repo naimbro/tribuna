@@ -291,7 +291,7 @@ window.datosMapa = () => {
 window.formarGruposBrujula = async () => {
   const alumnos = Object.entries(ON.brujula || {}).filter(([uid, b]) => b.pos && ON.jugadores[uid]).map(([uid, b]) => ({ uid, pos: b.pos, campo: b.campo }));
   if (alumnos.length < 2) return { ok: false, motivo: "Faltan alumnos: se necesitan al menos 2 con la brújula respondida." };
-  const { grupos, de } = formarGrupos(alumnos, BRUJULA.campos);
+  const { grupos, de } = formarGruposEnK(alumnos, BRUJULA.campos, S.clase.grupos);
   S.clase.gruposInfo = grupos.map(g => ({ n: g.n, campo: g.campo, nombre: (BRUJULA.campos.find(c => c.id === g.campo) || {}).nombre || g.campo,
                                           pos: { x: +g.pos.x.toFixed(2), y: +g.pos.y.toFixed(2) }, tam: g.miembros.length }));
   S.clase.grupos = grupos.length;

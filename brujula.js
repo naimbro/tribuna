@@ -93,6 +93,88 @@ function armarGrupos(alumnos, campos, tam) {
   return { grupos: salida, de };
 }
 
+/* --- k-means balanceado: los k grupos que pide el profesor ---------------
+   Portado de armarCampos() de ml2-master-game. A diferencia de formarGrupos(),
+   acá los campos del contenido NO deciden el grupo: se usan solo para etiquetar
+   el centroide de cada grupo, y el reparto sale de dónde quedó la nube.
+   K-means a secas sería lo obvio y es lo incorrecto, porque nada impide que un
+   cúster se lleve media sala: los tamaños parejos son un requisito de la
+   actividad, no una comodidad estadística. Determinista —sin Math.random ni
+   Date— porque un profesor que reagrupa y obtiene otra cosa no puede
+   explicarle el reparto a la clase. */
+
+// Las semillas, lo más lejanas posible entre sí: la primera es el punto más lejano
+// del centro de la nube, y cada siguiente maximiza su distancia a las ya elegidas.
+// Se eligen los extremos y no las zonas densas a propósito: las semillas definen
+// sobre qué van a discutir los grupos, y dos sacadas del mismo centro cargado dan
+// dos grupos que están de acuerdo entre ellos.
+function semillas(xs, k) {
+  if (!xs.length) return [];
+  const centro = centroide(xs);
+  const orden = [...xs].sort((a, b) => String(a.uid).localeCompare(String(b.uid)));
+  const elegidas = [orden.reduce((mejor, m) => (distancia(m.pos, centro) > distancia(mejor.pos, centro) ? m : mejor))];
+  while (elegidas.length < Math.min(k, orden.length)) {
+    let mejor = null, mejorDist = -1;
+    for (const m of orden) {
+      if (elegidas.some(s => s.uid === m.uid)) continue;
+      const d = Math.min(...elegidas.map(s => distancia(m.pos, s.pos)));
+      if (d > mejorDist) { mejorDist = d; mejor = m; }
+    }
+    if (!mejor) break;
+    elegidas.push(mejor);
+  }
+  return elegidas;
+}
+
+// Cada alumno al centro más cercano que todavía tenga cupo. Se recorren todos los
+// pares (alumno, centro) de menor a mayor distancia; el desempate por uid hace que
+// dos alumnos equidistantes caigan siempre en el mismo grupo entre una corrida y otra.
+function asignarCupos(xs, centros, cupos) {
+  const pares = [];
+  for (const m of xs) centros.forEach((c, i) => pares.push({ m, c: i, d: distancia(m.pos, c) }));
+  pares.sort((p, q) => p.d - q.d || String(p.m.uid).localeCompare(String(q.m.uid)) || p.c - q.c);
+  const grupos = centros.map(() => []), puestos = new Set();
+  for (const p of pares) {
+    if (puestos.has(p.m.uid) || grupos[p.c].length >= cupos[p.c]) continue;
+    grupos[p.c].push(p.m); puestos.add(p.m.uid);
+  }
+  // si a alguien se le llenaron todos los campos cercanos, entra al que tenga menos gente
+  for (const m of xs) {
+    if (puestos.has(m.uid)) continue;
+    const i = grupos.reduce((mej, g, gi) => (g.length < grupos[mej].length ? gi : mej), 0);
+    grupos[i].push(m); puestos.add(m.uid);
+  }
+  return grupos;
+}
+
+function formarGruposEnK(alumnos, campos, k) {
+  const xs = (alumnos || []).filter(a => a && a.pos && Number.isFinite(a.pos.x) && Number.isFinite(a.pos.y));
+  if (!xs.length) return { grupos: [], de: {} };
+  // para debatir hacen falta dos grupos; y la regla de Firestore admite grupo 1..10
+  const kReal = Math.max(xs.length >= 2 ? 2 : 1, Math.min(Math.floor(k) || 1, xs.length, MAX_GRUPOS));
+  const base = Math.floor(xs.length / kReal), sobran = xs.length % kReal;
+  const cupos = Array.from({ length: kReal }, (_, i) => base + (i < sobran ? 1 : 0));
+  let centros = semillas(xs, kReal).map(m => m.pos);
+  let grupos = asignarCupos(xs, centros, cupos);
+  // dos refinamientos: los centros se mueven al medio de lo que quedó y se reasigna.
+  // Más iteraciones no mueven nada con treinta puntos y sí hacen el reparto más
+  // difícil de explicar en la sala.
+  for (let i = 0; i < 2; i++) {
+    centros = grupos.map((g, gi) => (g.length ? centroide(g) : centros[gi]));
+    grupos = asignarCupos(xs, centros, cupos);
+  }
+  // numerados de izquierda a derecha del mapa, para poder decir «grupo 1, los de allá»
+  const primero = g => g.map(m => String(m.uid)).sort()[0];
+  const conPos = grupos.filter(g => g.length).map(g => ({ miembros: g, pos: centroide(g) }));
+  conPos.sort((a, b) => a.pos.x - b.pos.x || a.pos.y - b.pos.y || primero(a.miembros).localeCompare(primero(b.miembros)));
+  const de = {};
+  const salida = conPos.map((g, i) => {
+    g.miembros.forEach(m => { de[m.uid] = i + 1; });
+    return { n: i + 1, campo: campoDe(g.pos, campos), miembros: g.miembros.map(m => m.uid), pos: g.pos };
+  });
+  return { grupos: salida, de };
+}
+
 // Quien llega tarde (o no terminó la brújula): al grupo más chico de su campo; si su campo no
 // tiene grupos, al más cercano a su posición; sin posición, al más chico de todos.
 function asignarTarde(pos, campo, grupos) {
@@ -177,4 +259,4 @@ function ofrecerBrujula(bj, tieneMio) {
   return !!(bj && bj.activa && !tieneMio && ["responder", "grupos"].includes(bj.fase));
 }
 
-if (typeof module !== "undefined") module.exports = { TAM_GRUPO, posicion, campoDe, formarGrupos, asignarTarde, emparejarLejanos, mapaSvg, accionBrujula, ofrecerBrujula };
+if (typeof module !== "undefined") module.exports = { TAM_GRUPO, MAX_GRUPOS, posicion, campoDe, formarGrupos, formarGruposEnK, asignarTarde, emparejarLejanos, mapaSvg, accionBrujula, ofrecerBrujula };

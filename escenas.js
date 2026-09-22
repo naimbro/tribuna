@@ -74,7 +74,14 @@ function mostrarPortada(url, codigo, alEmpezar) {
     actualizarPortada(window.jugadoresSala?.() || {});
   };
   $("poTema").onchange = e => { S.clase.tema = e.target.value.trim().slice(0, 200) || SESION.tema; window.publicarEstado?.(); };
-  $("poGrupos").onchange = e => { S.clase.grupos = +e.target.value; window.publicarEstado?.(); actualizarPortada(window.jugadoresSala?.() || {}); };
+  $("poGrupos").onchange = async e => {
+    S.clase.grupos = +e.target.value;
+    // con los grupos ya formados, cambiar el numero los rehace: el profesor prueba 5 y 6
+    // mirando el mapa antes de mandar a nadie a moverse de silla
+    if (S.clase.brujula && S.clase.brujula.activa && S.clase.brujula.fase === "grupos") await window.formarGruposBrujula?.();
+    else window.publicarEstado?.();
+    actualizarPortada(window.jugadoresSala?.() || {});
+  };
   PORTADA.primera = true;
 }
 
@@ -105,10 +112,11 @@ function actualizarMapaPortada() {
 function actualizarPortada(jugadores) {
   const g = $("poGente"); if (!g) return;
   const conBrujula = S.clase.brujula && S.clase.brujula.activa && typeof BRUJULA !== "undefined";
-  if ($("poGrupos")) $("poGrupos").closest("label").style.display = conBrujula ? "none" : "";
+  // con la brujula encendida el selector fija el k del reparto, asi que se muestra siempre
+  if ($("poGrupos")) $("poGrupos").closest("label").style.display = "";
   if ($("poBrujula")) $("poBrujula").closest("label").style.display = conBrujula && S.clase.brujula.fase !== "responder" ? "none" : "";
   if ($("poPie")) $("poPie").textContent = conBrujula
-    ? "Entren con su cuenta de Google y respondan la brújula (un minuto). Los grupos se forman por posición."
+    ? `Entren con su cuenta de Google y respondan la brújula (un minuto). Salen ${S.clase.grupos} grupos, por posición en el mapa.`
     : "Entren con su cuenta de Google y elijan un grupo. Cada grupo debate y vota por turnos.";
   if (conBrujula && S.clase.brujula.fase === "responder") { actualizarMapaPortada(); return; }
   const lista = Object.entries(jugadores).map(([uid, j]) => ({ uid, ...j })).sort((a, b) => (a.unido || 0) - (b.unido || 0));
