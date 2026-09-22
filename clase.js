@@ -83,6 +83,7 @@ async function cerrarVotacion() {
   for (const e of (typeof window.listaElegibles === "function" ? window.listaElegibles() : []))
     if (!ya.has(e.uid)) reg.votos.push({ ...e, voto: null, prediccion: null });
   reg.publico = votoPublico(reg.votos.map(v => v.voto));
+  if (typeof barraDelDebate === "function") reg.barra = barraDelDebate();   // participación: solo registro, no puntaje
   S.fase = "veredictoPublico";
   $("btnPrincipal").textContent = "SALTAR ▶";
   publicarEstado();
@@ -129,9 +130,10 @@ function mostrarResultado() {
   $("btnPrincipal").textContent = "SEGUIR ▶";
 }
 
-function terminarClase() {
+// sinPreguntar: la orden viene del panel (admin.html), que ya pidió confirmación
+function terminarClase(sinPreguntar = false) {
   if (["abierta", "listo", "votando", "veredictoPublico", "veredictoJueces"].includes(S.fase)) {
-    if (!confirm("Hay un debate en curso. ¿Terminar la clase igual? Ese debate no cuenta para el ranking.")) return;
+    if (sinPreguntar !== true && !confirm("Hay un debate en curso. ¿Terminar la clase igual? Ese debate no cuenta para el ranking.")) return;
     clearInterval(S.reloj);
     cerrarEscena();
     const reg = S.debate && S.clase.debates[S.debate.n - 1];
@@ -160,13 +162,16 @@ function accionPrincipal() {
 }
 
 $("btnPrincipal").onclick = accionPrincipal;
-$("btnTerminar").onclick = terminarClase;
+$("btnTerminar").onclick = () => terminarClase();
 
 // 🧭 REPETIR BRÚJULA: solo si la partida formó los grupos con la brújula, y entre debates
 function actualizarBotonRepetir() {
   const b = $("btnRepetir");
   if (b) b.style.display = (S.clase.gruposInfo || []).length ? "" : "none";
 }
+$("btnMapa").onclick = () => abrirMapaGrande();
+// 🧭 MAPA: la brújula a pantalla completa, siempre que la sala la use
+setInterval(() => { $("btnMapa").style.display = S.clase.brujula && S.clase.brujula.activa && typeof BRUJULA !== "undefined" ? "" : "none"; }, 2000);
 $("btnRepetir").onclick = () => {
   if (!["propuesta", "fin"].includes(S.fase)) { tick("Termina el debate en curso antes de repetir la brújula."); return; }
   if (S.fase === "propuesta") clearInterval(cuentaPropuesta);           // que no se publique la pregunta por detrás

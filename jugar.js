@@ -106,17 +106,21 @@ async function entrarAlJuego() {
   // quiénes están en la sala: para sugerir nombres al escribir @
   subs.push(onSnapshot(collection(db, "salas", J.codigo, "jugadores"), snap => {
     J.gente = []; snap.forEach(d => J.gente.push({ uid: d.id, nombre: d.data().nombre || "", grupo: d.data().grupo || 0 }));
+    pintarBarraTel();
   }));
   // el profesor puede moverme de grupo: el rol y lo que escribo dependen de mi grupo actual
   subs.push(onSnapshot(doc(db, "salas", J.codigo, "jugadores", J.uid), snap => {
-    const g = snap.data()?.grupo;
-    if (g > 0 && g !== J.grupo) { J.grupo = g; J.debateVisto = null; pintarSala(); }
+    // también cuando vuelve a 0 (el profesor rehízo los grupos): si no, el teléfono seguiría
+    // mostrando un grupo que ya no es el suyo
+    const g = snap.data()?.grupo || 0;
+    if (g !== (J.grupo || 0)) { J.grupo = g || null; J.debateVisto = null; $("espera").dataset.clave = ""; pintarSala(); }
   }));
   subs.push(onSnapshot(query(collection(db, "salas", J.codigo, "mensajes"), orderBy("t")), snap => {
     const antes = new Set(J.chat.map(m => m.id));
     J.chat = []; snap.forEach(d => J.chat.push({ ...d.data(), id: d.id }));
     const nuevos = J.chat.filter(m => !antes.has(m.id));
     pintarChat();
+    pintarBarraTel();
     if (J.sala) pintarVotar(J.sala);                  // el resumen del relator llega con la votación ya abierta
     if (!J.primera) avisarNuevos(nuevos);
     J.primera = false;
@@ -130,11 +134,9 @@ async function entrarAlJuego() {
   clearInterval(J.reloj); J.reloj = setInterval(pintarReloj, 500);
 }
 
-// me nombran si aparece "@" + mi nombre (o mi primer nombre)
-const meNombran = t => {
-  const n = norm(t), mi = norm(J.nombre), primero = mi.split(" ")[0];
-  return n.includes("@" + mi) || (primero.length > 2 && n.includes("@" + primero));
-};
+// me nombran con "@" + mi nombre (o mi primer nombre, si no sigue el apellido de otro) o "@Grupo N"
+// de mi grupo: la moderadora le habla a los grupos (ritmo.js)
+const meNombran = t => { cargarApellidos(J.gente.map(g => g.nombre)); return mencionaA(t, J.nombre, J.grupo); };
 
 function avisarNuevos(nuevos) {
   for (const m of nuevos) {
@@ -168,6 +170,7 @@ function pintarSala() {
   $("tramoLbl").textContent = d ? `Debate ${d.n} · ${s.tramo === 1 ? "Réplica" : "Apertura"}.` : "Rotación.";
   $("pauta").textContent = d ? `«${d.pregunta}» — Grupo ${d.A} a favor, Grupo ${d.B} en contra.` : "Esperando la primera pregunta.";
   $("marca").innerHTML = "";
+  pintarBarraTel();
   const debatiendo = rol === "A" || rol === "B";
   $("caja").classList.toggle("oculto", !debatiendo);
   $("voto").classList.toggle("oculto", rol !== "P" || s.fase !== "abierta");
@@ -180,7 +183,7 @@ function pintarSala() {
   // brújula: la repetición del cierre; y si el profesor la apaga, quien no tiene grupo elige a mano
   const bj = s.brujula;
   const accion = accionBrujula(bj, { visible: !$("brujula").classList.contains("oculto"), modo: BJ.modo,
-    tieneMio: !!BJ.mio, tieneRepeticion: !!(BJ.mio && BJ.mio.repeticion) });
+    tieneMio: !!BJ.mio, tieneRepeticion: !!(BJ.mio && BJ.mio.repeticion && !BJ.mio.repeticion.parcial) });
   if (accion === "cerrar") { $("brujula").classList.add("oculto"); $("espera").dataset.clave = ""; }
   if (accion === "repetir") mostrarBrujula("repetir");
   if (!J.grupo && !$("pBancada").classList.contains("oculto")) {
@@ -216,7 +219,7 @@ function pintarReloj() {
 
 /* ---------- la conversación ---------- */
 function menciones(t) {
-  return esc(t).replace(/@([A-Za-zÁÉÍÓÚÑáéíóúñü][\wÁÉÍÓÚÑáéíóúñü.-]*(?:\s[A-ZÁÉÍÓÚÑ][\wáéíóúñü.-]*)?)/g,
+  return esc(t).replace(/@([Gg]rupo \d+|[A-Za-zÁÉÍÓÚÑáéíóúñü][\wÁÉÍÓÚÑáéíóúñü.-]*(?:\s[A-ZÁÉÍÓÚÑ][\wáéíóúñü.-]*)?)/g,
     (x, n) => `<b class="mencion ${meNombran("@" + n) ? "yo" : ""}">@${n}</b>`);
 }
 
@@ -258,6 +261,66 @@ function pintarChat() {
   }
   p.innerHTML = html || `<div class="sep" style="margin-top:40px">La conversación empieza cuando el profesor abra el primer tramo.</div>`;
   if (abajo || J.primera) p.scrollTop = p.scrollHeight;
+}
+
+/* ---------- la barra de participación (barra.js) ----------
+   Quien debate ve la barra de su grupo y cuánto le falta a su parte; el público, las dos en chico.
+   Se calcula aquí con los mensajes y la lista de la sala, igual que en el proyector. Cada
+   celebración va una vez por debate (lo ya celebrado se guarda en este teléfono). */
+const JB = { debate: null, antes: {}, hechos: new Set() };
+function llenadoTel(d, k) {
+  const ints = new Map();
+  for (const x of J.gente) if (x.grupo === d[k]) ints.set(claveBarra({ uid: x.uid }), { uid: x.uid, nombre: x.nombre });
+  for (const m of J.chat) if (m.tipo === "alumno" && m.debate === d.n && m.equipo === k && !ints.has(claveBarra(m))) ints.set(claveBarra(m), { uid: m.uid, nombre: m.nombre });
+  return llenadoGrupo(J.chat.filter(m => m.debate === d.n && m.equipo === k), [...ints.values()]);
+}
+function pintarBarraTel() {
+  const el = $("barraTel"), s = J.sala;
+  if (!el) return;
+  const d = s && s.debate;
+  if (!d || s.etapa != null || !["abierta", "votando"].includes(s.fase)) { el.innerHTML = ""; return; }
+  if (JB.debate !== d.n) {
+    JB.debate = d.n; JB.antes = {};
+    try { JB.hechos = new Set(JSON.parse(localStorage.getItem(`tribuna_barra_${J.codigo}_${d.n}`) || "[]")); } catch { JB.hechos = new Set(); }
+  }
+  const rol = rolEn(s);
+  const barra = (k, r, chica) => `<div class="bt ${chica ? "chica" : ""}" style="--c:${s.equipos[k].color}">
+      <div class="bt-cab"><b>Grupo ${d[k]}${chica ? "" : " · tu grupo"}</b>${r.todos ? `<span class="bt-sello">👥 todos</span>` : ""}<span class="bt-pct">${Math.round(r.pct * 100)} %</span></div>
+      <div class="bt-barra ${colorBarra(r.pct)}"><i style="width:${Math.round(r.pct * 100)}%"></i></div></div>`;
+  if (rol === "A" || rol === "B") {
+    const r = llenadoTel(d, rol), mi = r.personas.find(p => p.clave === claveBarra({ uid: J.uid }));
+    el.innerHTML = barra(rol, r, false) + `<div class="bt-yo ${mi && mi.pct >= 1 ? "lleno" : ""}">${mi && mi.pct >= 1 ? "✓ ¡Tu parte está llena!"
+      : `Tu parte: <b>${mi ? mi.palabras : 0}</b> de ${BARRA.META_PERSONA} palabras`}</div>`;
+    celebrarTel(rol, r);
+  } else {
+    el.innerHTML = `<div class="bt-dos">${barra("A", llenadoTel(d, "A"), true)}${barra("B", llenadoTel(d, "B"), true)}</div>`;
+  }
+}
+function celebrarTel(k, r) {
+  const antes = JB.antes[k] || null;
+  JB.antes[k] = r;
+  const yo = claveBarra({ uid: J.uid });
+  for (const h of hitosNuevos(antes, r)) {
+    if (h.tipo === "parte" && h.clave !== yo) continue;
+    const id = h.tipo + "|" + (h.clave || "");
+    if (JB.hechos.has(id)) continue;
+    JB.hechos.add(id);
+    try { localStorage.setItem(`tribuna_barra_${J.codigo}_${JB.debate}`, JSON.stringify([...JB.hechos])); } catch {}
+    if (h.tipo === "parte") {
+      navigator.vibrate?.([60, 40, 60]);
+      $("notaCaja").textContent = "✓ ¡Tu parte de la barra está llena! Sigue: ayuda a los que faltan.";
+      $("notaCaja").classList.add("ati");
+      confeti([J.sala.equipos[k].color, "#ffffff"], 1800);
+    } else if (h.tipo === "lleno") {
+      navigator.vibrate?.([100, 60, 100, 60, 220]);
+      confeti([J.sala.equipos[k].color, "#ffffff", "#ffb020"], 3500);
+      const c = document.createElement("div");
+      c.className = "bt-cartel"; c.style.setProperty("--c", J.sala.equipos[k].color);
+      c.textContent = "🎉 ¡Tu grupo llenó la barra!";
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), 3500);
+    }
+  }
 }
 
 /* ---------- escribir (bancadas) ---------- */
@@ -443,7 +506,8 @@ async function cargarBrujula() {
   if (BJ.cargada) return;
   BJ.cargada = true;
   const d = await getDoc(doc(db, "salas", J.codigo, "brujula", J.uid)).catch(() => null);
-  if (d && d.exists()) BJ.mio = d.data();
+  // una brújula a medio responder (se guarda tras cada pregunta) no cuenta como respondida
+  if (d && d.exists() && !d.data().parcial) BJ.mio = d.data();
 }
 function mostrarBrujula(modo = "inicio") {
   const b = J.sala && J.sala.brujula;
@@ -463,14 +527,26 @@ function mostrarBrujula(modo = "inicio") {
     if (!op) return;
     BJ.respuestas[p.id] = +op.dataset.k;
     navigator.vibrate?.(20);
-    if (BJ.i < b.preguntas.length - 1) { BJ.i++; mostrarBrujula(modo); } else guardarBrujula(modo);
+    if (BJ.i < b.preguntas.length - 1) { BJ.i++; mostrarBrujula(modo); guardarParcial(modo); } else guardarBrujula(modo);
   };
 }
-async function guardarBrujula(modo) {
+// Tras cada respuesta, la posición provisional: en el proyector el punto aparece y se va moviendo
+// mientras el alumno responde (como el compás de ml2). Si falla no pasa nada: la final se guarda igual.
+function datoBrujula(parcial) {
   const b = J.sala.brujula;
   const pos = posicion(BJ.respuestas, b.preguntas);
-  const campo = campoDe(pos, b.campos);
-  const dato = { respuestas: { ...BJ.respuestas }, pos: { x: +pos.x.toFixed(2), y: +pos.y.toFixed(2) }, campo, t: Date.now() };
+  if (!pos) return null;
+  return { respuestas: { ...BJ.respuestas }, pos: { x: +pos.x.toFixed(2), y: +pos.y.toFixed(2) }, campo: campoDe(pos, b.campos), t: Date.now(), parcial };
+}
+function guardarParcial(modo) {
+  const dato = datoBrujula(true);
+  if (!dato) return;
+  const ref = doc(db, "salas", J.codigo, "brujula", J.uid);
+  (modo === "repetir" ? (BJ.mio ? setDoc(ref, { uid: J.uid, ...BJ.mio, repeticion: dato }, { merge: true }) : Promise.resolve())
+    : setDoc(ref, { uid: J.uid, ...dato })).catch(() => {});
+}
+async function guardarBrujula(modo) {
+  const dato = datoBrujula(false);
   try {
     if (modo === "repetir") await setDoc(doc(db, "salas", J.codigo, "brujula", J.uid), { uid: J.uid, ...BJ.mio, repeticion: dato }, { merge: true });
     else await setDoc(doc(db, "salas", J.codigo, "brujula", J.uid), { uid: J.uid, ...dato });

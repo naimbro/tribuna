@@ -42,8 +42,7 @@ function recibirChat(lista, inicial = false) {
   for (const m of nuevos) {
     if (m.tipo === "alumno") {
       sonar("pop");
-      if (m.ronda === S.ronda && S.fase === "abierta") {
-        S.mod.nuevos++; S.mod.ultimoAlumno = Date.now();
+      if (m.ronda === S.ronda && S.fase === "abierta" && S.mod) {
         // le escribieron a ella con @Moderadora: responde de inmediato a esa persona
         if (/@moderadora\b/i.test(norm(m.texto))) { S.mod.pregunta = m; moderadorTalvez(true); }
       }
@@ -53,7 +52,7 @@ function recibirChat(lista, inicial = false) {
 }
 
 /* ---------- pintar la conversación ---------- */
-const conMenciones = t => esc(t).replace(/@([A-Za-zÁÉÍÓÚÑáéíóúñü][\wÁÉÍÓÚÑáéíóúñü.-]*(?:\s[A-ZÁÉÍÓÚÑ][\wáéíóúñü.-]*)?)/g, '<b class="mencion">@$1</b>');
+const conMenciones = t => esc(t).replace(/@([Gg]rupo \d+|[A-Za-zÁÉÍÓÚÑáéíóúñü][\wÁÉÍÓÚÑáéíóúñü.-]*(?:\s[A-ZÁÉÍÓÚÑ][\wáéíóúñü.-]*)?)/g, '<b class="mencion">@$1</b>');
 
 function burbuja(m) {
   const hora = new Date(m.t).toTimeString().slice(0, 5);
@@ -124,54 +123,56 @@ function transcripcionChat(filtro = () => true, max = 40) {
 }
 
 /* ---------- 🎙 la moderadora ---------- */
+// El ritmo (cuándo entra, a quién nombra, qué no repetir) está en ritmo.js y se prueba con Node.
+// Aquí se arma el prompt y se publica.
+
+// Los mensajes del debate (o del tramo, en modo local) en curso, en orden.
+const delDebateEnCurso = () => S.chat.filter(m => S.debate ? m.debate === S.debate.n : m.ronda === S.ronda);
+function estadoTramo() {
+  const ps = participantes();
+  cargarApellidos(ps.map(p => p.nombre));
+  return leerTramo(delDebateEnCurso(), ps, Date.now());
+}
+// Cómo se nombra a un grupo: «@Grupo 3»; sin rotación, el nombre de la bancada.
+const grupoDe = k => S.debate ? `@Grupo ${S.debate[k]}` : ladoNombre(k);
+
 function abrirTramoChat() {
   const R = tramoActual();
-  S.mod = { ultimo: Date.now(), nuevos: 0, enCurso: false, ultimoAlumno: 0, abre: Date.now() };
-  const ps = participantes();
-  const a = ps.filter(p => p.equipo === "A").map(p => "@" + p.nombre), b = ps.filter(p => p.equipo === "B").map(p => "@" + p.nombre);
-  const quien = (arr, def) => arr.length ? arr[Math.floor(Math.random() * arr.length)] : def;
+  S.mod = { enCurso: false, abre: Date.now(), pregunta: null };
   // Un solo tramo por debate: la posición de entrada y de ahí libre. Lo que estructura la
-  // conversación es ella, interviniendo, no un segundo turno con nombre propio.
+  // conversación es ella, interviniendo, no un segundo turno con nombre propio. Llama a los
+  // grupos, no a una persona: quien quiera responde por su grupo.
   const d = S.debate;
-  if (d) {
-    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto:
-      `Debate ${d.n}: «${d.pregunta}». Grupo ${d.A} defiende ${EQUIPOS.A.nombre}; Grupo ${d.B}, ${EQUIPOS.B.nombre}. ` +
-      `${quien(a, "Grupo " + d.A)} y ${quien(b, "Grupo " + d.B)}: su posición en una frase, y de ahí seguimos sueltos. Tienen ${Math.round(R.seg / 60)} minutos y yo voy a ir dando la palabra.` });
-  } else {
-    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto:
-      `«${mocionActual()}». ${quien(a, ladoNombre("A"))} y ${quien(b, ladoNombre("B"))}: su posición en una frase, y de ahí seguimos sueltos. Tienen ${Math.round(R.seg / 60)} minutos y yo voy a ir dando la palabra.` });
-  }
+  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: d
+    ? `Debate ${d.n}: «${d.pregunta}». Grupo ${d.A} defiende ${EQUIPOS.A.nombre}; Grupo ${d.B}, ${EQUIPOS.B.nombre}. ` +
+      `@Grupo ${d.A} y @Grupo ${d.B}: su posición en una frase, cualquiera del grupo, y de ahí seguimos sueltos. Tienen ${Math.round(R.seg / 60)} minutos.`
+    : `«${mocionActual()}». ${ladoNombre("A")} y ${ladoNombre("B")}: su posición en una frase, y de ahí seguimos sueltos. Tienen ${Math.round(R.seg / 60)} minutos.` });
 }
 
 // Se llama cada pocos segundos y cuando llega un mensaje. Decide si la moderadora interviene.
 function moderadorTalvez(forzar = false) {
   const M = S.mod;
   if (!M || M.enCurso || S.fase !== "abierta") return;
-  const ahora = Date.now();
-  const hayMensajes = S.chat.some(m => m.tipo === "alumno" && m.ronda === S.ronda);
-  const pausa = ahora - M.ultimo;
-  // Con un solo tramo abierto la moderadora ES la estructura: entra bastante más seguido
-  // que cuando el reloj marcaba los turnos.
-  const toca = forzar
-    || (pausa > 15000 && M.nuevos >= 2)                                   // la conversación avanzó
-    || (pausa > 20000 && M.nuevos >= 1 && ahora - M.ultimoAlumno > 10000)   // alguien dijo algo y quedó en el aire
-    || (pausa > 30000 && !hayMensajes && ahora - M.abre > 25000);          // silencio: nadie ha escrito
-  if (!toca) return;
-  M.enCurso = true; M.nuevos = 0;
-  intervenirModerador().finally(() => { M.enCurso = false; M.ultimo = Date.now(); });
+  if (!debeIntervenir(estadoTramo(), { ahora: Date.now(), abre: M.abre, forzar }).toca) return;
+  M.enCurso = true;
+  intervenirModerador(forzar).finally(() => { M.enCurso = false; });
 }
 
-function promptModerador() {
+function promptModerador(est) {
   const R = tramoActual();
-  const ps = participantes();
-  const lista = k => ps.filter(p => p.equipo === k).map(p => `${p.nombre} (${p.n} mensajes en este debate)`).join(", ") || "(nadie aún)";
+  const ahora = Date.now(), abre = S.mod ? S.mod.abre : ahora;
+  const minutos = Math.max(0, Math.round((ahora - abre) / 60000));
+  const puedeNombrar = nombrables(est, { ahora, abre }).map(p => p.nombre);
+  const fila = p => `${p.nombre} (${p.n} mensaje${p.n === 1 ? "" : "s"}${p.ausente ? "; PARECE NO ESTAR: no la nombres" : p.sinResponder ? `; la llamaste ${p.sinResponder} vez sin respuesta` : ""}${p.verificado ? "; ya le preguntaste de dónde saca algo" : ""})`;
+  const lista = k => est.alumnos.filter(p => p.equipo === k).map(fila).join(", ") || "(nadie aún)";
+  const d = S.debate;
   return `Eres la moderadora de un debate universitario en vivo, en un chat grupal. Curso: "${SESION.curso}", semana ${SESION.semana}: ${SESION.tema}.
-MOCIÓN: "${mocionActual()}". ${ladoNombre("A")} la defiende; ${ladoNombre("B")} la rechaza.
-TRAMO ACTUAL: ${R.nombre}. Pauta: ${R.pauta}
+MOCIÓN: "${mocionActual()}". ${d ? `Grupo ${d.A}` : ladoNombre("A")} la defiende (${EQUIPOS.A.nombre}); ${d ? `Grupo ${d.B}` : ladoNombre("B")} la rechaza (${EQUIPOS.B.nombre}).
+TRAMO: ${R.nombre}. Van ${minutos} de ${Math.round(R.seg / 60)} minutos. Pauta: ${R.pauta}
 
-PARTICIPANTES
-- ${ladoNombre("A")}: ${lista("A")}
-- ${ladoNombre("B")}: ${lista("B")}
+QUIÉNES DEBATEN
+- ${d ? `Grupo ${d.A}` : ladoNombre("A")}: ${lista("A")}
+- ${d ? `Grupo ${d.B}` : ladoNombre("B")}: ${lista("B")}
 
 CONCEPTOS Y LECTURAS DEL CURSO (SOLO PARA TI: ésta es la lectura que ellos tienen que hacer, y soplarla arruina el ejercicio):
 ${CONCEPTOS.map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n")}
@@ -179,51 +180,87 @@ ${CONCEPTOS.map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n")}
 PERSONAS Y FUENTES QUE ELLOS TIENEN IMPRESAS (puedes nombrarlas y preguntar por ellas):
 ${FUENTES.join(", ")}
 
-CONVERSACIÓN (lo último al final):
-${transcripcionChat(m => true, 30) || "(todavía nadie ha escrito)"}
+CONVERSACIÓN DE ESTE DEBATE (lo último al final):
+${transcripcionChat(m => (d ? m.debate === d.n : m.ronda === S.ronda), 30) || "(todavía nadie ha escrito)"}
 
 ${S.mod && S.mod.pregunta ? `TE ESCRIBIERON DIRECTAMENTE: ${S.mod.pregunta.nombre} te dijo: "${S.mod.pregunta.texto}".
-Responde PRIMERO a esa persona (nómbrala con @${S.mod.pregunta.nombre}), en una o dos frases. Puedes aclarar las reglas, el
-tiempo, la pregunta del debate o lo que pediste antes. Si te pide argumentos, datos, lecturas o que le digas quién tiene la
-razón, NO se los des: devuélvele la pregunta para que la responda su grupo. Después, si queda espacio, sigue moderando.
+Responde a esa persona (nómbrala con @${S.mod.pregunta.nombre}), en una o dos frases. Puedes aclarar las reglas, el
+tiempo, la pregunta del debate o lo que pediste antes. Si dice que no sabe o no tiene la respuesta, no se la vuelvas a
+pedir: pásale la pregunta a su grupo o sigue con otra cosa. Si te pide argumentos, datos, lecturas o que le digas quién
+tiene la razón, NO se los des: devuélvele la pregunta para que la responda su grupo.
 
-` : ""}TU TAREA: escribe UNA intervención breve que haga avanzar el debate. Elige lo más útil ahora:
-- "profundizar": pídele a quien hizo una afirmación gruesa que la desarrolle o la haga concreta.
-- "verificar": pregúntale de qué lectura o dato sale lo que dijo, o pídele que explique un concepto que nombró, para ver si de verdad lo sabe.
-- "pasar_pelota": dale la palabra a alguien que ha hablado poco o nada (prioriza a quien tiene 0 mensajes), idealmente respondiendo a algo concreto que dijo el otro lado. Es tu movida más importante: nadie puede pasarse el debate entero en silencio.
-- "contrastar": pon a una bancada frente al argumento más fuerte de la otra que todavía no ha respondido.
-- "examinar": hazle a alguien una pregunta factual sobre lo que leyó en el cuadernillo —quién es una de esas personas, qué pide exactamente, ante quién se reclama si no se cumple— para ver si de verdad lo leyó.
+` : ""}CÓMO MODERAS
+Sigue el ritmo de la conversación, como una buena moderadora humana: responde a lo que se acaba de decir, no a una lista de tareas. Si los grupos se están respondiendo bien entre ellos, no interrumpas: elige "esperar".
+Le hablas a los GRUPOS, no a las personas: "${d ? `@Grupo ${d.A}` : ladoNombre("A")}, ¿qué le responden a…?". Cualquiera del grupo contesta.
+${puedeNombrar.length ? `Solo a estas personas, que llevan rato sin escribir nada, puedes nombrarlas con @Nombre (una a la vez, la que tenga más sentido ahora): ${puedeNombrar.join(", ")}.` : "Ahora no nombres a ninguna persona con @: habla a los grupos."}${S.mod && S.mod.pregunta ? ` (Excepción: a ${S.mod.pregunta.nombre}, que te habló.)` : ""}
+Si un alumno dice que alguien no está, créele y no vuelvas a nombrar a esa persona.
+
+TUS INTERVENCIONES ANTERIORES EN ESTE DEBATE (no repitas ninguna, ni con otras palabras):
+${est.ultimasMod.map(t => `- ${t}`).join("\n") || "(ninguna)"}
+
+ELIGE UNA:
+- "esperar": la conversación avanza sola; no escribes nada.
+- "profundizar": pide a un grupo que desarrolle o haga concreta una afirmación gruesa que acaba de hacer.
+- "verificar": pregunta de qué lectura o dato sale una afirmación, o qué significa un concepto que usaron. Máximo una vez por persona y nunca dos veces seguidas: no conviertas cada mensaje en "¿de qué texto sale eso?".
+- "contrastar": pon a un grupo frente al argumento más fuerte del otro que todavía no ha respondido.
+- "pasar_pelota": dale la palabra al grupo que ha hablado menos, o a una persona de la lista de arriba, idealmente sobre algo concreto que dijo el otro lado.
+- "examinar": hazle a un grupo una pregunta factual sobre lo que leyó —quién es una de esas personas, qué pide exactamente— para ver si de verdad lo leyó.
 Reglas: eres neutral, no opinas sobre la moción ni dices quién tiene razón.
-PUEDES nombrar a las personas de los dos documentos que ellos tienen impresos y preguntar qué dijo o qué pide cada una: lo tienen en la mano y preguntarlo no les regala nada. Pero SIEMPRE como pregunta, nunca afirmando el dato —«@X, ¿qué pide Serrano exactamente?», no «Serrano pide un representante legal»—, y si contestan mal no los corrijas: pregúntales de dónde lo sacan.
-NO puedes entregarles la lectura: no digas a qué lado le sirve un argumento, no cruces los dos países por ellos, no les sugieras qué concepto usar ni les armes la refutación. Eso es lo que el jurado premia y tienen que hacerlo ellos; nombra a las personas con @Nombre (exactamente como aparecen arriba); máximo 45 palabras; una sola pregunta o encargo; español de Chile, tono de profesora cercana pero exigente; no repitas una pregunta que ya hiciste; sin groserías.
+PUEDES nombrar a las personas de los documentos que ellos tienen impresos y preguntar qué dijo o qué pide cada una: lo tienen en la mano y preguntarlo no les regala nada. Pero SIEMPRE como pregunta, nunca afirmando el dato, y si contestan mal no los corrijas: pregúntales de dónde lo sacan.
+NO puedes entregarles la lectura: no digas a qué lado le sirve un argumento, no cruces los materiales por ellos, no les sugieras qué concepto usar ni les armes la refutación. Máximo 40 palabras; una sola pregunta o encargo; español de Chile, tono de profesora cercana pero exigente; sin groserías.
 
-Antes de responder, revisa tu mensaje: ¿estoy AFIRMANDO un dato del material en vez de preguntarlo? ¿estoy señalando una conexión que ellos no hicieron —quién coincide con quién, a quién le conviene un argumento—? Si es que sí, reescríbelo como pregunta abierta.
-
-Responde SOLO un JSON: {"tipo": "profundizar"|"verificar"|"pasar_pelota"|"contrastar"|"examinar", "mensaje": "tu intervención"}`;
+Responde SOLO un JSON: {"tipo": "esperar"|"profundizar"|"verificar"|"contrastar"|"pasar_pelota"|"examinar", "mensaje": "tu intervención (vacío si esperas)"}`;
 }
 
-async function intervenirModerador() {
-  let texto = null;
+async function intervenirModerador(forzar = false) {
+  const est = estadoTramo();
+  const pregunta = S.mod && S.mod.pregunta;
+  let texto = null, espera = false;
   if (S.motor.activo) {
     try {
-      const j = jsonDe(await pedirLLM(promptModerador(), "jurado"));
-      if (typeof j.mensaje === "string" && j.mensaje.trim() && limpiaFrase(j.mensaje)) texto = j.mensaje.trim().slice(0, 400);
+      const j = jsonDe(await pedirLLM(promptModerador(est), "jurado"));
+      // el profesor la llamó o le hablaron: no se queda callada
+      if (j.tipo === "esperar" && !forzar && !pregunta) espera = true;
+      else if (typeof j.mensaje === "string" && j.mensaje.trim() && limpiaFrase(j.mensaje)) texto = j.mensaje.trim().slice(0, 400);
     } catch (e) { console.warn("moderadora:", e); }
   }
-  if (!texto) texto = moderadorSimple();
-  if (S.mod) S.mod.pregunta = null;
-  if (texto && S.fase === "abierta") postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto });
+  if (S.mod && S.mod.pregunta === pregunta) S.mod.pregunta = null;   // si llegó otra mientras pensaba, queda para la próxima
+  if (espera || S.fase !== "abierta") return;
+  if (texto && esRepetida(texto, est.ultimasMod)) texto = null;
+  if (!texto) texto = moderadorSimple(est, pregunta);
+  if (texto) postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto });
 }
 
-// Sin motor LLM: plantillas. Pasa la palabra a quien menos ha hablado y pide la fuente de lo último.
-function moderadorSimple() {
-  const ps = participantes();
-  const ult = [...S.chat].reverse().find(m => m.tipo === "alumno" && m.ronda === S.ronda);
-  const callado = [...ps].sort((a, b) => a.n - b.n)[0];
-  if (ult && !detectarFuentes(ult.texto).length)
-    return `@${ult.nombre}, ¿de qué lectura sale eso? Nombra el autor o el dato.${callado && callado.nombre !== ult.nombre ? ` Y @${callado.nombre}, ¿cómo le responde tu bancada?` : ""}`;
-  if (callado) return `@${callado.nombre}, todavía no te leemos en este debate. ¿Qué agregarías a lo que dijo ${ult ? "@" + ult.nombre : "el otro lado"}?`;
-  return `¿Quién abre? ${EQUIPOS.A.nombre} y ${EQUIPOS.B.nombre}, necesitamos sus tesis.`;
+// Sin motor LLM (o si el modelo repitió): plantillas. Le habla a los grupos, pregunta de dónde
+// sale algo una sola vez por persona, y si todo lo que tiene para decir ya lo dijo, se calla.
+function moderadorSimple(est = estadoTramo(), pregunta = null) {
+  const ahora = Date.now(), abre = S.mod ? S.mod.abre : ahora;
+  const alumnos = delDebateEnCurso().filter(m => m.tipo === "alumno");
+  const ult = alumnos[alumnos.length - 1];
+  const n = k => est.alumnos.filter(p => p.equipo === k).reduce((a, p) => a + p.n, 0);
+  const menos = n("A") <= n("B") ? "A" : "B";
+  const otro = k => (k === "A" ? "B" : "A");
+  const corto = x => String(x || "").split(" ")[0];
+  const callado = nombrables(est, { ahora, abre })[0];
+  const candidatos = [];
+  if (pregunta) {
+    const eq = pregunta.equipo === "A" || pregunta.equipo === "B" ? pregunta.equipo : null;
+    candidatos.push(eq ? `@${pregunta.nombre}, anotado. ${grupoDe(eq)}, ¿alguien le ayuda a ${corto(pregunta.nombre)} con eso?`
+                       : `@${pregunta.nombre}, esa se la devuelvo a los grupos: ¿qué opinan?`);
+  }
+  if (!ult) candidatos.push(`${grupoDe("A")} y ${grupoDe("B")}: ¿quién parte? Una frase con su posición basta.`,
+                            `${grupoDe(menos)}, los estamos esperando: ¿cuál es su posición?`);
+  if (ult && (ult.equipo === "A" || ult.equipo === "B")) {
+    const yo = est.alumnos.find(p => p.nombre === ult.nombre);
+    if (!detectarFuentes(ult.texto).length && yo && !yo.verificado && ult.texto.length > 60)
+      candidatos.push(`@${ult.nombre}, ¿de dónde sale eso? Un autor o un dato basta.`);
+    candidatos.push(`${grupoDe(otro(ult.equipo))}, ¿qué le responden a ${corto(ult.nombre)}?`,
+                    `${grupoDe(otro(ult.equipo))}, ¿en qué parte de eso no están de acuerdo?`,
+                    `${grupoDe(ult.equipo)}, ¿qué ejemplo concreto tienen de lo que dice ${corto(ult.nombre)}?`);
+  }
+  if (callado) candidatos.push(`@${callado.nombre}, todavía no te leemos. ¿Con qué parte de lo que se ha dicho no estás de acuerdo?`);
+  candidatos.push(`${grupoDe(menos)}, ¿cuál es el argumento del otro lado que más les cuesta responder?`);
+  return candidatos.find(t => !esRepetida(t, est.ultimasMod)) || null;
 }
 
 /* ---------- ⚖ el relator ---------- */

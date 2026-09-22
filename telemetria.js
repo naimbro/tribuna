@@ -46,4 +46,48 @@ function resumenTelemetria(registros) {
   return [...por.values()].sort((a, b) => b.senales.length - a.senales.length || String(a.nombre).localeCompare(String(b.nombre)));
 }
 
-if (typeof module !== "undefined") module.exports = { UMBRAL_TELEMETRIA, senalesMensaje, resumenTelemetria };
+/* --- el reporte visual (como «Cómo se escribió» de ml2) ---------------------------------
+   Por mensaje, qué parte del texto final llegó de una sola vez (pegado o inserción de golpe).
+   Sobre la mitad se marca en rojo: es el umbral de ml2. Una rampa en la huella es alguien
+   tipeando; un escalón que sube de golpe es un bloque que llegó entero. */
+const UMBRAL_DE_GOLPE = 0.5;
+const CORTO = 25;          // bajo esto un salto de una palabra ya es «la mitad»: no se clasifica
+
+function proporcionDeGolpe(t) {
+  const largo = t.largoFinal || 0;
+  if (largo < CORTO) return null;
+  const golpe = Math.max(t.maxInsercion || 0, ...(t.pegados || []).map(p => p.chars || 0));
+  return Math.min(1, golpe / largo);
+}
+// "golpe" (rojo) · "escrito" (azul) · "corto" (gris: muy breve para decir algo)
+function clasificarMensaje(t) {
+  const p = proporcionDeGolpe(t);
+  return p === null ? "corto" : p >= UMBRAL_DE_GOLPE ? "golpe" : "escrito";
+}
+
+// La huella como polilínea: una muestra del largo cada 2 s, y al final el largo enviado.
+function puntosHuella(t, ancho, alto) {
+  const h = [...(t.huella || []), t.largoFinal || 0];
+  const max = Math.max(1, ...h), n = h.length;
+  return h.map((v, i) => `${(n === 1 ? ancho : i / (n - 1) * ancho).toFixed(1)},${(alto - Math.max(0, v) / max * alto).toFixed(1)}`).join(" ");
+}
+
+const fmtDuracion = ms => { const s = Math.round((ms || 0) / 1000); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`; };
+
+// Hechos, no juicios: lo que pasó mientras escribía ese mensaje.
+function hechosMensaje(t) {
+  const largo = t.largoFinal || 0, p = proporcionDeGolpe(t);
+  const pegados = (t.pegados || []).filter(x => (x.chars || 0) > 0);
+  const tipos = t.tipos || [];
+  const out = [`Escribió ${largo} caracteres en ${fmtDuracion(t.msComposicion)}` +
+    (t.msComposicion > 0 && largo >= 40 ? ` (${(largo / (t.msComposicion / 1000)).toFixed(1)} por segundo)` : "") + "."];
+  out.push(`Mayor salto de una vez: ${t.maxInsercion || 0} caracteres${p !== null ? ` (${Math.round(p * 100)} % del texto)` : ""}.`);
+  out.push(pegados.length ? `Pegó ${pegados.length} vez${pegados.length === 1 ? "" : "es"}: ${pegados.map(x => x.chars).join(", ")} caracteres.` : "No pegó nada.");
+  if (tipos.includes("insertFromPaste") && !pegados.length) out.push("El teclado insertó texto del portapapeles (sin evento de pegado).");
+  if (tipos.includes("insertFromDrop")) out.push("Arrastró texto a la caja.");
+  out.push(t.salidas ? `Salió de la app ${t.salidas} ${t.salidas === 1 ? "vez" : "veces"}, ${fmtDuracion(t.msFuera)} en total.` : "No salió de la app.");
+  return out;
+}
+
+if (typeof module !== "undefined") module.exports = { UMBRAL_TELEMETRIA, senalesMensaje, resumenTelemetria,
+  UMBRAL_DE_GOLPE, proporcionDeGolpe, clasificarMensaje, puntosHuella, hechosMensaje };

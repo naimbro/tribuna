@@ -466,6 +466,8 @@ function pintarFeed() {
   f.innerHTML = html || `<div style="color:var(--dim2);text-align:center;padding:60px 20px;font-size:13px">
     La sala está en silencio.<br>Abre el primer tramo: la moderadora da la palabra y todos escriben en esta misma conversación.</div>`;
   if (abajo) f.scrollTop = f.scrollHeight;
+  // con un debate en curso, la barra de participación de cada grupo (barravista.js)
+  if (S.debate && typeof pintarBarras === "function") { pintarBarras(); return; }
   // quién está en cada bancada y cuántos mensajes lleva en el tramo
   const ps = participantes();
   for (const k of ["A", "B"]) {
@@ -755,12 +757,14 @@ function guardarMotor() {
   S.motor.activo = !!S.motor.key || S.motor.proxy || S.motor.funcion;
   if (!S.motor.activo) tick(`Sin key: no hay una para ${S.motor.prov} ni aquí, ni en .env, ni en el servidor (entra con Google).`);
   localStorage.setItem("tribuna_motor", JSON.stringify(S.motor));
+  localStorage.removeItem("tribuna_motor_eleccion");
   pintarModo();
   cerrarModal(); tick("Motor: " + (S.motor.activo ? S.motor.modelo : "heurístico local"));
 }
 function apagarMotor() {
   S.motor.activo = false; S.motor.key = ""; S.motor.proxy = false; S.motor.funcion = false; S.motor.sociedad = false;
   localStorage.removeItem("tribuna_motor");
+  localStorage.setItem("tribuna_motor_eleccion", "heuristico");   // a propósito: no se reactiva solo
   pintarModo();
   cerrarModal();
 }

@@ -60,9 +60,15 @@ en `RONDAS` de cada semana).
 - **🎙 Moderadora (IA).** Durante el tramo lee la conversación e interviene: pide profundizar una
   afirmación gruesa, pregunta de dónde sale un dato o qué significa un concepto (para comprobar
   que el alumno sabe, sin soplarle nunca la respuesta), le pasa la palabra a quien no ha hablado
-  y pone a una bancada frente al argumento del otro lado que no ha respondido. Nombra con
-  @Nombre; en el teléfono de esa persona el mensaje se destaca y vibra. Interviene sola cada
-  25–45 s según cómo avance la conversación, o cuando el profesor pulsa 🎙 MODERADORA.
+  y pone a una bancada frente al argumento del otro lado que no ha respondido. Le habla a los
+  **grupos** (`@Grupo 3`); a una persona la nombra con @Nombre solo si lleva más de 2 minutos sin
+  escribir, o si esa persona le habló a ella. En el teléfono de quien nombra, el mensaje se destaca
+  y vibra. Sigue el ritmo (`ritmo.js`, probado en `pruebas/ritmo.test.js`): no entra si alguien
+  escribió hace menos de 8 s, deja al menos 25 s entre dos intervenciones y con el LLM puede elegir
+  «esperar» si la conversación va sola. Si nadie le contesta, vuelve a entrar a los 45 s, 90 s y
+  135 s, y después calla hasta que alguien escriba. Nunca repite un mensaje, no insiste con quien
+  no responde (dos llamados sin respuesta, o un alumno que avisa «no está», y la da por ausente) y
+  pregunta «¿de dónde sale eso?» a lo más una vez por persona. 🎙 MODERADORA la hace entrar ya.
 - **⚖ Relator (IA).** Al pulsar ⚖ PEDIR VOTACIÓN (o al acabarse el reloj) resume con
   neutralidad la posición de cada bancada en el tramo, nombra el punto en disputa, dice qué
   revisar (cosas concretas que se dijeron) y con qué criterios votar, y pide el voto. Sus
@@ -118,9 +124,11 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
   colección `profesores/{email}` (la edita el admin desde la consola).
 - **Motor LLM online:** Cloud Function `evaluar` (`functions/src/index.ts`, us-central1). La
   key de Anthropic vive en Secret Manager (`ANTHROPIC_API_KEY`) y nunca llega a un navegador;
-  la función solo atiende a `naim.bro@gmail.com` o a correos en `profesores`. El profesor
-  entra con Google, abre ⚙ MOTOR, elige Anthropic y deja la key vacía: el rótulo dice
-  `(servidor TRIBUNA)`. Los alumnos nunca llaman al proveedor. El proyecto está en el plan
+  la función solo atiende a `naim.bro@gmail.com` o a correos en `profesores`. Cuando el profesor
+  entra con Google y la función responde, el motor se **enciende solo** (el rótulo dice
+  `(servidor TRIBUNA)`). Queda en el heurístico únicamente si en ⚙ MOTOR se eligió «Usar
+  heurístico», y esa elección se recuerda en ese navegador. Hasta el 22-sep-2026 había que
+  encenderlo a mano y la clase de la sala 42RT corrió entera con plantillas. Los alumnos nunca llaman al proveedor. El proyecto está en el plan
   Blaze (cuenta «Firebase Payment») con un presupuesto de alerta de $10.000 CLP/mes. Desplegar:
   copiar `functions/` a un directorio nativo de WSL y `firebase deploy --only functions`
   (desde `/mnt/c` falla por lentitud, como en ml2). En local sigue funcionando `servidor.py`
@@ -170,12 +178,27 @@ Una partida online tiene cuatro escenas (`escenas.js`, más la ceremonia en `app
 
 El feedback no se proyecta: se lee en el panel.
 
+## La brújula en vivo
+
+El mapa de la brújula (`mapavivo.js`) no se redibuja: cada alumno es un punto que se desliza a su
+nueva posición y deja un rastro tenue. El teléfono guarda la posición provisional tras cada
+pregunta (`parcial: true`), así que en el proyector los puntos aparecen huecos y se van moviendo
+mientras la clase responde; se llenan al terminar. FORMAR GRUPOS usa solo las brújulas completas.
+**⛶ AMPLIAR MAPA** en la portada, o **🧭 MAPA** en la mesa, lo abre a pantalla completa (Esc
+cierra). En la repetición del cierre, cada punto parte donde estaba y la flecha muestra el
+recorrido.
+
 ## Panel del profesor (`admin.html`)
 
 Todas las salas que creó tu cuenta, agrupadas por curso. Por partida muestra la fecha, el
 código, el estado, el ganador, cuántos jugaron en cada rol y el promedio del feedback. Al abrir
 una partida se ven los marcadores, los comentarios con nombre, quiénes jugaron, y los botones
-para volver a la pantalla, descargar la conversación en `.txt` o archivarla. Desde la cabecera
+para volver a la pantalla, descargar la conversación en `.txt` o archivarla. Una partida que quedó
+abierta se cierra con **🏁 Terminar partida**: el debate a medias no cuenta, se calcula el ranking
+y se revela al campeón en los teléfonos. Si la pantalla sigue abierta, recibe la orden
+(`privado/orden`) y termina ella misma. Al fondo de cada partida está **CÓMO ESCRIBIERON ·
+antitrampa** (`telemetria.js`): pegados, salidas de la app, inserciones de golpe y velocidad por
+mensaje. Nunca entra en un puntaje. Desde la cabecera
 de cada curso se crea una partida nueva. Las salas vacías y las archivadas se ocultan por
 defecto. El curso de cada semana está en `contenido/sesiones.js`.
 

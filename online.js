@@ -52,6 +52,7 @@ function estadoPublico() {
       puntajeA: d.res ? r1(d.res.A.puntaje) : null, puntajeB: d.res ? r1(d.res.B.puntaje) : null,
       totalA: d.panel ? r1(d.panel.A.total) : null, totalB: d.panel ? r1(d.panel.B.total) : null,
       votosA: d.publico ? d.publico.A : null, votosB: d.publico ? d.publico.B : null,
+      barraA: d.barra ? Math.round(d.barra.A.pct * 100) : null, barraB: d.barra ? Math.round(d.barra.B.pct * 100) : null,
       jueces: (d.jueces || []).map(j => ({ emoji: j.emoji, nombre: j.nombre, A: j.A, B: j.B, fraseA: j.fraseA || "", fraseB: j.fraseB || "" })) })),
     ultimo: U ? { n: U.n, pregunta: U.pregunta, A: U.A, B: U.B, ganador: U.res.ganador,
       resA: { jurado: r1(U.res.A.jurado), publico: r1(U.res.A.publico), puntaje: r1(U.res.A.puntaje) },
@@ -90,8 +91,8 @@ function estadoPublico() {
           preguntas: BRUJULA.preguntas.map(p => ({ id: p.id, texto: p.texto, opciones: p.opciones.map(o => ({ texto: o.texto,
             ...(typeof o.x === "number" ? { x: o.x } : {}), ...(typeof o.y === "number" ? { y: o.y } : {}) })) })) }
       : { activa: false, fase: null },
-    mapa: conBrujulaActiva() && ON.brujula ? barajar(window.datosMapa().puntos.map(p => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2), campo: p.campo }))) : [],
-    mapaMov: conBrujulaActiva() && ON.brujula ? barajar(window.datosMapa().movimiento.map(m => ({ x: m.x, y: m.y, dx: m.desde.x, dy: m.desde.y, campo: m.campo }))) : [],
+    mapa: conBrujulaActiva() && ON.brujula ? barajar(window.datosMapa().puntos.filter(p => !p.parcial).map(p => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2), campo: p.campo }))) : [],
+    mapaMov: conBrujulaActiva() && ON.brujula ? barajar(window.datosMapa().movimiento.filter(m => !m.parcial).map(m => ({ x: m.x, y: m.y, dx: m.desde.x, dy: m.desde.y, campo: m.campo }))) : [],
     gruposInfo: S.clase.gruposInfo || [],
     ticker: $("ticker").textContent, motor: $("modoLbl").textContent
   };
@@ -110,7 +111,7 @@ function estadoPrivado() {
   return {
     ronda: S.ronda, fase: S.fase, etapa: S.etapa || null, seq: S.seq, votoInicial: S.votoInicial, iniPos: S.iniPos,
     historial: S.historial, turnos: S.turnos, shocks: S.shocks, abreEn: S.abreEn || null,
-    clase: S.clase, debate: S.debate, tramo: S.tramo, finVoto: S.finVoto || null,
+    clase: S.clase, debate: S.debate, tramo: S.tramo, finVoto: S.finVoto || null, veredictoRevelado: !!S.veredictoRevelado,
     audiencia: Object.fromEntries(AUDIENCIA.map(p => [p.id, { pos: p.pos, memoria: p.memoria || [], ultimo: p.ultimo || "" }]))
   };
 }
@@ -173,6 +174,7 @@ function activarOnline() {
     asignarRezagados();
     if (S.publico) S.publico.elegibles = elegibles();
     pintarBarraOnline(); pintarFeed(); actualizarPortada(ON.jugadores);
+    if (typeof refrescarMapaVivo === "function") refrescarMapaVivo();
   });
 
   // El feedback de los alumnos (se pide en el teléfono al terminar). Aquí solo se cuenta:
@@ -188,7 +190,22 @@ function activarOnline() {
     asignarRezagados();
     if (typeof actualizarMapaPortada === "function") actualizarMapaPortada();
     if (typeof refrescarMovimiento === "function") refrescarMovimiento();
+    if (typeof refrescarMapaVivo === "function") refrescarMapaVivo();
     publicar();
+  }, () => {});
+  // 🏁 Terminar partida desde el panel (admin.html): si esta pantalla sigue abierta, termina ella,
+  // porque su próxima publicación pisaría el cierre que escribió el panel.
+  let ordenVista = null;
+  onSnapshot(doc(db, "salas", ON.codigo, "privado", "orden"), snap => {
+    const t = snap.exists() ? snap.data().terminar || 0 : 0;
+    if (ordenVista === null) { ordenVista = t; return; }          // la que ya estaba al abrir no cuenta
+    if (t <= ordenVista) return;
+    ordenVista = t;
+    if (S.fase === "fin") { S.veredictoRevelado = true; publicar(); return; }
+    terminarClase(true);
+    S.veredictoRevelado = true;
+    publicar();
+    tick("La partida se terminó desde el panel.");
   }, () => {});
   // quien llegó tarde y no responde la brújula en 90 s queda en el grupo más chico
   setInterval(asignarRezagados, 10000);
@@ -284,12 +301,18 @@ const conBrujulaActiva = () => !!(S.clase.brujula && S.clase.brujula.activa && t
 window.datosMapa = () => {
   const r = Object.entries(ON.brujula || {}).filter(([uid, b]) => b.pos && ON.jugadores && ON.jugadores[uid]).map(([uid, b]) => ({ ...b, uid }));
   return {
-    puntos: r.map(b => ({ uid: b.uid, x: b.pos.x, y: b.pos.y, campo: b.campo })),   // uid solo en la pantalla del profesor
-    movimiento: r.filter(b => b.repeticion && b.repeticion.pos).map(b => ({ x: b.repeticion.pos.x, y: b.repeticion.pos.y, desde: b.pos, campoAntes: b.campo, campo: b.repeticion.campo }))
+    // uid solo en la pantalla del profesor; «parcial»: todavía respondiendo (el punto se mueve en vivo)
+    puntos: r.map(b => ({ uid: b.uid, x: b.pos.x, y: b.pos.y, campo: b.campo, parcial: !!b.parcial, grupo: ON.jugadores[b.uid].grupo || 0 })),
+    movimiento: r.filter(b => b.repeticion && b.repeticion.pos).map(b => ({ uid: b.uid, x: b.repeticion.pos.x, y: b.repeticion.pos.y, desde: b.pos, campoAntes: b.campo, campo: b.repeticion.campo, parcial: !!b.repeticion.parcial }))
   };
 };
-window.formarGruposBrujula = async () => {
-  const alumnos = Object.entries(ON.brujula || {}).filter(([uid, b]) => b.pos && ON.jugadores[uid]).map(([uid, b]) => ({ uid, pos: b.pos, campo: b.campo }));
+// Una formación a la vez: el 22-sep-2026 (sala 42RT) dos corridas se cruzaron en el mismo segundo;
+// Firestore quedó con una mezcla de las dos y la pantalla con la otra, y los teléfonos decían un
+// grupo y el proyector otro durante toda la clase. Las corridas se encadenan y la última manda.
+let formando = Promise.resolve();
+window.formarGruposBrujula = () => (formando = formando.catch(() => {}).then(formarGruposAhora));
+async function formarGruposAhora() {
+  const alumnos = Object.entries(ON.brujula || {}).filter(([uid, b]) => b.pos && !b.parcial && ON.jugadores[uid]).map(([uid, b]) => ({ uid, pos: b.pos, campo: b.campo }));
   if (alumnos.length < 2) return { ok: false, motivo: "Faltan alumnos: se necesitan al menos 2 con la brújula respondida." };
   const { grupos, de } = formarGruposEnK(alumnos, BRUJULA.campos, S.clase.grupos);
   S.clase.gruposInfo = grupos.map(g => ({ n: g.n, campo: g.campo, nombre: (BRUJULA.campos.find(c => c.id === g.campo) || {}).nombre || g.campo,
@@ -299,14 +322,16 @@ window.formarGruposBrujula = async () => {
   S.clase.brujula.formadoEn = Date.now();
   // quienes no respondieron pero ya estaban en un grupo elegido a mano vuelven a quedar sin grupo
   const sinPos = Object.keys(ON.jugadores).filter(uid => !de[uid]);
-  await Promise.all([...Object.entries(de).map(([uid, n]) => window.moverAlumno(uid, n)),
+  ON.asignando = {};
+  const oks = await Promise.all([...Object.entries(de).map(([uid, n]) => window.moverAlumno(uid, n)),
                      ...sinPos.filter(uid => ON.jugadores[uid].grupo > 0).map(uid => window.moverAlumno(uid, 0))]);
-  sinPos.forEach(uid => { ON.jugadores[uid].grupo = 0; });
-  Object.entries(de).forEach(([uid, n]) => { ON.jugadores[uid].grupo = n; });
+  // ON.jugadores NO se toca a mano: lo reescribe el listener con lo que quedó en Firestore, que
+  // es lo mismo que ven los teléfonos. Una copia local «optimista» fue la que se desincronizó.
   asignarRezagados();                                    // quienes no terminaron la brújula
   publicar();
-  return { ok: true };
-};
+  const fallos = oks.filter(x => !x).length;
+  return fallos ? { ok: false, motivo: `No se pudo asignar a ${fallos} alumno${fallos === 1 ? "" : "s"}: vuelve a pulsar FORMAR GRUPOS.` } : { ok: true };
+}
 // Después de formar los grupos: quien no tiene grupo entra al más chico de su campo. Quien llegó
 // después de formarlos tiene 90 s para responder la brújula; si no, va al más chico de todos.
 function asignarRezagados() {
@@ -322,6 +347,7 @@ function asignarRezagados() {
     const b = ON.brujula && ON.brujula[uid];
     const tarde = (j.unido || 0) > (S.clase.brujula.formadoEn || 0);
     if (!(b && b.pos) && tarde && Date.now() - (j.unido || 0) < 90000) continue;
+    if (b && b.parcial && Date.now() - (b.t || 0) < 90000) continue;     // está respondiendo: se espera a que termine
     const n = asignarTarde(b && b.pos, b && b.campo, S.clase.gruposInfo);
     if (!n) continue;
     ON.asignando[uid] = n;
@@ -380,6 +406,7 @@ async function restaurar(codigo) {
       : ["cerrando", "veredictoPublico", "veredictoJueces"].includes(priv.fase) ? "votando"
       : priv.fase || "propuesta";
     S.ronda = priv.ronda; S.seq = priv.seq || 0; S.shocks = priv.shocks || [];
+    S.veredictoRevelado = !!priv.veredictoRevelado;       // si no, al reabrir se «des-revelaría» el campeón
     S.historial = priv.historial; S.turnos = priv.turnos || []; S.votoInicial = priv.votoInicial || S.votoInicial; S.iniPos = priv.iniPos || S.iniPos;
     S.abreEn = null;
     pintarRonda(); pintarMarcador(); pintarFeed();
@@ -443,7 +470,14 @@ if (HAY_FIREBASE) onAuthStateChanged(auth, async user => {
       try { return (await evaluarFn({ prompt, uso })).data.text; }
       catch (e) { throw new Error(e.message || e.code); }
     };
-    tick("El servidor de TRIBUNA tiene el motor LLM disponible (⚙ MOTOR, sin key).");
+    // Encendido por defecto: el 22-sep-2026 (sala 42RT) una clase entera corrió con el heurístico
+    // porque nadie abrió ⚙ MOTOR, y la moderadora repetía plantillas. Solo queda apagado si el
+    // profesor eligió «Usar heurístico» a propósito.
+    if (!S.motor.activo && localStorage.getItem("tribuna_motor_eleccion") !== "heuristico") {
+      Object.assign(S.motor, { prov: "anthropic", key: "", proxy: false, funcion: true, activo: true, modelo: "claude-sonnet-5", sociedad: false });
+      pintarModo(); publicar();
+      tick("Motor LLM del servidor de TRIBUNA activado: moderadora, relator y jueces con claude-sonnet-5.");
+    } else if (!S.motor.activo) tick("El servidor de TRIBUNA tiene el motor LLM disponible, pero elegiste el heurístico (⚙ MOTOR para cambiarlo).");
   });
   const codigo = (params.get("sala") || "").toUpperCase();
   if (codigo && await restaurar(codigo)) activarOnline();

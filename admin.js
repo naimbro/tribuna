@@ -4,11 +4,12 @@
    estado, ganador, quiénes jugaron y el feedback de los alumnos, que se lee aquí y no en la
    pantalla proyectada (con nombre delante del curso cambia lo que la gente se atreve a
    escribir). Desde aquí se abre una partida nueva o se vuelve a una existente.
-   Lee salas/{codigo} (lo público), sus jugadores y su feedback; escribe solo `archivada`.
+   Lee salas/{codigo} (lo público), sus jugadores y su feedback; escribe `archivada` y, con
+   🏁 TERMINAR, el cierre de una partida que quedó abierta.
    ===================================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { getFirestore, collection, query, where, getDocs, orderBy, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, getDocs, getDoc, setDoc, orderBy, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js?v=20260918a";
 
 const app = initializeApp(firebaseConfig);
@@ -108,6 +109,8 @@ function pintar() {
     location.href = `index.html?semana=${sel.value}`;
   });
   document.querySelectorAll("[data-txt]").forEach(b => b.onclick = () => descargarConversacion(b.dataset.txt));
+  document.querySelectorAll("[data-tlc]").forEach(b => b.onclick = () => detalleTelemetria(b.dataset.tlc, +b.dataset.tli));
+  document.querySelectorAll("[data-fin]").forEach(b => b.onclick = () => terminarPartida(b.dataset.fin, b));
   document.querySelectorAll("[data-arch]").forEach(b => b.onclick = async () => {
     const p = V.partidas.find(x => x.s.codigo === b.dataset.arch);
     const nuevo = !p.s.archivada;
@@ -142,19 +145,56 @@ function puntajeDe(s, j) {
   return `\nGrupo ${j.grupo || "?"}: ${g && g.puntaje !== null && g.puntaje !== undefined ? g.puntaje + " pts" : "sin debatir"}` + (o ? ` · 🔮 ${o.puntos}` : "");
 }
 
-// Antitrampa: cómo escribió cada alumno. Descriptivo: nunca entra en el puntaje (telemetria.js).
-function telemetriaHtml(telemetria) {
-  if (!telemetria || !telemetria.length) return "";
-  const r = resumenTelemetria(telemetria);
-  const conSenales = r.filter(x => x.senales.length);
-  return `<div class="caja" style="margin-top:14px"><h3>CÓMO ESCRIBIERON · antitrampa</h3>
-    <p style="color:var(--dim);font-size:12px;margin:-4px 0 10px">Pegados, salidas de la app, inserciones de golpe y velocidad de cada mensaje.
-      Es información para que juzgues tú: no cambia ningún puntaje.</p>
-    ${conSenales.length ? conSenales.map(x => `<div class="com"><div class="q"><b>${esc(x.nombre)}${x.grupo ? ` (grupo ${x.grupo})` : ""}</b>
-        <span style="color:var(--dim)">${x.mensajes} mensaje${x.mensajes === 1 ? "" : "s"}</span></div>
-        <p style="color:var(--amber)">${x.senales.map(esc).join("<br>")}</p></div>`).join("")
-      : `<p style="color:var(--dim)">Sin señales: ${r.length} alumno${r.length === 1 ? "" : "s"} escribieron ${telemetria.length} mensaje${telemetria.length === 1 ? "" : "s"} sin pegar textos largos ni salir de la app.</p>`}
+// Antitrampa: cómo escribió cada alumno, como «Cómo se escribió» de ml2. Una huella por mensaje
+// (el largo del texto cada 2 s): una rampa es alguien tipeando, un escalón es un bloque que llegó
+// entero. Rojo: más de la mitad del texto llegó de una vez. Descriptivo: nunca entra en un puntaje.
+const COLOR_TL = { golpe: "#f43f5e", escrito: "#38bdf8", corto: "#4d5f70" };
+function telemetriaHtml(telemetria, codigo) {
+  if (!telemetria || !telemetria.length) return `<div class="caja" style="margin-top:14px"><h3>CÓMO ESCRIBIERON · antitrampa</h3>
+    <p style="color:var(--dim)">Sin registros: nadie escribió desde el teléfono en esta partida.</p></div>`;
+  const por = new Map();
+  telemetria.forEach((t, i) => {
+    const x = por.get(t.uid) || { nombre: t.nombre || "?", grupo: t.grupo || 0, ms: [] };
+    x.ms.push({ t, i, clase: clasificarMensaje(t) });
+    por.set(t.uid, x);
+  });
+  const filas = [...por.values()];
+  filas.forEach(f => f.ms.sort((a, b) => (a.t.t || 0) - (b.t.t || 0)));
+  const rojos = f => f.ms.filter(m => m.clase === "golpe").length;
+  filas.sort((a, b) => rojos(b) - rojos(a) || a.nombre.localeCompare(b.nombre));
+  const total = telemetria.length, nRojos = telemetria.filter(t => clasificarMensaje(t) === "golpe").length;
+  const salieron = resumenTelemetria(telemetria).filter(x => x.salidas > 0);
+  const chispa = m => `<button class="tl-c" data-tlc="${codigo}" data-tli="${m.i}" title="Debate ${m.t.debate} · ${m.t.largoFinal} caracteres${m.clase === "golpe" ? " · más de la mitad de una vez" : ""}">
+      <svg viewBox="-2 -2 68 26" width="68" height="26"><polyline points="${puntosHuella(m.t, 64, 22)}" fill="none" stroke="${COLOR_TL[m.clase]}" stroke-width="1.8" stroke-linejoin="round"/></svg></button>`;
+  return `<div class="caja tl" style="margin-top:14px"><h3>CÓMO ESCRIBIERON · antitrampa</h3>
+    <p class="tl-ley"><b style="color:${COLOR_TL.golpe}">●</b> más de la mitad del texto llegó de una vez (pegado o insertado)
+      <b style="color:${COLOR_TL.escrito}">●</b> lo fue tipeando <b style="color:${COLOR_TL.corto}">●</b> muy corto para decir algo.
+      Rampa: tipeó. Escalón: llegó entero. Clic en una huella para el detalle. No cambia ningún puntaje.</p>
+    <p class="tl-sum"><b>${nRojos}</b> de ${total} mensaje${total === 1 ? "" : "s"} en rojo${salieron.length ? ` · salieron de la app mientras escribían: ${salieron.map(x => `${esc(x.nombre)} (${x.salidas})`).join(", ")}` : ""}</p>
+    <table class="tl-grid">${filas.map(f => `<tr><th>${esc(f.nombre)}${f.grupo ? ` <small>G${f.grupo}</small>` : ""}</th>
+      <td>${f.ms.map(chispa).join("")}</td></tr>`).join("")}</table>
+    <div class="tl-det" id="tlDet-${codigo}"></div>
   </div>`;
+}
+
+// El detalle de un mensaje: la huella grande, los hechos y el texto que envió.
+async function detalleTelemetria(codigo, i) {
+  const p = V.partidas.find(x => x.s.codigo === codigo), t = p && p.telemetria[i];
+  const el = $("tlDet-" + codigo);
+  if (!t || !el) return;
+  document.querySelectorAll(`[data-tlc="${codigo}"]`).forEach(b => b.classList.toggle("on", +b.dataset.tli === i));
+  const clase = clasificarMensaje(t), seg = Math.round((t.huella || []).length * 2);
+  el.innerHTML = `<div class="tl-dc"><b>${esc(t.nombre)}</b>${t.grupo ? ` · grupo ${t.grupo}` : ""} · debate ${t.debate} · ${new Date(t.t).toTimeString().slice(0, 5)}</div>
+    <svg viewBox="-4 -16 368 98" class="tl-big"><line x1="0" y1="64" x2="360" y2="64" stroke="#1e2a36"/>
+      <polyline points="${puntosHuella(t, 360, 64)}" fill="none" stroke="${COLOR_TL[clase]}" stroke-width="2.2" stroke-linejoin="round"/>
+      <text x="0" y="-6" fill="#7d8fa1" font-size="9">${t.largoFinal} caracteres</text><text x="360" y="76" fill="#7d8fa1" font-size="9" text-anchor="end">~${seg} s escribiendo</text></svg>
+    <ul>${hechosMensaje(t).map(h => `<li>${esc(h)}</li>`).join("")}</ul>
+    <div class="tl-tx" id="tlTx-${codigo}">Cargando el mensaje…</div>
+    <p class="tl-pie">Nada de esto dice «copió». Dice qué pasó mientras escribía: un bloque pegado puede ser una cita de la lectura, y el dictado por voz también entra de golpe.</p>`;
+  try {
+    const d = t.msg ? await getDoc(doc(db, "salas", codigo, "mensajes", t.msg)) : null;
+    if ($("tlTx-" + codigo)) $("tlTx-" + codigo).innerHTML = d && d.exists() ? `«${esc(d.data().texto)}»` : "";
+  } catch { if ($("tlTx-" + codigo)) $("tlTx-" + codigo).textContent = ""; }
 }
 
 // El campo de la brújula de cada alumno (y adónde llegó si la repitió), con su grupo.
@@ -189,7 +229,7 @@ function partidaHtml({ s, jugadores, feedback, telemetria }) {
       ${(s.debates || []).map(d => `<div class="com"><div class="q"><b>${d.n}.</b> Grupo ${d.A} vs Grupo ${d.B}
         <span class="mono" style="margin-left:auto">${d.puntajeA ?? "—"} · ${d.puntajeB ?? "—"}</span></div><p>${esc(d.pregunta)}</p>
         ${(d.jueces || []).length ? `<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin-top:4px">${d.jueces.map(j => `<span title="${esc(j.fraseA)} / ${esc(j.fraseB)}">${j.emoji} ${j.A ?? "—"} · ${j.B ?? "—"}</span>`).join("")}
-          <span>· jueces ${d.totalA ?? "—"} / ${d.totalB ?? "—"} · votos ${d.votosA ?? "—"} / ${d.votosB ?? "—"}</span></div>` : ""}</div>`).join("") || `<p style="color:var(--dim)">Sin debates.</p>`}
+          <span>· jueces ${d.totalA ?? "—"} / ${d.totalB ?? "—"} · votos ${d.votosA ?? "—"} / ${d.votosB ?? "—"}${d.barraA != null ? ` · barra ${d.barraA} % / ${d.barraB} %` : ""}</span></div>` : ""}</div>`).join("") || `<p style="color:var(--dim)">Sin debates.</p>`}
       <h3 style="margin-top:12px">🔮 ORÁCULOS</h3>
       ${(s.oraculos || []).map(o => `<div class="com"><div class="q"><b>#${o.puesto} ${esc(o.nombre)}${o.grupo ? ` (grupo ${o.grupo})` : ""}</b>
         <span style="color:var(--dim)">${o.aciertos} de ${o.predicciones} aciertos</span><span class="mono" style="margin-left:auto;color:#a78bfa">${o.puntos}</span></div></div>`).join("") || `<p style="color:var(--dim)">Sin predicciones.</p>`}
@@ -227,14 +267,56 @@ function partidaHtml({ s, jugadores, feedback, telemetria }) {
             : `<span style="color:var(--dim)">Nadie entró.</span>`}</div>
         </div>
       </div>
-      ${telemetriaHtml(telemetria)}
+      ${telemetriaHtml(telemetria, s.codigo)}
       <div class="acc">
         <a class="btn" href="index.html?sala=${s.codigo}&semana=${s.semana}" target="_blank">▶ Abrir pantalla</a>
         <button class="btn" data-txt="${s.codigo}">⬇ Conversación (.txt)</button>
+        ${rot && cls === "vivo" ? `<button class="btn" data-fin="${s.codigo}" title="Cierra la partida: el debate a medias no cuenta, se calcula el ranking y los teléfonos pasan al feedback y al campeón">🏁 Terminar partida</button>` : ""}
         <button class="btn" data-arch="${s.codigo}">${s.archivada ? "↩ Desarchivar" : "🗄 Archivar"}</button>
       </div>
     </div>
   </div>`;
+}
+
+/* --------------------- terminar una partida --------------------- */
+// Lo mismo que 🏁 TERMINAR CLASE + revelar al campeón en la pantalla del profesor, pero desde aquí:
+// sirve cuando la pantalla ya se cerró y la sala quedó «en curso». Si la pantalla sigue abierta,
+// recibe la orden (privado/orden) y termina ella misma, para no pisar este cierre al publicar.
+async function terminarPartida(codigo, boton) {
+  const p = V.partidas.find(x => x.s.codigo === codigo);
+  if (!confirm(`¿Terminar la partida ${codigo}? El debate que esté a medias no cuenta para el ranking. Los teléfonos pasan al feedback y al campeón.`)) return;
+  boton.disabled = true; boton.textContent = "Terminando…";
+  try {
+    const refPriv = doc(db, "salas", codigo, "privado", "estado");
+    const priv = (await getDoc(refPriv)).data();
+    if (!priv || !priv.clase) throw new Error("la sala no tiene estado guardado");
+    const clase = priv.clase;
+    const reg = priv.debate && clase.debates[priv.debate.n - 1];
+    if (reg && !reg.res) clase.debates.pop();
+    clase.ranking = ranking(clase.grupos, clase.debates);
+    clase.propuesta = null;
+    Object.assign(priv, { fase: "fin", debate: null, etapa: null, finVoto: null, veredictoRevelado: true });
+    await setDoc(refPriv, JSON.parse(JSON.stringify(priv)));
+    const r1 = v => (v === null || v === undefined ? null : +(+v).toFixed(1));
+    const r = clase.ranking;
+    const ors = rankingOraculos(clase.oraculos || {}).filter(o => o.predicciones).slice(0, 3);
+    const publico = {
+      fase: "fin", debate: null, etapa: null, finVoto: null, actualizado: Date.now(), terminadaDesdePanel: Date.now(),
+      ranking: r.map(f => ({ grupo: f.grupo, debates: f.debates, puesto: f.puesto, distincion: f.distincion ?? null,
+        jurado: r1(f.jurado), publico: r1(f.publico), puntaje: r1(f.puntaje) })),
+      debates: (p.s.debates || []).filter(d => d.n <= clase.debates.length),
+      veredicto: { campeon: r[0] && r[0].debates ? r[0].grupo : null,
+        ranking: r.map(f => ({ grupo: f.grupo, puesto: f.puesto, puntaje: r1(f.puntaje) })),
+        oraculos: ors.map(o => ({ nombre: o.nombre, grupo: o.grupo || 0, puntos: o.puntos, puesto: o.puesto })) }
+    };
+    await updateDoc(doc(db, "salas", codigo), JSON.parse(JSON.stringify(publico)));
+    await setDoc(doc(db, "salas", codigo, "privado", "orden"), { terminar: Date.now() });
+    Object.assign(p.s, publico);
+    pintar();
+  } catch (e) {
+    alert("No se pudo terminar: " + (e.code || e.message));
+    boton.disabled = false; boton.textContent = "🏁 Terminar partida";
+  }
 }
 
 /* --------------------- conversación como texto --------------------- */

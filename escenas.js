@@ -89,24 +89,30 @@ function mostrarPortada(url, codigo, alEmpezar) {
 function actualizarMapaPortada() {
   const g = $("poGente");
   if (!g || !S.clase.brujula || !S.clase.brujula.activa || S.clase.brujula.fase !== "responder" || typeof BRUJULA === "undefined") return;
-  const { puntos } = window.datosMapa ? window.datosMapa() : { puntos: [] };
-  const color = id => (BRUJULA.campos.find(c => c.id === id) || {}).color || "#7d8fa1";
+  const { puntos, completos } = puntosDelMapa();
   const n = Object.keys(window.jugadoresSala ? window.jugadoresSala() : {}).length;
-  $("poCuenta").innerHTML = `<span><b>${puntos.length}</b> de ${n} respondieron la brújula</span>
+  $("poCuenta").innerHTML = `<span><b>${completos}</b> de ${n} respondieron la brújula</span>
     ${BRUJULA.campos.map(c => `<span style="color:${c.color}">● ${escHtml(c.nombre)} ${puntos.filter(p => p.campo === c.id).length}</span>`).join("")}`;
-  const aviso = $("poFormarAviso") ? $("poFormarAviso").textContent : "";
-  // solo el punto de quien acaba de responder entra con animación
-  const primera = !PORTADA.bjVistos;
-  PORTADA.bjVistos = PORTADA.bjVistos || new Set();
-  const conNuevo = puntos.map(p => { const nuevo = !primera && !PORTADA.bjVistos.has(p.uid); PORTADA.bjVistos.add(p.uid); return { ...p, nuevo, color: color(p.campo) }; });
-  g.innerHTML = `<div class="po-mapa">${mapaSvg({ puntos: conNuevo, campos: BRUJULA.campos, ejes: BRUJULA.ejes, tam: 460 })}
-    <div class="po-formar"><button class="btn pri" id="poFormar">FORMAR GRUPOS</button><div class="aviso" id="poFormarAviso">${escHtml(aviso)}</div></div></div>`;
-  $("poFormar").onclick = async () => {
-    const r = await window.formarGruposBrujula();
-    if (!r.ok) { $("poFormarAviso").textContent = r.motivo; return; }
-    sonar("fanfarria");
-    actualizarPortada(window.jugadoresSala());
-  };
+  // el mapa se arma una vez y después solo se mueven los puntos (mapavivo.js)
+  if (!PORTADA.mapa || !g.contains(PORTADA.mapa.svg)) {
+    g.innerHTML = `<div class="po-mapa"><div id="poMapaVivo"></div>
+      <div class="po-formar"><button class="btn pri" id="poFormar">FORMAR GRUPOS</button>
+        <button class="btn" id="poAmpliar" title="El mapa a pantalla completa, para proyectarlo">⛶ AMPLIAR MAPA</button>
+        <div class="aviso" id="poFormarAviso"></div></div></div>`;
+    PORTADA.mapa = crearMapaVivo($("poMapaVivo"), { campos: BRUJULA.campos, ejes: BRUJULA.ejes, tam: 460 });
+    $("poAmpliar").onclick = abrirMapaGrande;
+    $("poFormar").onclick = async () => {
+      const b = $("poFormar");
+      b.disabled = true; b.textContent = "FORMANDO…";
+      try {
+        const r = await window.formarGruposBrujula();
+        if (!r.ok) { $("poFormarAviso").textContent = r.motivo; return; }
+        sonar("fanfarria");
+        actualizarPortada(window.jugadoresSala());
+      } finally { if ($("poFormar")) { $("poFormar").disabled = false; $("poFormar").textContent = "FORMAR GRUPOS"; } }
+    };
+  }
+  PORTADA.mapa.actualizar(puntos);
 }
 
 function actualizarPortada(jugadores) {
@@ -200,14 +206,15 @@ function mostrarIntro(alTerminar) {
 }
 
 /* ---------------------------- 3. CONFETI ---------------------------- */
-function confeti(colores, ms = 5000) {
+// origen: de dónde sale (p. ej. la barra de participación); por defecto, el centro
+function confeti(colores, ms = 5000, origen = null) {
   const c = document.createElement("canvas");
   c.style.cssText = "position:fixed;inset:0;z-index:80;pointer-events:none";
   c.width = innerWidth; c.height = innerHeight;
   document.body.appendChild(c);
   const x = c.getContext("2d");
   const ps = Array.from({ length: 220 }, () => ({
-    x: c.width / 2 + (Math.random() - .5) * c.width * .3, y: c.height * .45,
+    x: origen ? origen.x + (Math.random() - .5) * 160 : c.width / 2 + (Math.random() - .5) * c.width * .3, y: origen ? origen.y : c.height * .45,
     vx: (Math.random() - .5) * 22, vy: -Math.random() * 20 - 6,
     r: Math.random() * 7 + 4, a: Math.random() * 6, va: (Math.random() - .5) * .4,
     col: colores[Math.floor(Math.random() * colores.length)]
@@ -326,11 +333,19 @@ function refrescarMovimiento() {
   const el = $("escena");
   if (!el || !el.classList.contains("movimiento") || typeof BRUJULA === "undefined" || !window.datosMapa) return;
   const { puntos, movimiento } = window.datosMapa();
-  const color = id => (BRUJULA.campos.find(c => c.id === id) || {}).color || "#7d8fa1";
+  const hechos = movimiento.filter(m => !m.parcial);
   const cuenta = (xs, id) => xs.filter(p => p.campo === id).length;
-  el.innerHTML = `<div class="es-k">🧭 LA BRÚJULA, OTRA VEZ · ${movimiento.length} de ${puntos.length} respondieron</div>
-    <div class="po-mapa" style="justify-content:center">${mapaSvg({ puntos: movimiento.map(m => ({ x: m.x, y: m.y, desde: m.desde, color: color(m.campo) })), campos: BRUJULA.campos, ejes: BRUJULA.ejes, tam: 520 })}
-      <div class="rs-or"><div class="rs-ork">ANTES → AHORA</div>${BRUJULA.campos.map(c => `<div><b style="color:${c.color}">${escHtml(c.nombre)}</b><i>${cuenta(movimiento.map(m => ({ campo: m.campoAntes })), c.id)} → ${cuenta(movimiento, c.id)}</i></div>`).join("")}</div></div>`;
+  // cada punto parte donde estaba al inicio y se desliza a medida que el alumno responde de nuevo
+  if (!el.querySelector("#movMapa")) {
+    el.innerHTML = `<div class="es-k" id="movK"></div>
+      <div class="po-mapa" style="justify-content:center"><div id="movMapa"></div>
+        <div><div class="rs-or" id="movCuenta"></div><button class="btn" id="movAmpliar" style="margin-top:12px">⛶ AMPLIAR</button></div></div>`;
+    MV.mov = crearMapaVivo($("movMapa"), { campos: BRUJULA.campos, ejes: BRUJULA.ejes, tam: 520 });
+    $("movAmpliar").onclick = abrirMapaGrande;
+  }
+  $("movK").textContent = `🧭 LA BRÚJULA, OTRA VEZ · ${hechos.length} de ${puntos.length} respondieron`;
+  $("movCuenta").innerHTML = `<div class="rs-ork">ANTES → AHORA</div>${BRUJULA.campos.map(c => `<div><b style="color:${c.color}">${escHtml(c.nombre)}</b><i>${cuenta(hechos.map(m => ({ campo: m.campoAntes })), c.id)} → ${cuenta(hechos, c.id)}</i></div>`).join("")}`;
+  MV.mov.actualizar(puntosDelMapa().puntos, { flechas: true });
 }
 
 /* ------------------------ 5. VEREDICTOS ------------------------ */

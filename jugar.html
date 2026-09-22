@@ -19,6 +19,22 @@ header .reloj.urgente{color:var(--B)}
 .estado b{color:var(--amber)}
 .marca{display:flex;gap:10px;font-size:11.5px;margin-top:3px;flex-wrap:wrap}
 .marca span{white-space:nowrap}
+/* la barra de participación */
+#barraTel:empty{display:none}
+#barraTel{margin-top:5px}
+.bt-cab{display:flex;gap:8px;align-items:baseline;font-size:11.5px}
+.bt-cab b{color:var(--c)}
+.bt-pct{margin-left:auto;font-weight:800;color:var(--txt)}
+.bt-sello{color:#00e07a;font-weight:700}
+.bt-barra{height:10px;border-radius:99px;background:#101820;border:1px solid #1e2a36;overflow:hidden;margin-top:3px;--f:#f43f5e}
+.bt-barra.ambar{--f:#ffb020}.bt-barra.verde{--f:#00e07a}.bt-barra.lleno{--f:#38bdf8;box-shadow:0 0 10px #38bdf8aa}
+.bt-barra i{display:block;height:100%;background:var(--f);border-radius:99px;transition:width .6s}
+.bt-yo{font-size:11.5px;margin-top:3px;color:var(--dim)}
+.bt-yo b{color:var(--txt)}
+.bt-yo.lleno{color:#38bdf8;font-weight:700}
+.bt-dos{display:flex;gap:12px}.bt-dos .bt{flex:1}
+.bt-cartel{position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:31;padding:14px 22px;border-radius:14px;background:#0b1520f0;border:2px solid var(--c);color:#e6edf3;font:800 21px system-ui;box-shadow:0 0 30px var(--c);text-align:center;pointer-events:none;animation:btCartel 3.5s ease both}
+@keyframes btCartel{0%{opacity:0;transform:translateX(-50%) scale(.6)}12%{opacity:1;transform:translateX(-50%) scale(1.08)}20%{transform:translateX(-50%) scale(1)}85%{opacity:1}100%{opacity:0}}
 .pant{flex:1 1 auto;overflow-y:auto;padding:10px 10px 14px;display:flex;flex-direction:column;gap:2px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px}
 .k{font-size:11px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;margin-bottom:6px}
@@ -177,6 +193,7 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 <div id="estado" class="estado oculto">
   <div><b id="tramoLbl"></b> <span id="pauta"></span></div>
   <div class="marca" id="marca"></div>
+  <div id="barraTel"></div>
 </div>
 <section id="pJuego" class="pant oculto"></section>
 
@@ -199,6 +216,8 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 <div id="brujula" class="capa oculto"></div>
 
 <script src="brujula.js?v=20260922e"></script>
-<script type="module" src="jugar.js?v=20260924d"></script>
+<script src="ritmo.js?v=20260923a"></script>
+<script src="barra.js?v=20260923a"></script>
+<script type="module" src="jugar.js?v=20260925b"></script>
 </body>
 </html>

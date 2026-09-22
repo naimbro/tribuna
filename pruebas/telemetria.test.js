@@ -42,3 +42,25 @@ test("senalesMensaje: si ya hubo pegado o inserción de golpe, la velocidad no s
   assert.deepEqual(T.senalesMensaje({ ...base, pegados: [{ ms: 1, chars: 302 }], largoFinal: 302, msComposicion: 100 }), ["pegó 302 caracteres"]);
   assert.deepEqual(T.senalesMensaje({ ...base, maxInsercion: 250, largoFinal: 250, msComposicion: 100 }), ["insertó 250 caracteres de golpe"]);
 });
+
+test("clasificarMensaje: la mitad del texto de una vez es rojo; mensajes cortos no se clasifican", () => {
+  assert.equal(T.clasificarMensaje({ ...base, largoFinal: 200, maxInsercion: 12 }), "escrito");
+  assert.equal(T.clasificarMensaje({ ...base, largoFinal: 200, maxInsercion: 150 }), "golpe");
+  assert.equal(T.clasificarMensaje({ ...base, largoFinal: 200, maxInsercion: 5, pegados: [{ ms: 1, chars: 120 }] }), "golpe");
+  assert.equal(T.clasificarMensaje({ ...base, largoFinal: 19, maxInsercion: 9 }), "corto");
+});
+
+test("puntosHuella: termina en el largo enviado, arriba del todo", () => {
+  const pts = T.puntosHuella({ huella: [0, 10, 20], largoFinal: 40 }, 30, 10).split(" ");
+  assert.equal(pts.length, 4);
+  assert.equal(pts[0], "0.0,10.0");
+  assert.equal(pts[3], "30.0,0.0");
+});
+
+test("hechosMensaje: describe sin juzgar", () => {
+  const h = T.hechosMensaje({ ...base, largoFinal: 200, msComposicion: 65000, maxInsercion: 150, salidas: 2, msFuera: 130000, tipos: ["insertFromPaste"] });
+  assert.ok(h.some(x => x.includes("75 % del texto")));
+  assert.ok(h.some(x => x.includes("portapapeles")));
+  assert.ok(h.some(x => x.includes("2 min 10 s")));
+  assert.ok(!h.join(" ").includes("copi"));
+});
