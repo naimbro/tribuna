@@ -355,12 +355,14 @@ function prepararCaja() {
   });
   tx.addEventListener("beforeinput", e => { if (e.inputType) registro().tipos.add(e.inputType); });
   tx.addEventListener("input", () => {
+    cortarDictado();                                // empezó a tipear: el dictado termina donde está
     const r = registro(), largo = tx.value.length;
     if (r.primera === null && largo > 0) r.primera = Date.now();
     r.maxInsercion = Math.max(r.maxInsercion, largo - r.largoPrev);
     r.largoPrev = largo;
   });
   tx.oninput = () => { tx.style.height = "auto"; tx.style.height = Math.min(140, tx.scrollHeight) + "px"; pintarCaja(); sugerir(); };
+  prepararDictado();
   tx.onclick = tx.onkeyup = sugerir;
   tx.onblur = () => setTimeout(() => { $("sugiere").innerHTML = ""; $("sugiere").classList.remove("on"); }, 200);
   $("btnEnviar").onclick = enviar;
@@ -418,10 +420,13 @@ function pintarCaja() {
   const abierta = J.sala.fase === "abierta" && (rolEn(J.sala) === "A" || rolEn(J.sala) === "B");
   $("tx").disabled = !abierta;
   $("tx").placeholder = abierta ? "Escribe a la conversación…" : "La conversación se abre cuando el profesor abra el tramo.";
+  if ($("btnMic")) $("btnMic").disabled = !abierta;
+  if (!abierta) cortarDictado();
   $("btnEnviar").disabled = !abierta || !$("tx").value.trim();
   if (!abierta) { $("notaCaja").textContent = ""; $("notaCaja").classList.remove("ati"); }
 }
 async function enviar() {
+  cortarDictado();                                  // si envía hablando, va lo que se ve en la caja
   const texto = $("tx").value.trim();
   if (!texto || !J.sala || J.sala.fase !== "abierta") return;
   $("btnEnviar").disabled = true;
@@ -437,7 +442,7 @@ async function enviar() {
       largoFinal: texto.length, msComposicion: r.primera ? ahora - r.primera : 0,
       pegados: r.pegados.slice(0, 30), maxInsercion: r.maxInsercion,
       salidas: r.salidas, msFuera: r.msFuera + (r.ocultoDesde ? ahora - r.ocultoDesde : 0),
-      huella: r.huella, tipos: [...r.tipos].slice(0, 12)
+      huella: r.huella, tipos: [...r.tipos].slice(0, 12), dictado: Math.min(r.dictado || 0, texto.length)
     }).catch(() => {});
     TEL.r = null;
     $("tx").value = ""; $("tx").style.height = "auto"; $("sugiere").innerHTML = "";
@@ -445,6 +450,68 @@ async function enviar() {
     $("pJuego").scrollTop = $("pJuego").scrollHeight;
   } catch (e) { $("notaCaja").textContent = "No se envió: " + e.code; }
   pintarCaja();
+}
+
+/* ---------- dictado por voz (botón 🎤) ----------
+   El reconocimiento de voz del propio navegador (Chrome en Android, Safari en iPhone) escribe en
+   la caja; el alumno revisa y envía. Gratis y sin servidor. En la telemetría queda aparte
+   («dictado»): el texto dictado entra de a frases enteras y no debe leerse como pegado. Como el
+   texto se pone por código (sin evento input), no mueve maxInsercion; por eso largoPrev se
+   actualiza a mano después de cada frase. */
+const Reconocedor = window.SpeechRecognition || window.webkitSpeechRecognition;
+const VOZ = { rec: null, base: "", final: "" };
+function prepararDictado() {
+  const b = $("btnMic");
+  if (!b) return;
+  if (!Reconocedor) { b.remove(); return; }     // navegador sin reconocimiento de voz: no se ofrece
+  b.classList.remove("oculto");
+  b.onclick = () => (VOZ.rec ? VOZ.rec.stop() : empezarDictado());
+}
+function ponerTexto(valor) {
+  const tx = $("tx");
+  tx.value = valor.slice(0, 1500);
+  registro().largoPrev = tx.value.length;
+  tx.style.height = "auto"; tx.style.height = Math.min(140, tx.scrollHeight) + "px";
+  pintarCaja();
+}
+function empezarDictado() {
+  const tx = $("tx");
+  if (tx.disabled) return;
+  const rec = new Reconocedor();
+  rec.lang = "es-CL"; rec.continuous = true; rec.interimResults = true;
+  VOZ.rec = rec; VOZ.final = "";
+  VOZ.base = tx.value && !/\s$/.test(tx.value) ? tx.value + " " : tx.value;
+  const r = registro();
+  if (r.primera === null) r.primera = Date.now();
+  rec.onresult = e => {
+    let interino = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) VOZ.final += e.results[i][0].transcript;
+      else interino += e.results[i][0].transcript;
+    }
+    ponerTexto(VOZ.base + VOZ.final + interino);
+  };
+  rec.onerror = e => {
+    $("notaCaja").textContent = e.error === "not-allowed" || e.error === "service-not-allowed"
+      ? "🎤 Para dictar, permite el micrófono en el navegador." : e.error === "no-speech" ? "🎤 No te escuché. Aprieta de nuevo y habla." : "🎤 No se pudo dictar: " + e.error;
+  };
+  rec.onend = () => cortarDictado(false);
+  try { rec.start(); } catch { VOZ.rec = null; return; }
+  $("btnMic").classList.add("on");
+  $("notaCaja").textContent = "🎤 Te escucho… aprieta de nuevo para terminar. Revisa el texto antes de enviar.";
+}
+// Termina el dictado y anota en la telemetría cuánto se dictó. Si terminó solo, queda en la caja
+// lo reconocido en firme; si se corta (envía, tipea o se cierra el tramo), queda lo que se ve.
+function cortarDictado(abortar = true) {
+  if (!VOZ.rec) return;
+  const rec = VOZ.rec;
+  VOZ.rec = null;
+  rec.onend = null; rec.onresult = null;
+  if (abortar) try { rec.abort(); } catch {}
+  else if ($("tx").value !== VOZ.base + VOZ.final) ponerTexto(VOZ.base + VOZ.final);
+  registro().dictado = (registro().dictado || 0) + Math.max(0, $("tx").value.length - VOZ.base.length);
+  VOZ.final = "";
+  $("btnMic")?.classList.remove("on");
 }
 
 /* ---------- votar: quién te convenció y a quién elegirá el jurado ---------- */

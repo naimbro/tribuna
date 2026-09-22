@@ -164,8 +164,8 @@ function telemetriaHtml(telemetria, codigo) {
   filas.sort((a, b) => rojos(b) - rojos(a) || a.nombre.localeCompare(b.nombre));
   const total = telemetria.length, nRojos = telemetria.filter(t => clasificarMensaje(t) === "golpe").length;
   const salieron = resumenTelemetria(telemetria).filter(x => x.salidas > 0);
-  const chispa = m => `<button class="tl-c" data-tlc="${codigo}" data-tli="${m.i}" title="Debate ${m.t.debate} · ${m.t.largoFinal} caracteres${m.clase === "golpe" ? " · más de la mitad de una vez" : ""}">
-      <svg viewBox="-2 -2 68 26" width="68" height="26"><polyline points="${puntosHuella(m.t, 64, 22)}" fill="none" stroke="${COLOR_TL[m.clase]}" stroke-width="1.8" stroke-linejoin="round"/></svg></button>`;
+  const chispa = m => `<button class="tl-c" data-tlc="${codigo}" data-tli="${m.i}" title="Debate ${m.t.debate} · ${m.t.largoFinal} caracteres${m.clase === "golpe" ? " · más de la mitad de una vez" : ""}${m.t.dictado ? " · 🎤 dictado por voz" : ""}">
+      <svg viewBox="-2 -2 68 26" width="68" height="26"><polyline points="${puntosHuella(m.t, 64, 22)}" fill="none" stroke="${COLOR_TL[m.clase]}" stroke-width="1.8" stroke-linejoin="round"/></svg>${m.t.dictado ? `<span class="tl-mic">🎤</span>` : ""}</button>`;
   return `<div class="caja tl" style="margin-top:14px"><h3>CÓMO ESCRIBIERON · antitrampa</h3>
     <p class="tl-ley"><b style="color:${COLOR_TL.golpe}">●</b> más de la mitad del texto llegó de una vez (pegado o insertado)
       <b style="color:${COLOR_TL.escrito}">●</b> lo fue tipeando <b style="color:${COLOR_TL.corto}">●</b> muy corto para decir algo.

@@ -81,6 +81,10 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 #tx{min-height:44px;max-height:140px;resize:none;border-radius:20px;padding:10px 14px}
 #btnEnviar{margin:0;border-radius:50%;width:46px;height:46px;padding:0;font-size:20px;background:var(--neon);color:#062a17;border:none;flex:0 0 auto;cursor:pointer}
 #btnEnviar:disabled{background:#1f2c26;color:var(--dim2)}
+#btnMic{margin:0;border-radius:50%;width:46px;height:46px;padding:0;font-size:20px;background:#16212c;border:1px solid var(--line);flex:0 0 auto;cursor:pointer}
+#btnMic.on{background:#f43f5e;border-color:#f43f5e;animation:micPulso 1.2s ease-in-out infinite}
+#btnMic:disabled{opacity:.35}
+@keyframes micPulso{50%{box-shadow:0 0 0 8px #f43f5e33}}
 .nota-caja{font-size:11.5px;color:var(--dim2);margin:4px 4px 0}
 .nota-caja.ati{color:var(--neon)}
 /* espera (portada / intro) y feedback: tapan la conversación */
@@ -201,6 +205,7 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
   <div class="sugiere" id="sugiere"></div>
   <div class="fila">
     <textarea id="tx" rows="1" placeholder="Escribe…"></textarea>
+    <button id="btnMic" class="oculto" title="Dictar por voz">🎤</button>
     <button id="btnEnviar" title="Enviar">➤</button>
   </div>
   <div class="nota-caja" id="notaCaja"></div>
@@ -218,6 +223,6 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 <script src="brujula.js?v=20260922e"></script>
 <script src="ritmo.js?v=20260923a"></script>
 <script src="barra.js?v=20260923a"></script>
-<script type="module" src="jugar.js?v=20260925b"></script>
+<script type="module" src="jugar.js?v=20260925c"></script>
 </body>
 </html>

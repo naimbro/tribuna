@@ -64,3 +64,17 @@ test("hechosMensaje: describe sin juzgar", () => {
   assert.ok(h.some(x => x.includes("2 min 10 s")));
   assert.ok(!h.join(" ").includes("copi"));
 });
+
+test("dictado por voz: no cuenta como velocidad sospechosa ni como golpe", () => {
+  // 300 caracteres dictados en 20 s (15/s) + 20 tipeados: rápido, pero es voz
+  const t = { ...base, largoFinal: 320, msComposicion: 20000, maxInsercion: 4, dictado: 300 };
+  assert.deepEqual(T.senalesMensaje(t), []);
+  assert.equal(T.clasificarMensaje(t), "escrito");
+  assert.ok(T.hechosMensaje(t).some(x => x.includes("Dictó por voz 300 caracteres")));
+});
+
+test("dictado por voz: si además pegó, el pegado se sigue viendo", () => {
+  const t = { ...base, largoFinal: 400, msComposicion: 30000, dictado: 100, pegados: [{ ms: 1, chars: 280 }] };
+  assert.deepEqual(T.senalesMensaje(t), ["pegó 280 caracteres"]);
+  assert.equal(T.clasificarMensaje(t), "golpe");
+});

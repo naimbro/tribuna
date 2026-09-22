@@ -23,7 +23,9 @@ function senalesMensaje(t) {
   if (t.salidas > 0) s.push(`salió de la app ${t.salidas} ${t.salidas === 1 ? "vez" : "veces"} (${Math.round((t.msFuera || 0) / 1000)} s)`);
   const seg = (t.msComposicion || 0) / 1000;
   const yaEntroDeGolpe = s.some(x => x.startsWith("pegó") || x.startsWith("insertó"));   // la velocidad sería el mismo hecho
-  if (!yaEntroDeGolpe && (t.largoFinal || 0) >= UMBRAL_TELEMETRIA.LARGO_VELOCIDAD && seg > 0 && t.largoFinal / seg > UMBRAL_TELEMETRIA.VELOCIDAD)
+  // lo dictado por voz (botón 🎤) es rápido por naturaleza: la velocidad se mide solo en lo tipeado
+  const tipeado = Math.max(0, (t.largoFinal || 0) - (t.dictado || 0));
+  if (!yaEntroDeGolpe && tipeado >= UMBRAL_TELEMETRIA.LARGO_VELOCIDAD && seg > 0 && tipeado / seg > UMBRAL_TELEMETRIA.VELOCIDAD)
     s.push(`escribió ${t.largoFinal} caracteres en ${Math.round(seg)} s`);
   return s;
 }
@@ -82,6 +84,7 @@ function hechosMensaje(t) {
   const out = [`Escribió ${largo} caracteres en ${fmtDuracion(t.msComposicion)}` +
     (t.msComposicion > 0 && largo >= 40 ? ` (${(largo / (t.msComposicion / 1000)).toFixed(1)} por segundo)` : "") + "."];
   out.push(`Mayor salto de una vez: ${t.maxInsercion || 0} caracteres${p !== null ? ` (${Math.round(p * 100)} % del texto)` : ""}.`);
+  if (t.dictado) out.push(`Dictó por voz ${t.dictado} caracteres (botón 🎤): eso no cuenta como texto que llegó de golpe.`);
   out.push(pegados.length ? `Pegó ${pegados.length} vez${pegados.length === 1 ? "" : "es"}: ${pegados.map(x => x.chars).join(", ")} caracteres.` : "No pegó nada.");
   if (tipos.includes("insertFromPaste") && !pegados.length) out.push("El teclado insertó texto del portapapeles (sin evento de pegado).");
   if (tipos.includes("insertFromDrop")) out.push("Arrastró texto a la caja.");
