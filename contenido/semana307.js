@@ -79,8 +79,8 @@ const CONCEPTOS = [
     claves: ["tenemos diferencias","existe un consenso","poner limites a la ia","limites a la ia y a las plataformas","cuatro iniciativas","idea de legislar","por unanimidad","comision de ciencias","comision de ciencia"] },
 
   { id: "incidentes_openai", etiqueta: "Los seis incidentes y el deber de anticiparse (Martínez, UDI)", lado: +1,
-    fuente: "La Tercera: los seis incidentes con agentes descontrolados que reveló OpenAI, símil del hackeo de julio a Hugging Face; Cristóbal Martínez (UDI)",
-    claves: ["seis incidentes","agentes descontrolados","agentes de ia descontrolados","fuera de control","descontrolado","anticiparnos","anticiparse","no se trata de frenar la tecnologia","impedir la innovacion","los propios desarrolladores","vienen advirtiendo","cristobal martinez"] },
+    fuente: "La Tercera: los seis incidentes con agentes descontrolados que reveló OpenAI, símil del hackeo de julio a Hugging Face; Cristóbal Martínez (UDI). La diapo 12 de la exposición le puso el detalle: unos 700 agentes entraron a la infraestructura de Hugging Face y trataron de borrar sus huellas —un tercio hubo que reconstruirlo— y en septiembre renunció Jacob Coxon, investigador de seguridad de Anthropic",
+    claves: ["seis incidentes","agentes descontrolados","agentes de ia descontrolados","fuera de control","descontrolado","anticiparnos","anticiparse","no se trata de frenar la tecnologia","impedir la innovacion","los propios desarrolladores","vienen advirtiendo","cristobal martinez","700 agentes","setecientos agentes","borrar sus huellas","un tercio hubo que reconstruir","coxon","apostando con nuestras vidas","stress-testing","renuncio un investigador"] },
 
   { id: "kaiser_derechos", etiqueta: "Derechos del ciudadano, no regular el funcionamiento (Kaiser)", lado: -1,
     fuente: "La Tercera: Johannes Kaiser, líder del PNL",
@@ -184,7 +184,7 @@ const FUENTES = [
   "huang","sacks","andreessen","horowitz","sanders","hawley","durbin","thune","trump","johnson",
   "hugging face","anthropic","openai","nvidia",
   // Lectura asignada, y el único dato de la exposición que la brújula les proyecta
-  "schneier","rewiring democracy","pew"
+  "schneier","rewiring democracy","pew","coxon"
 ];
 
 /* --- La audiencia: seis bloques, no una masa -------------------------
@@ -466,7 +466,7 @@ const BRUJULA = {
     },
     {
       id: "p4",
-      texto: "En Estados Unidos la mitad de los adultos dice que el uso creciente de la IA en la vida diaria los deja más preocupados que entusiasmados; un 38% por igual, y sólo un 10% más entusiasmados. Y el miedo apunta a los demás antes que a uno: 79% teme por los jóvenes y sólo 56% por su propia familia. ¿Y tú?",
+      texto: "En Estados Unidos el 52% de los adultos dice que el uso creciente de la IA en la vida diaria lo deja más preocupado que entusiasmado, y sólo un 9% al revés. Viene subiendo desde el 37% de 2021, con el salto en 2023. Y el miedo apunta a los demás antes que a uno: 79% teme por los jóvenes y sólo 56% por su propia familia. ¿Y tú?",
       opciones: [
         { texto: "Entusiasmado. Lo que veo son oportunidades, y todo este pesimismo me parece sobre todo una moda.", y: -8 },
         { texto: "Más entusiasmado que preocupado, aunque me incomoda no tener idea de en qué termina esto.", y: -3 },
