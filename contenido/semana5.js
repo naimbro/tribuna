@@ -27,7 +27,7 @@ const RONDAS = [
 const RUBRICA = [
   { id: "evidencia",  nombre: "Uso de evidencia",      max: 5, desc: "Afirmaciones ancladas en lecturas, con datos específicos." },
   { id: "refutacion", nombre: "Calidad de refutación",  max: 5, desc: "Responde al argumento real, no a una versión debilitada." },
-  { id: "estructura", nombre: "Estructura y economía",  max: 5, desc: "Tesis clara, argumentos jerarquizados, tiempo ajustado." },
+  { id: "estructura", nombre: "Claridad y economía",    max: 5, desc: "Se entiende qué sostiene y no hace perder el tiempo. Vale igual en un mensaje largo o en varios cortos." },
   { id: "concesion",  nombre: "Concesión honesta",      max: 5, desc: "Identifica la fortaleza adversaria y explica por qué persiste su posición." }
 ];
 
