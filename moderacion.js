@@ -130,14 +130,16 @@ function abrirTramoChat() {
   const ps = participantes();
   const a = ps.filter(p => p.equipo === "A").map(p => "@" + p.nombre), b = ps.filter(p => p.equipo === "B").map(p => "@" + p.nombre);
   const quien = (arr, def) => arr.length ? arr[Math.floor(Math.random() * arr.length)] : def;
+  // Un solo tramo por debate: la posición de entrada y de ahí libre. Lo que estructura la
+  // conversación es ella, interviniendo, no un segundo turno con nombre propio.
   const d = S.debate;
-  if (d && S.tramo === 0) {
+  if (d) {
     postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto:
       `Debate ${d.n}: «${d.pregunta}». Grupo ${d.A} defiende ${EQUIPOS.A.nombre}; Grupo ${d.B}, ${EQUIPOS.B.nombre}. ` +
-      `${quien(a, "Grupo " + d.A)}, ¿cuál es la tesis de tu grupo? Y ${quien(b, "Grupo " + d.B)}, la del suyo. Tienen ${Math.round(R.seg / 60)} minutos.` });
+      `${quien(a, "Grupo " + d.A)} y ${quien(b, "Grupo " + d.B)}: su posición en una frase, y de ahí seguimos sueltos. Tienen ${Math.round(R.seg / 60)} minutos y yo voy a ir dando la palabra.` });
   } else {
     postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto:
-      `Réplica. ${quien(b, "Grupo " + (d ? d.B : ""))} y ${quien(a, "Grupo " + (d ? d.A : ""))}: respondan lo más fuerte que dijo el otro grupo. Conceder un punto válido suma.` });
+      `«${mocionActual()}». ${quien(a, ladoNombre("A"))} y ${quien(b, ladoNombre("B"))}: su posición en una frase, y de ahí seguimos sueltos. Tienen ${Math.round(R.seg / 60)} minutos y yo voy a ir dando la palabra.` });
   }
 }
 
@@ -148,10 +150,12 @@ function moderadorTalvez(forzar = false) {
   const ahora = Date.now();
   const hayMensajes = S.chat.some(m => m.tipo === "alumno" && m.ronda === S.ronda);
   const pausa = ahora - M.ultimo;
+  // Con un solo tramo abierto la moderadora ES la estructura: entra bastante más seguido
+  // que cuando el reloj marcaba los turnos.
   const toca = forzar
-    || (pausa > 25000 && M.nuevos >= 3)                                   // la conversación avanzó
-    || (pausa > 30000 && M.nuevos >= 1 && ahora - M.ultimoAlumno > 15000)   // alguien dijo algo y quedó en el aire
-    || (pausa > 45000 && !hayMensajes && ahora - M.abre > 40000);          // silencio: nadie ha escrito
+    || (pausa > 15000 && M.nuevos >= 2)                                   // la conversación avanzó
+    || (pausa > 20000 && M.nuevos >= 1 && ahora - M.ultimoAlumno > 10000)   // alguien dijo algo y quedó en el aire
+    || (pausa > 30000 && !hayMensajes && ahora - M.abre > 25000);          // silencio: nadie ha escrito
   if (!toca) return;
   M.enCurso = true; M.nuevos = 0;
   intervenirModerador().finally(() => { M.enCurso = false; M.ultimo = Date.now(); });
@@ -160,7 +164,7 @@ function moderadorTalvez(forzar = false) {
 function promptModerador() {
   const R = tramoActual();
   const ps = participantes();
-  const lista = k => ps.filter(p => p.equipo === k).map(p => `${p.nombre} (${p.n} mensajes en este tramo)`).join(", ") || "(nadie aún)";
+  const lista = k => ps.filter(p => p.equipo === k).map(p => `${p.nombre} (${p.n} mensajes en este debate)`).join(", ") || "(nadie aún)";
   return `Eres la moderadora de un debate universitario en vivo, en un chat grupal. Curso: "${SESION.curso}", semana ${SESION.semana}: ${SESION.tema}.
 MOCIÓN: "${mocionActual()}". ${ladoNombre("A")} la defiende; ${ladoNombre("B")} la rechaza.
 TRAMO ACTUAL: ${R.nombre}. Pauta: ${R.pauta}
@@ -169,8 +173,11 @@ PARTICIPANTES
 - ${ladoNombre("A")}: ${lista("A")}
 - ${ladoNombre("B")}: ${lista("B")}
 
-CONCEPTOS Y LECTURAS DEL CURSO (SOLO PARA TI, para juzgar si lo que dicen está bien; NO los nombres en tu intervención si el participante no los nombró antes):
+CONCEPTOS Y LECTURAS DEL CURSO (SOLO PARA TI: ésta es la lectura que ellos tienen que hacer, y soplarla arruina el ejercicio):
 ${CONCEPTOS.map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n")}
+
+PERSONAS Y FUENTES QUE ELLOS TIENEN IMPRESAS (puedes nombrarlas y preguntar por ellas):
+${FUENTES.join(", ")}
 
 CONVERSACIÓN (lo último al final):
 ${transcripcionChat(m => true, 30) || "(todavía nadie ha escrito)"}
@@ -183,13 +190,16 @@ razón, NO se los des: devuélvele la pregunta para que la responda su grupo. De
 ` : ""}TU TAREA: escribe UNA intervención breve que haga avanzar el debate. Elige lo más útil ahora:
 - "profundizar": pídele a quien hizo una afirmación gruesa que la desarrolle o la haga concreta.
 - "verificar": pregúntale de qué lectura o dato sale lo que dijo, o pídele que explique un concepto que nombró, para ver si de verdad lo sabe.
-- "pasar_pelota": dale la palabra a alguien que ha hablado poco o nada (prioriza a quien tiene 0 mensajes), idealmente respondiendo a algo concreto que dijo el otro lado.
+- "pasar_pelota": dale la palabra a alguien que ha hablado poco o nada (prioriza a quien tiene 0 mensajes), idealmente respondiendo a algo concreto que dijo el otro lado. Es tu movida más importante: nadie puede pasarse el debate entero en silencio.
 - "contrastar": pon a una bancada frente al argumento más fuerte de la otra que todavía no ha respondido.
-Reglas: eres neutral, no opinas sobre la moción ni das la respuesta; NUNCA le sugieras a un participante qué concepto, autor, lectura o dato usar (la lista de arriba es para que TÚ verifiques, no para soplarles): pregúntale de dónde lo saca o qué significa lo que dijo, tu trabajo es comprobar que sabe, no enseñarle; nombra a las personas con @Nombre (exactamente como aparecen arriba); máximo 45 palabras; una sola pregunta o encargo; español de Chile, tono de profesora cercana pero exigente; no repitas una pregunta que ya hiciste; sin groserías.
+- "examinar": hazle a alguien una pregunta factual sobre lo que leyó en el cuadernillo —quién es una de esas personas, qué pide exactamente, ante quién se reclama si no se cumple— para ver si de verdad lo leyó.
+Reglas: eres neutral, no opinas sobre la moción ni dices quién tiene razón.
+PUEDES nombrar a las personas de los dos documentos que ellos tienen impresos y preguntar qué dijo o qué pide cada una: lo tienen en la mano y preguntarlo no les regala nada. Pero SIEMPRE como pregunta, nunca afirmando el dato —«@X, ¿qué pide Serrano exactamente?», no «Serrano pide un representante legal»—, y si contestan mal no los corrijas: pregúntales de dónde lo sacan.
+NO puedes entregarles la lectura: no digas a qué lado le sirve un argumento, no cruces los dos países por ellos, no les sugieras qué concepto usar ni les armes la refutación. Eso es lo que el jurado premia y tienen que hacerlo ellos; nombra a las personas con @Nombre (exactamente como aparecen arriba); máximo 45 palabras; una sola pregunta o encargo; español de Chile, tono de profesora cercana pero exigente; no repitas una pregunta que ya hiciste; sin groserías.
 
-Antes de responder, revisa tu mensaje: si contiene el nombre de un concepto, hallazgo, autor o lectura que la persona a la que le hablas no escribió antes, reescríbelo sin eso (por ejemplo, en vez de "¿qué muestra el Hallazgo 1?", pregunta "¿en qué lectura o dato te basas?").
+Antes de responder, revisa tu mensaje: ¿estoy AFIRMANDO un dato del material en vez de preguntarlo? ¿estoy señalando una conexión que ellos no hicieron —quién coincide con quién, a quién le conviene un argumento—? Si es que sí, reescríbelo como pregunta abierta.
 
-Responde SOLO un JSON: {"tipo": "profundizar"|"verificar"|"pasar_pelota"|"contrastar", "mensaje": "tu intervención"}`;
+Responde SOLO un JSON: {"tipo": "profundizar"|"verificar"|"pasar_pelota"|"contrastar"|"examinar", "mensaje": "tu intervención"}`;
 }
 
 async function intervenirModerador() {
@@ -212,7 +222,7 @@ function moderadorSimple() {
   const callado = [...ps].sort((a, b) => a.n - b.n)[0];
   if (ult && !detectarFuentes(ult.texto).length)
     return `@${ult.nombre}, ¿de qué lectura sale eso? Nombra el autor o el dato.${callado && callado.nombre !== ult.nombre ? ` Y @${callado.nombre}, ¿cómo le responde tu bancada?` : ""}`;
-  if (callado) return `@${callado.nombre}, todavía no te leemos en este tramo. ¿Qué agregarías a lo que dijo ${ult ? "@" + ult.nombre : "el otro lado"}?`;
+  if (callado) return `@${callado.nombre}, todavía no te leemos en este debate. ¿Qué agregarías a lo que dijo ${ult ? "@" + ult.nombre : "el otro lado"}?`;
   return `¿Quién abre? ${EQUIPOS.A.nombre} y ${EQUIPOS.B.nombre}, necesitamos sus tesis.`;
 }
 

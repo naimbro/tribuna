@@ -19,7 +19,7 @@ function publicarDebate({ pregunta, A, B }) {
   S.clase.debates.push({ n, pregunta: S.debate.pregunta, A, B, res: null, votantes: [] });
   S.clase.propuesta = null;
   S.tramo = 0;
-  S.ronda = (n - 1) * 2;
+  S.ronda = n - 1;
   S.publico = { A: 0, B: 0, n: 0, votantes: [] };
   S.debateAnterior = anterior;
   if (typeof window.alCambiarDebate === "function") window.alCambiarDebate(n);   // online: votos del debate n
@@ -27,15 +27,6 @@ function publicarDebate({ pregunta, A, B }) {
   pintarRonda(); pintarMarcador();
   S.fase = "listo";
   abrirRonda();                                          // abre la apertura; abrirTramoChat anuncia
-  publicarEstado();
-}
-
-function pasarAReplica() {
-  S.tramo = 1;
-  S.ronda = (S.debate.n - 1) * 2 + 1;
-  pintarRonda();
-  S.fase = "listo";
-  abrirRonda();
   publicarEstado();
 }
 

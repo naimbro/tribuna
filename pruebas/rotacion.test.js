@@ -180,3 +180,22 @@ test("acumularOraculos: guarda el grupo del votante", () => {
   const reg = R.acumularOraculos(undefined, [{ uid: "u1", nombre: "Ana", grupo: 3, prediccion: "A" }], "A");
   assert.equal(reg.u1.grupo, 3);
 });
+
+/* --- Un solo tramo abierto por debate ---------------------------------
+   La posición de entrada y después libre: la estructura la pone la moderadora,
+   no el reloj. */
+
+test("TRAMOS: un solo tramo abierto por debate", () => {
+  assert.equal(R.TRAMOS.length, 1);
+  const t = R.TRAMOS[0];
+  assert.equal(t.id, "apertura", "el id es la clave de EJEMPLOS_SESION y del marcador local");
+  assert.ok(t.seg >= 300, "el tramo único dura lo que antes duraban los dos");
+  assert.ok(!/r[ée]plica|refutaci[óo]n|cierre/i.test(t.nombre + " " + t.pauta),
+    "la pauta ya no prescribe reconstruir-y-refutar ni concluir");
+});
+
+test("TRAMOS: la duración del tramo único sale de ROT", () => {
+  assert.equal(R.TRAMOS[0].seg, R.ROT.SEG_DEBATE);
+  assert.equal(R.ROT.SEG_APERTURA, undefined, "quedó una constante del esquema viejo");
+  assert.equal(R.ROT.SEG_REPLICA, undefined, "quedó una constante del esquema viejo");
+});

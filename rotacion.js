@@ -7,7 +7,7 @@
    ===================================================================== */
 
 const ROT = {
-  SEG_APERTURA: 180, SEG_REPLICA: 180, SEG_VOTACION: 45, SEG_VEREDICTO_PUBLICO: 6, SEG_JUEZ: 3, SEG_TOTALES: 6, SEG_RESULTADO: 10, SEG_PROPUESTA: 15,
+  SEG_DEBATE: 360, SEG_VOTACION: 45, SEG_VEREDICTO_PUBLICO: 6, SEG_JUEZ: 3, SEG_TOTALES: 6, SEG_RESULTADO: 10, SEG_PROPUESTA: 15,
   GRUPOS_DEFECTO: 6, GRUPOS_MIN: 2, GRUPOS_MAX: 10,
   INDECISO: 8,          // |pos| ≤ 8 es indeciso y no suma votos
   ESCALA: 12,           // voto suave: tanh(|pos| / 12)
@@ -15,12 +15,14 @@ const ROT = {
   EMPATE_JURADO: 0.05   // el jurado empata bajo 0,05 puntos (de 20) de diferencia
 };
 
-// Los dos tramos de cada debate. "refutacion" es el id que el jurado ya conoce para la réplica.
+// Un solo tramo abierto por debate: la posición de entrada y después libre. La estructura
+// la pone la moderadora en vivo —dando la palabra al que no ha hablado y preguntando por lo
+// que leyeron— y no el reloj partido en discursos.
+// El id se mantiene en "apertura" porque es la clave con que EJEMPLOS_SESION y el marcador
+// local reconocen el tramo; lo que desaparece es el segundo tramo de réplica.
 const TRAMOS = [
-  { id: "apertura", nombre: "Apertura", seg: ROT.SEG_APERTURA, rol: "Apertura",
-    pauta: "Tesis y argumentos principales. Toda afirmación empírica requiere atribución a la bibliografía." },
-  { id: "refutacion", nombre: "Réplica", seg: ROT.SEG_REPLICA, rol: "Réplica",
-    pauta: "Responde lo más fuerte que dijo el otro grupo. Conceder un punto válido suma." }
+  { id: "apertura", nombre: "Debate", seg: ROT.SEG_DEBATE, rol: "Debate",
+    pauta: "Cada grupo parte diciendo su posición en una frase. De ahí en adelante es libre: responder, preguntar, conceder. Toda afirmación empírica requiere atribución." }
 ];
 
 // Quién debate ahora. Siempre los dos grupos que menos han debatido (así nadie queda dos

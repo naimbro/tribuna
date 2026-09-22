@@ -152,7 +152,7 @@ function laminasIntro() {
     `<div class="in-k">CÓMO FUNCIONA</div>
      <div class="in-jueces">
        <div><div class="in-e">🎙</div><b>LA MODERADORA LLAMA</b><span>Plantea una pregunta y llama a dos grupos: uno a favor y otro en contra.</span></div>
-       <div><div class="in-e">💬</div><b>DEBATEN</b><span>Apertura (${mm(ROT.SEG_APERTURA)}) y réplica (${mm(ROT.SEG_REPLICA)}), todos en la misma conversación.</span></div>
+       <div><div class="in-e">💬</div><b>DEBATEN</b><span>Un tramo abierto de ${mm(ROT.SEG_DEBATE)}: la posición de entrada y después libre. La moderadora da la palabra.</span></div>
        <div><div class="in-e">🗳</div><b>LOS DEMÁS VOTAN</b><span>Los grupos que no debaten votan quién los convenció y predicen a los jueces: cada acierto suma un punto de oráculo. Después, rotan.</span></div>
      </div>`,
     `<div class="in-k">CÓMO SE GANA</div>
