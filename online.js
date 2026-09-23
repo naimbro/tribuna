@@ -365,7 +365,7 @@ async function crearSala() {
   ON.codigo = nuevoCodigo();
   ON.creada = Date.now();
   S.etapa = "portada";                  // toda sala nueva parte en la portada
-  S.clase = { grupos: ROT.GRUPOS_DEFECTO, tema: SESION.tema, debates: [], propuesta: null, evaluado: 0 };
+  S.clase = { grupos: SESION.grupos || ROT.GRUPOS_DEFECTO, tema: SESION.tema, debates: [], propuesta: null, evaluado: 0 };
   // brújula corta: encendida por defecto si la semana la define; el profesor la apaga en la portada
   S.clase.brujula = { activa: typeof BRUJULA !== "undefined", fase: typeof BRUJULA !== "undefined" ? "responder" : null };
   S.clase.gruposInfo = [];

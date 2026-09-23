@@ -8,7 +8,7 @@
 const S = {
   fase: "propuesta",      // propuesta | listo | abierta | votando | resultado | fin   (rotación)
   tramo: 0,               // 0 = apertura, 1 = réplica, dentro del debate en curso
-  clase: { grupos: ROT.GRUPOS_DEFECTO, tema: "", debates: [], propuesta: null, evaluado: 0 },
+  clase: { grupos: SESION.grupos || ROT.GRUPOS_DEFECTO, tema: "", debates: [], propuesta: null, evaluado: 0 },
   debate: null,           // { n, pregunta, A: grupo, B: grupo } — el debate en curso
   ronda: 0,
   chat: [],               // la conversación: alumnos, moderadora, relator, resultados (moderacion.js)

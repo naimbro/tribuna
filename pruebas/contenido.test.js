@@ -13,21 +13,39 @@ function cargar(archivo) {
   return ctx.BRUJULA;
 }
 
-test("semana 7: brújula de 5 preguntas con opciones en los dos ejes y 4 campos", () => {
+test("semana 7: brújula corta de 6 preguntas, 3 por eje, cada una sobre un solo eje", () => {
   const b = cargar("contenido/semana7.js");
   assert.ok(b, "semana7.js no define BRUJULA");
-  assert.equal(b.preguntas.length, 5);
+  assert.equal(b.preguntas.length, 6);
   for (const p of b.preguntas) {
-    assert.ok(p.id && p.texto && p.opciones.length >= 2, p.id);
-    for (const o of p.opciones) assert.ok(typeof o.x === "number" || typeof o.y === "number", `${p.id}: opción sin eje`);
+    assert.equal(p.opciones.length, 4, p.id);
+    // cortas: se leen en el teléfono en ~10 s (investigación del 23-sep-2026)
+    assert.ok(p.texto.length <= 120, `${p.id}: enunciado de ${p.texto.length} caracteres`);
+    for (const o of p.opciones) assert.ok(o.texto.length <= 50, `${p.id}: opción de ${o.texto.length} caracteres: ${o.texto}`);
+    const eje = typeof p.opciones[0].x === "number" ? "x" : "y";
+    const vs = p.opciones.map(o => o[eje]);
+    assert.ok(vs.every(v => typeof v === "number"), `${p.id}: opciones en ejes distintos`);
+    assert.ok(vs.every((v, i) => i === 0 || v > vs[i - 1]), `${p.id}: opciones desordenadas`);
+    assert.ok(vs[0] < 0 && vs[3] > 0, `${p.id}: no cubre los dos extremos`);
   }
-  const ejesUsados = new Set(b.preguntas.flatMap(p => p.opciones.flatMap(o => ["x", "y"].filter(k => typeof o[k] === "number"))));
-  assert.deepEqual([...ejesUsados].sort(), ["x", "y"]);
+  const ejes = b.preguntas.map(p => typeof p.opciones[0].x === "number" ? "x" : "y");
+  assert.equal(ejes.filter(e => e === "x").length, 3);
+  assert.equal(ejes.filter(e => e === "y").length, 3);
   assert.equal(b.campos.length, 4);
   for (const c of b.campos) assert.ok(c.id && c.nombre && c.afirma && c.color && c.centro, c.id);
-  // cada combinación extrema cae en un campo distinto
   const extremos = [0, 3].flatMap(i => [0, 3].map(j => Object.fromEntries(b.preguntas.map(p => [p.id, typeof p.opciones[0].x === "number" ? i : j]))));
   assert.equal(new Set(extremos.map(r => B.campoDe(B.posicion(r, b.preguntas), b.campos))).size, 4);
+});
+
+test("semana 7: La Tercera, Acemoglu, cinco jueces y preguntas semilla", () => {
+  const s = cargarSesion("contenido/semana7.js");
+  assert.ok(s.CONCEPTOS.some(c => /La Tercera/.test(c.fuente)), "ningún concepto del reportaje");
+  assert.ok(s.CONCEPTOS.some(c => /Acemoglu/.test(c.fuente)), "ningún concepto de Acemoglu");
+  for (const n of ["serrano", "girardi", "kaiser", "acemoglu"]) assert.ok(s.FUENTES.includes(n), n);
+  assert.equal(s.JUECES.length, 5);
+  for (const j of s.JUECES) assert.match(j.valora, /instrumento/, j.id);
+  assert.ok(s.PREGUNTAS.length >= 4, "faltan preguntas semilla");
+  assert.equal(s.SESION.grupos, 5);
 });
 
 test("semana 5: sin brújula, el juego queda con la elección a mano", () => {

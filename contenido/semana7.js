@@ -1,20 +1,27 @@
 /* =====================================================================
    TRIBUNA — contenido de una sesión.
-   Este archivo es TODO lo que hay que editar para montar otra semana.
-   Fuente: naimbro.github.io/ia-democracia-2026 — Semana 7, la guía de
-   estudio (lecturas/semana7/guia-semana7.html), el mapa del NYT leído en
-   sala y el deck «Automatización y represión».
-   Jueves 24 de septiembre de 2026, 15:00–16:10. Dos partidas seguidas:
-   primero los dos campos que quieren frenar la IA (¿frenar por ley o desde
-   adentro?), después los dos que quieren acelerar (¿guardarraíles sin freno
-   o ni freno ni ley?). Cada partida parte con la sala en 5–7–15.
+   CSC00155 · Inteligencia Artificial y Democracia · Semana 7.
+   Jueves 24 de septiembre de 2026, 15:00–16:10. Unos 20–25 alumnos.
+
+   Material (naimbro.github.io/ia-democracia-2026):
+   1) La guía de lectura concentrada (semana7_guia_lectura.html), la misma
+      de MGT300: el mapa del NYT (13 fichas) y el reportaje de La Tercera
+      sobre la ley chilena de IA (Chernin y Yáñez, 20 sep. 2026).
+   2) El deck «Automatización y represión»: el modelo de Acemoglu, Gitmez y
+      Shadmehr (2026), The Economist sobre el empleo y el dato del CEP.
+   3) Lo ya leído: el podcast de Acemoglu, la entrevista a Gates (NYT).
+
+   Modo de juego: clase en rotación con brújula, 5 grupos de 4–5 (SESION.grupos).
+   Los conceptos de La Tercera y el cruce son los de semana307.js (MGT300):
+   si se corrige uno allá, corregirlo acá.
    ===================================================================== */
 
 const SESION = {
   curso: "CSC00155 — Inteligencia Artificial y Democracia",
   semana: 7,
-  tema: "¿Quién debe gobernar la IA? Modelos de gobernanza y regulación",
-  mocion: "La IA de frontera debe gobernarla el Estado, no los laboratorios que la construyen.",
+  tema: "¿Quién debe gobernar la IA? Automatización, represión y la ley chilena",
+  mocion: "La IA debe gobernarla el Estado con reglas vinculantes, aunque la misma IA le abarate vigilar.",
+  grupos: 5,                // 20–25 alumnos: 5 grupos de 4–5 (el profesor lo cambia en la portada)
   favor: "A FAVOR",
   contra: "EN CONTRA"
 };
@@ -89,11 +96,83 @@ const CONCEPTOS = [
     claves: ["captura","capturado","lobby","les paga el sueldo","le paga el sueldo","regulados","puerta giratoria","escriben la ley","quien escribe la ley","quién escribe la ley","no hay tribunales","sin tribunales","derechos fundamentales","prensa"] },
   { id: "ubi", etiqueta: "Renta básica, jornada y agencia (podcast)", lado: 0,
     fuente: "Acemoglu, podcast, 53:08–55:56",
-    claves: ["renta basica","renta básica","ubi","ingreso basico","ingreso básico","agencia humana","no crea empleos","reducir la jornada","jornada","brainless","encarece el trabajo","gravar la ia","gravar los robots","impuesto a la ia"] }
+    claves: ["renta basica","renta básica","ubi","ingreso basico","ingreso básico","agencia humana","no crea empleos","reducir la jornada","jornada","brainless","encarece el trabajo","gravar la ia","gravar los robots","impuesto a la ia"] },
+
+  /* ---- La Tercera (misma guía de lectura que MGT300, sección 2) ---- */
+
+
+  { id: "giro_180", etiqueta: "El giro de 180 grados: del enfoque de riesgos a la inversión", lado: 0,
+    fuente: "La Tercera (20 sep. 2026), Chernin y Yáñez: el proyecto de Boric de mayo de 2024 y las indicaciones sustitutivas de Kast, según Rojo Edwards",
+    claves: ["giro de 180","180 grados","indicacion sustitutiva","indicaciones sustitutivas","sustitutiva","mas de 20 articulos","20 articulos","veinte articulos","clasificacion de riesgos","enfoque de riesgos","union europea","mayo de 2024","proyecto de 2024","sobrerregulacion","rojo edwards","comision futuro","boletin 16821"] },
+
+  { id: "consenso_limites", etiqueta: "El consenso de la Cámara para poner límites (Manouchehri)", lado: +1,
+    fuente: "La Tercera: Daniel Manouchehri (PS), presidente de la Comisión de Ciencias; cuatro iniciativas aprobadas por unanimidad en la idea de legislar",
+    claves: ["tenemos diferencias","existe un consenso","poner limites a la ia","limites a la ia y a las plataformas","cuatro iniciativas","idea de legislar","por unanimidad","comision de ciencias","comision de ciencia"] },
+
+  { id: "incidentes_openai", etiqueta: "Los seis incidentes y el deber de anticiparse (Martínez, UDI)", lado: +1,
+    fuente: "La Tercera: los seis incidentes con agentes descontrolados que reveló OpenAI, símil del hackeo de julio a Hugging Face; Cristóbal Martínez (UDI). La diapo 12 de la exposición le puso el detalle: unos 700 agentes entraron a la infraestructura de Hugging Face y trataron de borrar sus huellas —un tercio hubo que reconstruirlo— y en septiembre renunció Jacob Coxon, investigador de seguridad de Anthropic",
+    claves: ["seis incidentes","agentes descontrolados","agentes de ia descontrolados","fuera de control","descontrolado","anticiparnos","anticiparse","no se trata de frenar la tecnologia","impedir la innovacion","los propios desarrolladores","vienen advirtiendo","cristobal martinez","700 agentes","setecientos agentes","borrar sus huellas","un tercio hubo que reconstruir","coxon","apostando con nuestras vidas","stress-testing","renuncio un investigador"] },
+
+  { id: "kaiser_derechos", etiqueta: "Derechos del ciudadano, no regular el funcionamiento (Kaiser)", lado: -1,
+    fuente: "La Tercera: Johannes Kaiser, líder del PNL",
+    claves: ["kaiser","derechos de las personas respecto","no de regular el funcionamiento","regular el funcionamiento","supervigilancia","estado de supervigilancia","enemigo del ciudadano","ciudadano honesto","el estado es el que tiene que ser transparente","estado al servicio del ciudadano","se le arranca la moto","control del ciudadano"] },
+
+  { id: "regular_no_prohibir", etiqueta: "Regular en vez de prohibir: la brocha de los deepfakes (Ross, Schalper)", lado: -1,
+    fuente: "La Tercera: Felipe Ross (Republicano, Distrito 13) sobre el proyecto de deepfakes; Diego Schalper (RN, Distrito 11) y las cortapisas al uso",
+    claves: ["prohibir con la brocha","con la brocha","representaciones digitales verosimiles","verosimiles pero falsas","deep fakes","deepfakes","metaverso","regular en vez de prohibir","cortapisas","cortapisas al uso","derechos de autor","pagar un fee","un fee","uso indiscriminado","estoy por regularla","barreras al desarrollo","se autorregula","uso libre","se le sanciona","boletin 17795"] },
+
+  { id: "inversion_primero", etiqueta: "Que la inversión llegue primero: centros de datos, pymes, mercado flexible", lado: -1,
+    fuente: "La Tercera: Felipe Ross (republicanos) sobre data centers y mercado laboral; Patricio Briones (PDG)",
+    claves: ["data center","data centers","centros de datos","centro de datos","recirculan el agua","amenaza ambiental","algo del pasado","mercado laboral mucho mas flexible","mercado laboral flexible","rigidizacion","rigidizacion del mercado","revolucion industrial","la cut","los gremios","tiro en los pies","pegarse un tiro","emprendedores","pymes","ganarle al sistema","nuestra propia inteligencia artificial","briones"] },
+
+  { id: "winter_sujeto", etiqueta: "«¿Quién será el dueño del futuro?»: articular un sujeto o recibir limosna (Winter)", lado: 0,
+    fuente: "La Tercera: la carta abierta de Gonzalo Winter (FA) en Substack, 28 de julio, 20 páginas y 71 mil caracteres",
+    claves: ["dueno del futuro","quien sera el dueno","carta abierta","substack","71 mil caracteres","20 paginas","articular a un sujeto","un sujeto que hoy no esta articulado","corriente de pensamiento","una sensibilidad","necesita dos actores","amenazarse el uno al otro","aqui hay uno solo","volverse temible","temible para los duenos","toda mediacion","un monologo","una limosna","toda concesion"] },
+
+  { id: "impuesto_global", etiqueta: "Impuesto global a la IA e institucionalidad sudamericana (Winter)", lado: +1,
+    fuente: "La Tercera: la carta de Gonzalo Winter (FA)",
+    claves: ["impuesto global","impuesto nacional","todas las inteligencias artificiales del mundo","la humanidad completa","los pueblos que produjeron","donde tributa","quien administra","america del sur","institucionalidad comun","negociar de igual a igual","corporaciones tecnologicas planetarias","ningun pais del sur","mas ricas que su propio producto interno","producto interno"] },
+
+  { id: "girardi_prevision", etiqueta: "¿Quién financia la previsión cuando el trabajo se desplaza? (Girardi)", lado: +1,
+    fuente: "La Tercera: el exsenador Guido Girardi (PPD)",
+    claves: ["girardi","seguridad social","prestaciones de salud","las pensiones se financian","impuestos al trabajo","quien va a financiar la salud","seres humanos sean desplazados","contratacion por tareas","uberizacion","uberizacion del trabajo","fragilizar"] },
+
+  { id: "reconversion_reparto", etiqueta: "Quién se beneficia de la productividad: reconversión y cuotas (Manouchehri, Yeomans)", lado: +1,
+    fuente: "La Tercera: Daniel Manouchehri (PS) y Gael Yeomans (FA), presidenta del partido",
+    claves: ["quien se va a beneficiar","de esa productividad","siglo xxi","desigualdades del siglo xix","facil innovar","caro vulnerar derechos","confederacion nacional de trabajadores","trabajadores del comercio","proceso de reemplazo","plan agresivo","reconversion laboral","reconversion","cuotas de puestos","puestos de trabajo que no se debiesen reemplazar","son indispensables","mas que subsidios","el obrero","reparte en una aplicacion","cuida a un adulto mayor","no tiene contrato","la automatizacion acelera","sus sindicatos","tienen que estar en esa conversacion","se tiene que distribuir","mayor capacitacion","medidas pro empleo","yeomans","manouchehri"] },
+
+  { id: "representante_legal", etiqueta: "Representante legal en Chile: el puesto de comida y la soberanía (Serrano)", lado: +1,
+    fuente: "La Tercera: Daniela Serrano (PC), representante del PC en la Comisión de Ciencias",
+    claves: ["serrano","representante legal","sin un representante legal","grandes plataformas que operen","puesto de comida","serie de permisos","permisos y requisitos","batalla cultural","cuestion de soberania","soberania"] },
+
+  { id: "thiel_vs_papa", etiqueta: "Thiel contra el Papa: la disputa deja de ser izquierda y derecha (Montalva)", lado: 0,
+    fuente: "La Tercera: José Montalva (ex PPD), de la Comisión de Ciencias",
+    claves: ["montalva","disputa de poder","ya no va a ser entre izquierdas y derechas","tecnolibertaria","tecnolibertarismo","corriente tecnolibertaria","peter thiel","thiel","fundo palantir","palantir","leon xiv","papa leon","subordinada a la dignidad humana","bien comun","no sean pocas empresas","pocas empresas las que terminen controlando"] },
+
+  { id: "enciclica", etiqueta: "La encíclica Magnifica Humanitas: el proyecto tecnocrático deshumanizador", lado: +1,
+    fuente: "La Tercera: la encíclica de León XIV y su influencia en Chile Vamos frente a republicanos y el PNL",
+    claves: ["enciclica","magnifica humanitas","proyecto tecnocratico","tecnocratico","deshumanizador","meros datos","reduce a los individuos","monopolios digitales","priorizan el lucro","lucro por sobre la dignidad","dignidad humana","chile vamos","el estado como regulador"] },
+
+  /* ---- El cruce de la guía ---- */
+
+  { id: "instrumento", etiqueta: "Qué instrumento le pide o le niega al Estado cada persona", lado: 0,
+    fuente: "Guía de lectura, cierre del cruce: «elige a uno de los veinticinco y anota en una frase qué instrumento le pide o le niega al Estado»; y la columna «qué pide» de la tabla de los doce chilenos",
+    claves: ["que instrumento","con que instrumento","que instrumento pide","le pide al estado","le niega al estado","un instrumento","el instrumento","una prohibicion","una obligacion previa","responsabilidad por dano","permiso de entrada","una cuota","un impuesto","un derecho","quien lo hace cumplir","con que facultad"] },
+
+  { id: "lineas_conocidas", etiqueta: "En EE.UU. las divisiones no siguen las líneas conocidas; en Chile sí", lado: 0,
+    fuente: "Guía de lectura, observaciones de las secciones 1 y 2: el cruce de los 13 estadounidenses contra el de los 12 chilenos",
+    claves: ["no siguen las lineas conocidas","lineas conocidas","sanders y hawley","un socialista y un republicano","del mismo lado","enfrentado a los ejecutivos","que financiaron su campana","los tres que mas saben","los que mas quieren frenarla","en chile si","casi todos los diputados","la regla la pone el estado","de que trata la ley","el trabajo y el reparto","los derechos individuales","limites al estado","tercera pregunta","en los dos paises","los dos textos","los dos documentos","el mapa y el reportaje"] }
 ];
 
 /* --- Fuentes citables: detectarlas sube evidencia --------------------- */
-const FUENTES = ["acemoglu","gitmez","shadmehr","the economist","economist","new york times","nyt","gates","amodei","altman","musk","nadella","hassabis","pichai","zuckerberg","huang","sacks","andreessen","sanders","jeffries","hawley","durbin","thune","trump","johnson","bls","goldman","linkedin","indeed","hanauer","gawdat","schneier","levitsky","ziblatt","toner","ezra klein","hernandez","podcast"];
+const FUENTES = [
+  "acemoglu", "gitmez", "shadmehr", "the economist", "economist", "new york times", "nyt", "gates", "amodei", "altman", "musk", "nadella",
+  "hassabis", "pichai", "zuckerberg", "huang", "sacks", "andreessen", "sanders", "jeffries", "hawley", "durbin", "thune", "trump",
+  "johnson", "bls", "goldman", "linkedin", "indeed", "hanauer", "gawdat", "schneier", "levitsky", "ziblatt", "toner", "ezra klein",
+  "hernandez", "podcast", "la tercera", "chernin", "yanez", "schalper", "ross", "kaiser", "briones", "martinez", "yeomans", "winter",
+  "manouchehri", "girardi", "serrano", "montalva", "edwards", "boric", "kast", "enciclica", "magnifica humanitas", "leon xiv", "thiel", "palantir",
+  "horowitz", "hugging face", "anthropic", "openai", "nvidia", "rewiring democracy", "pew", "coxon"
+];
 
 /* --- La audiencia: seis bloques, no una masa ------------------------- */
 /* Las mismas seis personas de la semana 5, con el oído afinado a la moción
@@ -180,6 +259,28 @@ const AUDIENCIA = [
   }
 ];
 
+/* --- El panel de jueces de esta semana --------------------------------
+   Los cinco de MGT300 (nombrar a una persona real y el instrumento que le pide
+   o le niega al Estado, y contestar lo que el rival dijo de verdad), más el
+   modelo de Acemoglu, Gitmez y Shadmehr, que en esta clase sí se expuso. */
+const JUECES = [
+  { id: "academica", nombre: "La académica", emoji: "\u{1F393}",
+    valora: "que nombren a una persona real del mapa del NYT o del reportaje de La Tercera, o el modelo de Acemoglu, digan qué instrumento le pide o le niega al Estado y contesten lo que el rival dijo de verdad; su énfasis propio es usar bien el modelo: qué afirma, bajo qué dos supuestos, y no confundirlo con un pronóstico",
+    molesta: "atribuirle a Acemoglu lo que no dice, confundir los países o los documentos, y la autoridad sin argumento" },
+  { id: "jurista", nombre: "El jurista", emoji: "\u{2696}",
+    valora: "que nombren a una persona real y digan qué instrumento le pide o le niega al Estado, contestando lo que el rival sostuvo de verdad; su énfasis propio es la precisión del instrumento: prohibición, obligación previa, responsabilidad por daño, representante legal, impuesto o derecho, y quién lo hace cumplir",
+    molesta: "decir «hay que regular» sin decir con qué figura, con qué facultad y contra quién se reclama" },
+  { id: "economista", nombre: "La economista", emoji: "\u{1F4C8}",
+    valora: "que nombren a una persona real y el instrumento que pide, y que respondan al argumento real del rival; su énfasis propio es quién paga: el costo del impuesto o la obligación, el umbral fiscal del modelo de Acemoglu, y qué dicen los datos del empleo (The Economist, el CEP)",
+    molesta: "moralizar sin decir quién paga, y hablar del apocalipsis del empleo como si fuera un dato" },
+  { id: "periodista", nombre: "La periodista", emoji: "\u{1F4F0}",
+    valora: "que nombren a una persona real, digan qué instrumento le piden o le niegan al Estado y contesten lo que el rival dijo; su énfasis propio es la escena concreta: la comisión, la indicación sustitutiva, la indagatoria de Hawley, la frase exacta que se citó",
+    molesta: "la jerga, las evasivas y los datos inventados que no están en ningún documento" },
+  { id: "activista", nombre: "La activista", emoji: "\u{270A}",
+    valora: "que nombren a una persona real y el instrumento que pide o niega, y que respondan al argumento real; su énfasis propio es quién gana y quién pierde con ese instrumento, y el riesgo de que la IA le abarate al poder vigilar y reprimir a quien protesta",
+    molesta: "la tecnocracia sin público y hablar de los trabajadores sin que nadie los haya escuchado" }
+];
+
 /* --- Sala de control: shocks que el profesor lanza en vivo ------------
    efecto > 0 mueve hacia A FAVOR (el Estado); < 0 hacia EN CONTRA.      */
 const EVENTOS = [
@@ -192,7 +293,13 @@ const EVENTOS = [
   { id: "sanders", titular: "Sanders propone una moratoria a nuevos centros de datos y un impuesto de 50% por una vez a las grandes empresas de IA para un fondo público.",
     efecto: { territorio: 14, calle: 10, trabajo: 7, estado: 2, academia: -3, capital: -10 } },
   { id: "prop11", titular: "Acemoglu, Gitmez & Shadmehr: orientar la IA en dirección proworker no mueve el umbral del golpe (Prop. 11). La política tecnológica sola no basta.",
-    efecto: { academia: 8, estado: 7, trabajo: 3, territorio: 1, calle: 0, capital: -3 } }
+    efecto: { academia: 8, estado: 7, trabajo: 3, territorio: 1, calle: 0, capital: -3 } },
+  { id: "enciclica", titular: "El Papa León XIV publica la encíclica Magnifica Humanitas: advierte contra un proyecto tecnocrático deshumanizador que reduce a los individuos a meros datos, impulsado por monopolios digitales como OpenAI, Palantir y Anthropic.",
+    efecto: { territorio: 9, estado: 8, academia: 5, trabajo: 5, calle: 3, capital: -7 } },
+  { id: "sustitutiva", titular: "El gobierno de Kast ingresa la indicación sustitutiva de más de 20 artículos: el proyecto pasa de la clasificación de riesgos europea a un enfoque estratégico hacia la inversión.",
+    efecto: { capital: -11, estado: -6, academia: -4, calle: 6, trabajo: 5, territorio: 3 } },
+  { id: "representante", titular: "Daniela Serrano presenta la moción que obliga a las grandes plataformas a tener representante legal en Chile: «no es sólo una batalla cultural, es una cuestión de soberanía».",
+    efecto: { estado: 11, trabajo: 7, territorio: 6, calle: 5, academia: 3, capital: -7 } }
 ];
 
 /* --- Bancadas -------------------------------------------------------- */
@@ -231,182 +338,82 @@ const EJEMPLOS_SESION = {
   }
 };
 
-/* --- Preguntas escritas por el profesor (opcional) --------------------
-   Si hay, la moderadora las propone primero, en este orden. Después genera
-   las suyas a partir del tema general, el material y lo que va pasando. */
-const PREGUNTAS = [];
+/* --- Preguntas escritas por el profesor -------------------------------
+   Una por cada choque probable entre campos. La moderadora las propone
+   primero, en este orden; después genera las suyas. */
+const PREGUNTAS = [
+  "Chile debe aprobar obligaciones vinculantes para las empresas de IA antes de que llegue la inversión.",
+  "El mayor riesgo de la IA en Chile es un Estado que la use para vigilar, no unas pocas empresas que la controlen.",
+  "Si la automatización abarata la represión, hay que gravar la IA hoy, antes de que el capital prefiera la fuerza al impuesto.",
+  "Orientar la IA a complementar al trabajador basta: no hace falta limitar la automatización por ley."
+];
 
-/* --- Brújula corta (opcional en cada partida) -------------------------
-   5 preguntas del instrumento de la semana 7 de ml2 (ítems 1, 2, 3, 4 y 6). x = velocidad
-   (frenar … acelerar), y = quién pone la regla (industria … Estado). Los campos son los
-   cuatro que ya se usan para formar las partidas. */
+/* --- Brújula corta ------------------------------------------------------
+   Rehecha el 23-sep-2026 con lo que mostró la clase de MGT300 (sala 42RT):
+   el eje emocional funcionó (sus dos preguntas correlacionaron 0,78) y el
+   ideológico no (sus tres preguntas no correlacionaron entre sí: cada opción
+   hablaba de un tema distinto). Reglas nuevas: cada eje es UNA pregunta de
+   fondo con tres ítems; enunciados de ~20 palabras y opciones de ≤ 50
+   caracteres, para que se responda en un minuto en el teléfono.
+
+   x — ¿De quién hay que cuidarse? Las empresas de IA (−) ↔ el Estado con IA
+       (+). Es la pregunta del modelo de Acemoglu (el Estado que reprime, la IA
+       que abarata vigilar) y cruza con La Tercera y el mapa del NYT.
+   y — Cómo te deja: entusiasmo (−) ↔ preocupación (+), como en MGT300.
+
+   Al terminar la clase, revisar que los tres ítems de cada eje correlacionen
+   entre sí (ver pruebas/: el análisis se hizo a mano con las respuestas). */
 const BRUJULA = {
-  "ejes": {
-    "x": {
-      "id": "velocidad",
-      "etiqueta": "Velocidad",
-      "min": "frenar",
-      "max": "acelerar"
-    },
-    "y": {
-      "id": "regla",
-      "etiqueta": "Quién pone la regla",
-      "min": "la industria se regula sola",
-      "max": "el Estado, con potestades vinculantes"
-    }
+  ejes: {
+    x: { id: "cuidarse", etiqueta: "¿De quién hay que cuidarse?", min: "de las empresas de IA", max: "del Estado con IA" },
+    y: { id: "animo", etiqueta: "Cómo te deja", min: "entusiasmo", max: "preocupación" }
   },
-  "preguntas": [
-    {
-      "id": "p1",
-      "texto": "Sam Altman firmó en 2023 la declaración sobre riesgo de extinción, en 2025 dijo que todo sería gradual y manejable, y este mes, después de que los sistemas de OpenAI se salieran de control y atacaran a Hugging Face, dijo que puede ser hora de ir más lento. ¿Qué es ese giro?",
-      "opciones": [
-        {
-          "texto": "La única respuesta honesta a un sistema que se le escapó a su propio fabricante. Llegó tarde, pero llegó.",
-          "x": -8
-        },
-        {
-          "texto": "Una señal de que los constructores ya no controlan el ritmo, y eso basta para bajar la velocidad mientras se entiende qué pasó.",
-          "x": -4
-        },
-        {
-          "texto": "Un incidente de seguridad, grave pero acotado, que se arregla con ingeniería y no parando la industria.",
-          "x": 4
-        },
-        {
-          "texto": "Teatro. Frenar le conviene al que va adelante: congela la ventaja de OpenAI y Anthropic frente a los que vienen atrás.",
-          "x": 8
-        }
-      ]
-    },
-    {
-      "id": "p2",
-      "texto": "David Sacks, asesor de Trump, contestó el ensayo de Amodei diciendo que los laboratorios fijan la frontera tecnológica ellos mismos. La misma semana, el senador Hawley le exigió a Altman explicaciones por escrito sobre el ataque a Hugging Face y abrió una indagatoria formal. ¿Cuál de los dos tiene el rol correcto?",
-      "opciones": [
-        {
-          "texto": "Sacks. El que construye el sistema es el único que sabe dónde está la frontera; un senador leyendo un informe llega siempre tarde.",
-          "y": -7
-        },
-        {
-          "texto": "Sacks en el fondo, pero con condiciones: que los laboratorios se revisen entre sí antes de lanzar, con el gobierno mirando.",
-          "y": -3
-        },
-        {
-          "texto": "Hawley, siempre que la indagatoria termine en una regla y no en una audiencia televisada.",
-          "y": 3
-        },
-        {
-          "texto": "Hawley. Un sistema que atacó a otra empresa es un producto que causó daño, y eso se responde ante la ley, no ante el directorio.",
-          "y": 7
-        }
-      ]
-    },
-    {
-      "id": "p3",
-      "texto": "Jensen Huang, cuyos chips mueven casi toda la industria, sostiene que ninguna empresa debería estar pidiéndole al gobierno más regulación de la IA, y ha discutido en público con Amodei por sus predicciones de pérdida de empleos. ¿Qué pesa más en esa posición?",
-      "opciones": [
-        {
-          "texto": "Que vende las palas de la fiebre del oro: cada mes de pausa es facturación perdida, y eso desautoriza su opinión sobre el ritmo.",
-          "x": -8
-        },
-        {
-          "texto": "Que el ritmo actual lo fija quien más gana con él, y por eso alguien de afuera tiene que ponerle un freno.",
-          "x": -4
-        },
-        {
-          "texto": "Que tiene razón en algo: pedir regulación es la forma en que los que van adelante levantan la escalera detrás de sí.",
-          "x": 4
-        },
-        {
-          "texto": "Que tiene razón entera: el ritmo lo tiene que fijar la competencia, y frenar en Estados Unidos es regalarle la delantera a China.",
-          "x": 8
-        }
-      ]
-    },
-    {
-      "id": "p4",
-      "texto": "Bernie Sanders propone una moratoria a nuevos centros de datos, un impuesto de 50 por ciento por una sola vez a las grandes empresas de IA para un fondo público, la prohibición permanente de la superinteligencia y una pausa hasta que exista un regulador federal. ¿Qué haces con ese paquete?",
-      "opciones": [
-        {
-          "texto": "Descartarlo entero: es la prueba de que cuando el Estado se mete, se mete con brocha gorda. Mejor que la industria se ordene sola.",
-          "y": -7
-        },
-        {
-          "texto": "Rescatar el fondo público y botar el resto. Lo que se puede regular es el reparto, no la tecnología.",
-          "y": -3
-        },
-        {
-          "texto": "Tomar en serio el regulador federal y la pausa hasta que exista; la moratoria y la prohibición son consignas.",
-          "y": 3
-        },
-        {
-          "texto": "Es el único paquete de la lista que le pone al Estado los cuatro instrumentos a la vez: frenar, gravar, prohibir y supervisar. Por ahí va.",
-          "y": 7
-        }
-      ]
-    },
-    {
-      "id": "p5",
-      "texto": "El líder del Senado, John Thune, quiere una ley bipartidista de «toque liviano» con guardarraíles sólo para los modelos más riesgosos. Hakeem Jeffries dice que el Congreso no puede dejar que los ejecutivos regulen su propia tecnología. Y Satya Nadella ofrece un «ritmo deliberado» decidido por la propia industria. ¿Quién pone la regla?",
-      "opciones": [
-        {
-          "texto": "Nadella. Un compromiso de la industria se cumple al día siguiente; una ley del Congreso se discute dos años y nace vieja.",
-          "y": -7
-        },
-        {
-          "texto": "La industria escribe la regla y el Estado la homologa: un organismo financiado por las empresas y supervisado por el gobierno.",
-          "y": -3
-        },
-        {
-          "texto": "Thune: una ley mínima, sólo para lo más riesgoso, antes que un pacto voluntario que nadie puede hacer cumplir.",
-          "y": 3
-        },
-        {
-          "texto": "Jeffries. El único que puede obligar a Microsoft es alguien a quien Microsoft no le paga el sueldo.",
-          "y": 7
-        }
-      ]
-    }
+  preguntas: [
+    { id: "p1", texto: "Acemoglu: la misma IA que automatiza el trabajo abarata la vigilancia. ¿Qué te preocupa más?",
+      opciones: [
+        { texto: "Que pocas empresas controlen la IA", x: -8 },
+        { texto: "Más las empresas, pero ojo con el Estado", x: -3 },
+        { texto: "Más el Estado, pero ojo con las empresas", x: 3 },
+        { texto: "Un Estado que vigile con IA", x: 8 }] },
+    { id: "p2", texto: "Pew (semana 3): la mitad de los adultos en EE.UU. está más preocupada que entusiasmada con la IA. ¿Y tú?",
+      opciones: [
+        { texto: "Muy entusiasmado", y: -8 },
+        { texto: "Más entusiasmado que preocupado", y: -3 },
+        { texto: "Más preocupado que entusiasmado", y: 3 },
+        { texto: "Muy preocupado", y: 8 }] },
+    { id: "p3", texto: "Serrano (PC): ninguna plataforma global debe operar en Chile sin representante legal. ¿Qué hacemos?",
+      opciones: [
+        { texto: "Obligarlas ya: es soberanía", x: -8 },
+        { texto: "Obligarlas, con reglas parejas", x: -3 },
+        { texto: "Esperar la ley, sin improvisar", x: 3 },
+        { texto: "Nada: más control estatal es peor", x: 8 }] },
+    { id: "p4", texto: "Agentes de IA se salieron de control y atacaron a Hugging Face. ¿Qué te produce?",
+      opciones: [
+        { texto: "Nada: una industria que vende miedo", y: -8 },
+        { texto: "Poco: toda tecnología falla al comienzo", y: -3 },
+        { texto: "Inquietud: lo advierten sus creadores", y: 3 },
+        { texto: "Miedo: lo que viene es peor", y: 8 }] },
+    { id: "p5", texto: "¿Quién debe poner las reglas de la IA más avanzada?",
+      opciones: [
+        { texto: "El Estado, por ley y con sanciones", x: -8 },
+        { texto: "El Estado, con la industria en la mesa", x: -3 },
+        { texto: "La industria, con el Estado mirando", x: 3 },
+        { texto: "La industria: el Estado llega tarde", x: 8 }] },
+    { id: "p6", texto: "The Economist: por ahora la IA crea más empleos de los que destruye. ¿Cómo te deja?",
+      opciones: [
+        { texto: "Tranquilo: vienen oportunidades", y: -8 },
+        { texto: "Tranquilo, con algo de duda", y: -3 },
+        { texto: "Inquieto por lo que viene", y: 3 },
+        { texto: "Preocupado, también por mi trabajo", y: 8 }] }
   ],
-  "campos": [
-    {
-      "id": "ley",
-      "nombre": "Frenar por ley",
-      "centro": {
-        "x": -6,
-        "y": 5
-      },
-      "color": "#38bdf8",
-      "afirma": "La IA de frontera hay que frenarla, y el freno lo tiene que poner la ley del Estado."
-    },
-    {
-      "id": "adentro",
-      "nombre": "Frenar desde adentro",
-      "centro": {
-        "x": -6,
-        "y": -5
-      },
-      "color": "#34d399",
-      "afirma": "La IA de frontera hay que frenarla, pero el freno lo ponen mejor los propios laboratorios que una ley."
-    },
-    {
-      "id": "guard",
-      "nombre": "Guardarraíles sin freno",
-      "centro": {
-        "x": 6,
-        "y": 5
-      },
-      "color": "#f59e0b",
-      "afirma": "No hay que frenar la IA de frontera, pero el Estado tiene que fijarle guardarraíles vinculantes."
-    },
-    {
-      "id": "nada",
-      "nombre": "Ni freno ni ley",
-      "centro": {
-        "x": 6,
-        "y": -5
-      },
-      "color": "#fb7185",
-      "afirma": "No hay que frenar la IA de frontera ni regularla por ley: el ritmo y las reglas los fija la industria."
-    }
+  campos: [
+    { id: "ley_antes", nombre: "Ley antes", centro: { x: -5, y: 5 }, color: "#38bdf8",
+      afirma: "La IA preocupa y el peligro son las empresas: el Estado tiene que ponerles reglas vinculantes ya, antes de que lleguen." },
+    { id: "reglas_estado", nombre: "Que llegue, con reglas", centro: { x: -5, y: -5 }, color: "#34d399",
+      afirma: "La IA es buena noticia, pero las reglas las pone el Estado y no las empresas que la venden." },
+    { id: "no_vigilar", nombre: "Que no nos vigilen", centro: { x: 5, y: 5 }, color: "#f59e0b",
+      afirma: "La IA preocupa porque le abarata al Estado vigilar y reprimir: el límite hay que ponérselo al Estado." },
+    { id: "sin_trabas", nombre: "Que llegue sin trabas", centro: { x: 5, y: -5 }, color: "#fb7185",
+      afirma: "La IA es buena noticia y el Estado regula tarde y mal: que la industria se ordene y el Estado no estorbe." }
   ]
 };
