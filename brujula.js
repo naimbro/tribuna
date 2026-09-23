@@ -222,22 +222,30 @@ function mapaSvg({ puntos = [], campos = [], ejes = null, tam = 420, chico = fal
   if (puntos.some(p => p.desde)) s += `<defs><marker id="fl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e6edf3"/></marker></defs>`;
   s += `<rect x="${m}" y="${m}" width="${W - 2 * m}" height="${H - 2 * m}" fill="none" stroke="#1e2a36"/>`;
   s += `<line x1="${W / 2}" y1="${m}" x2="${W / 2}" y2="${H - m}" stroke="#1e2a36" stroke-dasharray="4 4"/><line x1="${m}" y1="${H / 2}" x2="${W - m}" y2="${H / 2}" stroke="#1e2a36" stroke-dasharray="4 4"/>`;
-  for (const c of campos) {
-    s += `<circle cx="${X(c.centro.x).toFixed(1)}" cy="${Y(c.centro.y).toFixed(1)}" r="${chico ? 16 : 46}" fill="${c.color || "#7d8fa1"}" opacity=".13"/>`;
-    if (!chico) s += `<text x="${X(c.centro.x).toFixed(1)}" y="${(Y(c.centro.y) - 52).toFixed(1)}" text-anchor="middle" fill="${c.color || "#7d8fa1"}" font-size="12" font-weight="700">${e(c.nombre)}</text>`;
-  }
-  if (ejes && !chico) {
-    s += `<text x="${m}" y="${H / 2 - 6}" fill="#7d8fa1" font-size="11">${e(ejes.x.min)}</text><text x="${W - m}" y="${H / 2 - 6}" fill="#7d8fa1" font-size="11" text-anchor="end">${e(ejes.x.max)}</text>`;
-    s += `<text x="${W / 2 + 6}" y="${m + 12}" fill="#7d8fa1" font-size="11">${e(ejes.y.max)}</text><text x="${W / 2 + 6}" y="${H - m - 4}" fill="#7d8fa1" font-size="11">${e(ejes.y.min)}</text>`;
+  for (const c of campos) s += `<circle cx="${X(c.centro.x).toFixed(1)}" cy="${Y(c.centro.y).toFixed(1)}" r="${chico ? 16 : Math.round(tam * .1)}" fill="${c.color || "#7d8fa1"}" opacity=".13"/>`;
+  if (!chico) {
+    // El nombre de cada campo, en la esquina de su cuadrante (dentro del marco), y los ejes, fuera
+    // del marco: los laterales en vertical. Antes todo iba en la cruz central y se pisaba.
+    for (const c of campos) {
+      const der = c.centro.x > 0, arriba = c.centro.y > 0;
+      s += `<text x="${der ? W - m - 6 : m + 6}" y="${arriba ? m + 15 : H - m - 7}" text-anchor="${der ? "end" : "start"}" fill="${c.color || "#7d8fa1"}" font-size="12" font-weight="700">${e(c.nombre)}</text>`;
+    }
+    if (ejes) {
+      s += `<text x="${W / 2}" y="${m - 8}" fill="#7d8fa1" font-size="11" text-anchor="middle">▲ ${e(ejes.y.max)}</text>`;
+      s += `<text x="${W / 2}" y="${H - m + 17}" fill="#7d8fa1" font-size="11" text-anchor="middle">▼ ${e(ejes.y.min)}</text>`;
+      s += `<text transform="translate(${m - 9} ${H / 2}) rotate(-90)" fill="#7d8fa1" font-size="11" text-anchor="middle">${e(ejes.x.min)}</text>`;
+      s += `<text transform="translate(${W - m + 9} ${H / 2}) rotate(90)" fill="#7d8fa1" font-size="11" text-anchor="middle">${e(ejes.x.max)}</text>`;
+    }
   }
   // varias personas con las mismas respuestas caen en el mismo punto: se abren en espiral
-  const vistos = {}, radio = chico ? 5 : 11;
+  // el tamaño del punto va con el del mapa: en un mapa chico, puntos de 6 tapaban la nube
+  const pr = chico ? 3.5 : Math.max(3.5, tam * .012), vistos = {}, radio = chico ? 5 : pr * 1.9;
   for (const p of puntos) {
     const k = p.x.toFixed(1) + "," + p.y.toFixed(1), i = vistos[k] = (vistos[k] ?? -1) + 1;
     const r = i ? radio * Math.sqrt(i) : 0, dx = r * Math.cos(i * 2.4), dy = r * Math.sin(i * 2.4);
     const px = (X(p.x) + dx).toFixed(1), py = (Y(p.y) + dy).toFixed(1);
     if (p.desde) s += `<line class="mv" x1="${X(p.desde.x).toFixed(1)}" y1="${Y(p.desde.y).toFixed(1)}" x2="${px}" y2="${py}" stroke="${p.color}" stroke-width="2" opacity=".75" marker-end="url(#fl)"/>`;
-    s += `<circle class="${p.nuevo ? "pt nuevo" : "pt"}" cx="${px}" cy="${py}" r="${p.yo ? (chico ? 6 : 9) : (chico ? 3.5 : 6)}" fill="${p.color}" stroke="${p.yo ? "#ffffff" : "none"}" stroke-width="2"/>`;
+    s += `<circle class="${p.nuevo ? "pt nuevo" : "pt"}" cx="${px}" cy="${py}" r="${(p.yo ? (chico ? 6 : pr * 1.5) : pr).toFixed(1)}" fill="${p.color}" stroke="${p.yo ? "#ffffff" : "none"}" stroke-width="2"/>`;
   }
   return s + "</svg>";
 }
