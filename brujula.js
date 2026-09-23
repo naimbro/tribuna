@@ -212,6 +212,14 @@ function emparejarLejanos(disponibles, debates, posDe) {
   return vecesA(x) <= vecesA(y) ? { A: x, B: y } : { A: y, B: x };
 }
 
+// Una pregunta escrita que dice qué campo afirma: A FAVOR va al grupo del par más cercano al centro
+// de ese campo. Sin campo conocido (o sin posiciones), el par queda como vino.
+function ladoQueAfirma(par, afirma, campos, posDe) {
+  const c = (campos || []).find(x => x.id === afirma);
+  if (!par || !c || !posDe || !posDe[par.A] || !posDe[par.B]) return par;
+  return distancia(posDe[par.B], c.centro) < distancia(posDe[par.A], c.centro) - 1e-9 ? { A: par.B, B: par.A } : par;
+}
+
 // El mapa: un plano de −10 a 10 con los centros de los campos como círculos tenues y un punto por
 // alumno (flecha si trae «desde»). SVG en texto: lo usan el proyector, el teléfono y el panel.
 function mapaSvg({ puntos = [], campos = [], ejes = null, tam = 420, chico = false }) {
@@ -267,4 +275,4 @@ function ofrecerBrujula(bj, tieneMio) {
   return !!(bj && bj.activa && !tieneMio && ["responder", "grupos"].includes(bj.fase));
 }
 
-if (typeof module !== "undefined") module.exports = { TAM_GRUPO, MAX_GRUPOS, posicion, campoDe, formarGrupos, formarGruposEnK, asignarTarde, emparejarLejanos, mapaSvg, accionBrujula, ofrecerBrujula };
+if (typeof module !== "undefined") module.exports = { TAM_GRUPO, MAX_GRUPOS, posicion, campoDe, formarGrupos, formarGruposEnK, asignarTarde, emparejarLejanos, ladoQueAfirma, mapaSvg, accionBrujula, ofrecerBrujula };

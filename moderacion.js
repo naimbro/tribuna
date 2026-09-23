@@ -58,7 +58,7 @@ function burbuja(m) {
   const hora = new Date(m.t).toTimeString().slice(0, 5);
   if (m.tipo === "sistema") return `<div class="msg sys">${esc(m.texto)}</div>`;
   if (m.tipo === "noticia") return `<div class="msg noticia"><div class="who">📰 Última hora<span class="hora">${hora}</span></div><div class="tx">${esc(m.texto)}</div></div>`;
-  if (m.tipo === "mod") return `<div class="msg mod"><div class="who">🎙 ${MOD_NOMBRE}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div></div>`;
+  if (m.tipo === "mod") return `<div class="msg mod ${m.datos && m.datos.tribuna ? "trib" : ""}"><div class="who">🎙 ${MOD_NOMBRE}${m.datos && m.datos.tribuna ? " · ✋ la tribuna" : ""}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div></div>`;
   if (m.tipo === "relator") {
     const d = m.datos || {};
     return `<div class="msg rel"><div class="who">📣 ${REL_NOMBRE} · llamado a votar<span class="hora">${hora}</span></div>
@@ -90,7 +90,15 @@ function burbuja(m) {
   }
   // alumno
   const e = EQUIPOS[m.equipo] || { color: "var(--dim)", nombre: "" };
-  return `<div class="msg ${m.equipo}" style="--c:${e.color}"><div class="who">${esc(conGrupo(m.nombre || "?", grupoDeMensaje(m)))}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div></div>`;
+  return `<div class="msg ${m.equipo}" style="--c:${e.color}"><div class="who">${esc(conGrupo(m.nombre || "?", grupoDeMensaje(m)))}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div>${chipsReacciones(m.id)}</div>`;
+}
+
+// 🔥 🤔 🤝 que le puso el público a un mensaje (publico.js); nada si nadie reaccionó.
+function chipsReacciones(id) {
+  const c = S.reacciones && S.reacciones[id];
+  if (!c) return "";
+  const xs = PUB.REACCIONES.filter(r => c[r.id]).map(r => `<span title="${r.nombre}">${r.emoji} ${c[r.id]}</span>`);
+  return xs.length ? `<div class="rx">${xs.join("")}</div>` : "";
 }
 
 // El grupo de quien escribió: viene en el mensaje, o se deduce del lado que le tocó en ese debate.
@@ -153,9 +161,43 @@ function abrirTramoChat() {
 function moderadorTalvez(forzar = false) {
   const M = S.mod;
   if (!M || M.enCurso || S.fase !== "abierta") return;
+  // la tribuna: a los 3 minutos, si hay preguntas del público y no salió ninguna, entra una
+  // (una vez por minuto como mucho: si la moderadora las descarta todas no se insiste en bucle)
+  const T = estadoTribuna();
+  if (T.forzar && Date.now() - (M.tribunaForzadaEn || 0) > 60000) { M.tribunaForzadaEn = Date.now(); forzar = true; }
   if (!debeIntervenir(estadoTramo(), { ahora: Date.now(), abre: M.abre, forzar }).toca) return;
   M.enCurso = true;
   intervenirModerador(forzar).finally(() => { M.enCurso = false; });
+}
+
+/* ---------- ✋ la tribuna (publico.js): lo que pide el público desde el teléfono ---------- */
+// Las preguntas del público que siguen en la fila y si toca ofrecerlas o forzar una.
+function estadoTribuna() {
+  const reg = S.debate && S.clase.debates[S.debate.n - 1];
+  if (!reg || !S.mod) return { pendientes: [], ofrecer: false, forzar: false };
+  const pendientes = preguntasPendientes(S.preguntasPub, reg.tribuna).filter(p => limpiaFrase(p.texto));
+  const seg = (Date.now() - S.mod.abre) / 1000;
+  return { pendientes, ...turnoTribuna({ seg, emitidas: (reg.tribuna || []).length, pendientes: pendientes.length }) };
+}
+// La moderadora lanza la pregunta elegida con el nombre de quien la hizo: +1 punto de oráculo.
+function lanzarPreguntaTribuna(p, destino) {
+  const reg = S.debate && S.clase.debates[S.debate.n - 1];
+  if (!reg || !p) return;
+  (reg.tribuna = reg.tribuna || []).push({ uid: p.uid, nombre: p.nombre || "", grupo: p.grupo || 0, texto: String(p.texto).slice(0, PUB.PREGUNTA_MAX) });
+  S.clase.oraculos = sumarPuntoPregunta(S.clase.oraculos, p);
+  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: textoTribuna(p, destino), datos: { tribuna: "pregunta", uid: p.uid } });
+  if (typeof pintarColumna === "function") pintarColumna();
+  if (typeof window.publicarEstado === "function") window.publicarEstado();
+}
+// Un mensaje juntó suficientes 🤔: la moderadora pide la fuente en nombre de la tribuna. Es una
+// plantilla fija a propósito: rápida, y dice de quién viene la pregunta.
+function pedirFuenteTribuna(msgId) {
+  const m = S.chat.find(x => x.id === msgId);
+  if (!m || S.fase !== "abierta" || !S.mod) return;
+  const cita = String(m.texto || "").replace(/\s+/g, " ").trim();
+  const corta = cita.length > 70 ? cita.slice(0, 70).replace(/\s+\S*$/, "") + "…" : cita;
+  postChat({ tipo: "mod", nombre: MOD_NOMBRE, datos: { tribuna: "fuente", msg: msgId },
+    texto: `🤔 @${String(m.nombre || "").split(" ")[0]}, la tribuna pregunta de dónde sale esto: «${corta}». Un autor o un documento basta.` });
 }
 
 function promptModerador(est) {
@@ -195,7 +237,7 @@ Le hablas a los GRUPOS, no a las personas: "${d ? `@Grupo ${d.A}` : ladoNombre("
 ${puedeNombrar.length ? `Solo a estas personas, que llevan rato sin escribir nada, puedes nombrarlas con @Nombre (una a la vez, la que tenga más sentido ahora): ${puedeNombrar.join(", ")}.` : "Ahora no nombres a ninguna persona con @: habla a los grupos."}${S.mod && S.mod.pregunta ? ` (Excepción: a ${S.mod.pregunta.nombre}, que te habló.)` : ""}
 Si un alumno dice que alguien no está, créele y no vuelvas a nombrar a esa persona.
 
-TUS INTERVENCIONES ANTERIORES EN ESTE DEBATE (no repitas ninguna, ni con otras palabras):
+${tribunaParaPrompt()}TUS INTERVENCIONES ANTERIORES EN ESTE DEBATE (no repitas ninguna, ni con otras palabras):
 ${est.ultimasMod.map(t => `- ${t}`).join("\n") || "(ninguna)"}
 
 ELIGE UNA:
@@ -204,25 +246,48 @@ ELIGE UNA:
 - "verificar": pregunta de qué lectura o dato sale una afirmación, o qué significa un concepto que usaron. Máximo una vez por persona y nunca dos veces seguidas: no conviertas cada mensaje en "¿de qué texto sale eso?".
 - "contrastar": pon a un grupo frente al argumento más fuerte del otro que todavía no ha respondido.
 - "pasar_pelota": dale la palabra al grupo que ha hablado menos, o a una persona de la lista de arriba, idealmente sobre algo concreto que dijo el otro lado.
-- "examinar": hazle a un grupo una pregunta factual sobre lo que leyó —quién es una de esas personas, qué pide exactamente— para ver si de verdad lo leyó.
+- "examinar": hazle a un grupo una pregunta factual sobre lo que leyó —quién es una de esas personas, qué pide exactamente— para ver si de verdad lo leyó.${estadoTribuna().ofrecer ? `
+- "tribuna": lanza una de las PREGUNTAS DE LA TRIBUNA de arriba, tal cual (la escribió el público). En "elegida" pon su número; en "mensaje", solo a quién va dirigida ("@Grupo N" o "@Grupo N y @Grupo M").` : ""}
 Reglas: eres neutral, no opinas sobre la moción ni dices quién tiene razón.
 PUEDES nombrar a las personas de los documentos que ellos tienen impresos y preguntar qué dijo o qué pide cada una: lo tienen en la mano y preguntarlo no les regala nada. Pero SIEMPRE como pregunta, nunca afirmando el dato, y si contestan mal no los corrijas: pregúntales de dónde lo sacan.
 NO puedes entregarles la lectura: no digas a qué lado le sirve un argumento, no cruces los materiales por ellos, no les sugieras qué concepto usar ni les armes la refutación. Máximo 40 palabras; una sola pregunta o encargo; español de Chile, tono de profesora cercana pero exigente; sin groserías.
 
-Responde SOLO un JSON: {"tipo": "esperar"|"profundizar"|"verificar"|"contrastar"|"pasar_pelota"|"examinar", "mensaje": "tu intervención (vacío si esperas)"}`;
+Responde SOLO un JSON: {"tipo": "esperar"|"profundizar"|"verificar"|"contrastar"|"pasar_pelota"|"examinar"${estadoTribuna().ofrecer ? '|"tribuna"' : ""}, "mensaje": "tu intervención (vacío si esperas)"${estadoTribuna().ofrecer ? ', "elegida": número de la pregunta de la tribuna (solo si tipo es "tribuna")' : ""}}`;
+}
+
+function tribunaParaPrompt() {
+  const T = estadoTribuna();
+  if (!T.ofrecer) return "";
+  return `PREGUNTAS DE LA TRIBUNA (las escribió el público, los grupos que no debaten; quien hizo la elegida gana un punto):
+${T.pendientes.map((p, i) => `${i + 1}. ${p.nombre} (grupo ${p.grupo}): "${p.texto}"`).join("\n")}
+Elige la que más haga avanzar el debate ahora, si alguna lo hace: una pregunta de verdad, sobre la moción y que el otro lado no haya contestado. Descarta las ofensivas o las que no son preguntas.${T.forzar ? " ESTA VEZ elige \"tribuna\": el público lleva rato esperando (salvo que ninguna sirva)." : ""}
+
+`;
 }
 
 async function intervenirModerador(forzar = false) {
   const est = estadoTramo();
   const pregunta = S.mod && S.mod.pregunta;
   let texto = null, espera = false;
+  const T = estadoTribuna();
   if (S.motor.activo) {
     try {
       const j = jsonDe(await pedirLLM(promptModerador(est), "jurado"));
+      const elegida = j.tipo === "tribuna" && T.ofrecer ? T.pendientes[(+j.elegida || 0) - 1] : null;
+      if (elegida && S.fase === "abierta") {
+        if (S.mod && S.mod.pregunta === pregunta) S.mod.pregunta = null;
+        const destino = String(j.mensaje || "").match(/@Grupo \d+(?:\s*y\s*@Grupo \d+)?/i);
+        lanzarPreguntaTribuna(elegida, destino ? destino[0] : `@Grupo ${S.debate.A} y @Grupo ${S.debate.B}`);
+        return;
+      }
       // el profesor la llamó o le hablaron: no se queda callada
       if (j.tipo === "esperar" && !forzar && !pregunta) espera = true;
-      else if (typeof j.mensaje === "string" && j.mensaje.trim() && limpiaFrase(j.mensaje)) texto = j.mensaje.trim().slice(0, 400);
+      else if (j.tipo !== "tribuna" && typeof j.mensaje === "string" && j.mensaje.trim() && limpiaFrase(j.mensaje)) texto = j.mensaje.trim().slice(0, 400);
     } catch (e) { console.warn("moderadora:", e); }
+  } else if (T.forzar && S.fase === "abierta") {
+    // sin motor: la primera pregunta de la fila, a los dos grupos
+    lanzarPreguntaTribuna(T.pendientes[0], `@Grupo ${S.debate.A} y @Grupo ${S.debate.B}`);
+    return;
   }
   if (S.mod && S.mod.pregunta === pregunta) S.mod.pregunta = null;   // si llegó otra mientras pensaba, queda para la próxima
   if (espera || S.fase !== "abierta") return;
@@ -270,7 +335,7 @@ async function relatorPideVoto() {
   let d = null;
   if (S.motor.activo) {
     const prompt = `Eres el relator de un debate universitario en vivo. Curso: "${SESION.curso}", semana ${SESION.semana}.
-MOCIÓN: "${mocionActual()}". ${ladoNombre("A")} la defiende; ${ladoNombre("B")} la rechaza. Acaba de terminar el debate ${S.debate ? S.debate.n : ""}: «${mocionActual()}» (apertura y réplica).
+MOCIÓN: "${mocionActual()}". ${ladoNombre("A")} la defiende; ${ladoNombre("B")} la rechaza. Acaba de terminar el debate ${S.debate ? S.debate.n : ""}: «${mocionActual()}».
 
 LO QUE SE DIJO EN ESTE TRAMO:
 ${transcripcionChat(delTramo, 60) || "(nadie escribió)"}

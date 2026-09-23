@@ -55,10 +55,15 @@ test("ranking: ordena por puntaje promedio, desempata por jurado, deja al final 
   assert.equal(r[1].distincion, "publico");
 });
 
-test("proximaPreguntaEscrita: devuelve la primera no usada", () => {
-  assert.equal(R.proximaPreguntaEscrita(["a", "b"], ["a"]), "b");
+test("proximaPreguntaEscrita: devuelve la primera no usada, como { texto, afirma }", () => {
+  assert.deepEqual(R.proximaPreguntaEscrita(["a", "b"], ["a"]), { texto: "b", afirma: null });
   assert.equal(R.proximaPreguntaEscrita(["a"], ["a"]), null);
   assert.equal(R.proximaPreguntaEscrita(undefined, []), null);
+  // con el campo que afirma; las usadas se comparan por texto, vengan como texto u objeto
+  const ps = [{ texto: "Ley ya.", afirma: "ley_antes" }, { texto: "Sin trabas.", afirma: "sin_trabas" }];
+  assert.deepEqual(R.proximaPreguntaEscrita(ps, []), { texto: "Ley ya.", afirma: "ley_antes" });
+  assert.deepEqual(R.proximaPreguntaEscrita(ps, [" ley ya. "]), { texto: "Sin trabas.", afirma: "sin_trabas" });
+  assert.equal(R.proximaPreguntaEscrita(ps, [ps[0], ps[1]]), null);
 });
 
 test("mejorIntervencion: la nota más alta", () => {
@@ -198,4 +203,15 @@ test("TRAMOS: la duración del tramo único sale de ROT", () => {
   assert.equal(R.TRAMOS[0].seg, R.ROT.SEG_DEBATE);
   assert.equal(R.ROT.SEG_APERTURA, undefined, "quedó una constante del esquema viejo");
   assert.equal(R.ROT.SEG_REPLICA, undefined, "quedó una constante del esquema viejo");
+});
+
+test("sumarPuntoPregunta: +1 punto de oráculo sin contar como predicción", () => {
+  let reg = R.sumarPuntoPregunta({}, { uid: "u1", nombre: "Lucas", grupo: 3 });
+  assert.deepEqual([reg.u1.puntos, reg.u1.predicciones, reg.u1.preguntas, reg.u1.grupo], [1, 0, 1, 3]);
+  reg = R.acumularOraculos(reg, [{ uid: "u1", nombre: "Lucas", grupo: 3, prediccion: "A" }], "A");
+  assert.deepEqual([reg.u1.puntos, reg.u1.predicciones, reg.u1.aciertos], [2, 1, 1]);
+  // quien solo sumó por una pregunta igual aparece en el ranking de oráculos
+  const r = R.rankingOraculos(R.sumarPuntoPregunta({}, { uid: "u9", nombre: "Ana" }));
+  assert.equal(r.length, 1); assert.equal(r[0].tasa, 0);
+  assert.deepEqual(R.sumarPuntoPregunta({ x: 1 }, null), { x: 1 });
 });

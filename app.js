@@ -383,8 +383,38 @@ function pintarMarcador() {
   pintarColumna();
 }
 
+// 🌡 El público en vivo (publico.js): la curva del termómetro del debate en curso, arriba de la
+// columna derecha. +100 arriba es A FAVOR, −100 abajo es EN CONTRA. Solo se ve con el debate
+// abierto o votando, y solo en línea (el termómetro lo mueven los teléfonos).
+function pintarTermometro() {
+  const caja = $("termoCaja");
+  if (!caja) return;
+  const d = S.debate, reg = d && S.clase.debates[d.n - 1];
+  const ver = !!(reg && S.termo && ["abierta", "votando"].includes(S.fase));
+  caja.style.display = ver ? "" : "none";
+  if (!ver) return;
+  const r = resumenTermometro(Object.values(S.termo));
+  const W = 300, H = 112, m = 6, X = s => m + Math.min(1, s / (tramoActual().seg || ROT.SEG_DEBATE)) * (W - 2 * m), Y = v => H / 2 - v / 100 * (H / 2 - m);
+  const curva = [...(reg.curva || [])];
+  const pts = curva.map(p => `${X(p.s).toFixed(1)},${Y(p.m).toFixed(1)}`).join(" ");
+  const ult = curva[curva.length - 1];
+  const lado = r.final === null ? null : r.final > 4 ? "A" : r.final < -4 ? "B" : null;
+  $("termoPt").innerHTML = r.n ? `${r.n} moviéndolo · ${lado ? `inclinado al <b style="color:${EQUIPOS[lado].color}">Grupo ${d[lado]}</b>` : "parejo"}` : "nadie lo ha movido";
+  const pend = (S.preguntasPub || []).length - (reg.tribuna || []).length;
+  $("termo").innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="termo-svg">
+      <rect x="0" y="0" width="${W}" height="${H / 2}" fill="${EQUIPOS.A.color}" opacity=".07"/><rect x="0" y="${H / 2}" width="${W}" height="${H / 2}" fill="${EQUIPOS.B.color}" opacity=".07"/>
+      <line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#2c3a48" stroke-dasharray="4 4"/>
+      <text x="${m}" y="13" fill="${EQUIPOS.A.color}" font-size="10" font-weight="700">▲ GRUPO ${d.A} · A FAVOR</text>
+      <text x="${m}" y="${H - 5}" fill="${EQUIPOS.B.color}" font-size="10" font-weight="700">▼ GRUPO ${d.B} · EN CONTRA</text>
+      ${pts ? `<polyline points="${pts}" fill="none" stroke="#e6edf3" stroke-width="2.2" stroke-linejoin="round"/>` : ""}
+      ${ult ? `<circle cx="${X(ult.s).toFixed(1)}" cy="${Y(ult.m).toFixed(1)}" r="4.5" fill="${ult.m > 4 ? EQUIPOS.A.color : ult.m < -4 ? EQUIPOS.B.color : "#e6edf3"}"/>` : ""}
+    </svg>
+    <div class="termo-pie">${pend > 0 ? `✋ ${pend} pregunta${pend === 1 ? "" : "s"} de la tribuna en la fila` : "✋ el público puede mandar preguntas desde el teléfono"}</div>`;
+}
+
 // Columna derecha: ranking de grupos, oráculos y las tarjetas del último panel.
 function pintarColumna() {
+  pintarTermometro();
   if (typeof actualizarBotonRepetir === "function") actualizarBotonRepetir();
   const f1 = v => (v === null || v === undefined ? "—" : v.toFixed(1));
   const t3 = $("top3");
@@ -395,7 +425,7 @@ function pintarColumna() {
   }
   const or = $("oraculos");
   if (or) {
-    const r = rankingOraculos(S.clase.oraculos || {}).filter(o => o.predicciones).slice(0, 5);
+    const r = rankingOraculos(S.clase.oraculos || {}).slice(0, 5);
     or.innerHTML = r.length ? r.map(o => `<div class="t3"><span>#${o.puesto}</span><b>${esc(conGrupo(o.nombre, o.grupo))}</b><i style="color:#a78bfa">🔮 ${o.puntos}</i></div>`).join("")
       : `<div class="vacio">Aparecen cuando los jueces dan su primer veredicto.</div>`;
   }

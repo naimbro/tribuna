@@ -33,7 +33,7 @@ const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, 
 function estadoPublico() {
   const r1 = v => (v === null || v === undefined ? null : +(+v).toFixed(1));
   const U = S.clase.ultimo;
-  const orac = rankingOraculos(S.clase.oraculos || {}).filter(o => o.predicciones);
+  const orac = rankingOraculos(S.clase.oraculos || {});
   const R = tramoActual();
   return {
     profeUid: ON.uid, profeEmail: ON.email, actualizado: Date.now(), creada: ON.creada || null,
@@ -59,7 +59,8 @@ function estadoPublico() {
       resB: { jurado: r1(U.res.B.jurado), publico: r1(U.res.B.publico), puntaje: r1(U.res.B.puntaje) },
       panel: U.panel ? { A: r1(U.panel.A.total), B: r1(U.panel.B.total), ganador: U.panel.ganador } : null,
       publico: U.publico ? { A: U.publico.A, B: U.publico.B, n: U.publico.n, ganador: U.publico.ganador } : null,
-      jueces: (U.jueces || []).map(j => ({ id: j.id, nombre: j.nombre, emoji: j.emoji, A: j.A, B: j.B, fraseA: j.fraseA || "", fraseB: j.fraseB || "" })) } : null,
+      jueces: (U.jueces || []).map(j => ({ id: j.id, nombre: j.nombre, emoji: j.emoji, A: j.A, B: j.B, fraseA: j.fraseA || "", fraseB: j.fraseB || "" })),
+      termo: U.termo || null, frase: U.frase || null } : null,
     conteoVotos: { A: S.publico.A || 0, B: S.publico.B || 0, n: S.publico.n || 0, elegibles: S.publico.elegibles || 0 },
     oraculos: orac.slice(0, 10).map(o => ({ uid: o.uid, nombre: o.nombre, grupo: o.grupo || 0, puntos: o.puntos, aciertos: o.aciertos, predicciones: o.predicciones, puesto: o.puesto })),
     oraculoDe: Object.fromEntries(orac.map(o => [o.uid, { puntos: o.puntos, puesto: o.puesto }])),
@@ -100,7 +101,7 @@ function estadoPublico() {
 
 function resumenFinal() {
   const r = S.clase.ranking || [];
-  const ors = rankingOraculos(S.clase.oraculos || {}).filter(o => o.predicciones).slice(0, 3);
+  const ors = rankingOraculos(S.clase.oraculos || {}).slice(0, 3);
   return { campeon: r[0] && r[0].debates ? r[0].grupo : null,
            ranking: r.map(f => ({ grupo: f.grupo, puesto: f.puesto, puntaje: f.puntaje === null ? null : +f.puntaje.toFixed(1) })),
            oraculos: ors.map(o => ({ nombre: o.nombre, grupo: o.grupo || 0, puntos: o.puntos, puesto: o.puesto })) };
@@ -162,7 +163,7 @@ function activarOnline() {
     .map(j => ({ nombre: j.nombre, equipo: j.grupo === S.debate.A ? "A" : "B", grupo: j.grupo }));
   window.moverAlumno = (uid, grupo) => setDoc(doc(db, "salas", ON.codigo, "jugadores", uid), { grupo }, { merge: true })
     .then(() => true).catch(e => { tick("No se pudo mover al alumno: " + e.code); return false; });
-  window.alCambiarDebate = n => suscribirVotos(n);
+  window.alCambiarDebate = n => { suscribirVotos(n); suscribirPublicoActivo(n); };
   envolver("lanzarEvento");
   envolver("pintarMarcador");
   envolver("guardarMotor");
@@ -219,7 +220,9 @@ function activarOnline() {
   else if (S.fase === "propuesta") mostrarPropuesta();     // se recargó con una propuesta pendiente
   else if (S.fase === "votando" && S.debate) mostrarVotacion(S.debate);   // se recargó a mitad de la votación
   // restaurar corre antes que activarOnline: la suscripción a los votos del debate en curso va aquí
-  if (S.debate) suscribirVotos(S.debate.n);
+  if (S.debate) { suscribirVotos(S.debate.n); suscribirPublicoActivo(S.debate.n); }
+  // la curva del termómetro: un punto cada pocos segundos mientras el debate está abierto
+  setInterval(muestrearTermometro, PUB.CURVA_PASO * 1000);
 
   pintarBarraOnline();
   $("btnEjemplo").style.display = "none";        // en línea escriben los alumnos, no el botón
@@ -274,6 +277,46 @@ function suscribirVotos(n) {
   });
 }
 
+/* ---------- EL PÚBLICO ACTIVO (publico.js): termómetro, reacciones y preguntas ----------
+   Lo escriben los votantes desde el teléfono, por debate; aquí se lee para el proyector y la
+   moderadora. S.termo: { uid: { pos, pos0 } }; S.reacciones: { msg: { fuego, fuente, concede } };
+   S.preguntasPub: las preguntas de la tribuna del debate en curso. */
+let desuscribirActivo = [];
+function suscribirPublicoActivo(n) {
+  desuscribirActivo.forEach(u => u()); desuscribirActivo = [];
+  S.termo = {}; S.reacciones = {}; S.preguntasPub = [];
+  const del = c => query(collection(db, "salas", ON.codigo, c), where("debate", "==", n));
+  desuscribirActivo.push(onSnapshot(del("termometro"), snap => {
+    S.termo = {}; snap.forEach(d => { const x = d.data(); S.termo[x.uid] = { pos: x.pos, pos0: x.pos0 }; });
+    if (typeof pintarTermometro === "function") pintarTermometro();
+  }, () => {}));
+  desuscribirActivo.push(onSnapshot(del("reacciones"), snap => {
+    const xs = []; snap.forEach(d => xs.push(d.data()));
+    S.reacciones = contarReacciones(xs);
+    pintarFeed();
+    // 🤔 de la tribuna: si un mensaje cruza el umbral, la moderadora pide la fuente
+    const reg = S.clase.debates[n - 1];
+    if (!reg || S.fase !== "abierta" || !S.debate || S.debate.n !== n) return;
+    for (const id of pedidosDeFuente(S.reacciones, reg.pedidosFuente, elegibles())) {
+      (reg.pedidosFuente = reg.pedidosFuente || []).push(id);
+      if (typeof pedirFuenteTribuna === "function") pedirFuenteTribuna(id);
+    }
+  }, () => {}));
+  desuscribirActivo.push(onSnapshot(del("preguntas"), snap => {
+    S.preguntasPub = []; snap.forEach(d => S.preguntasPub.push(d.data()));
+    if (typeof pintarTermometro === "function") pintarTermometro();
+  }, () => {}));
+}
+function muestrearTermometro() {
+  if (S.fase !== "abierta" || !S.debate || !S.termo) return;
+  const reg = S.clase.debates[S.debate.n - 1];
+  if (!reg) return;
+  const r = resumenTermometro(Object.values(S.termo));
+  const seg = S.abreEn ? (Date.now() - S.abreEn) / 1000 : tramoActual().seg - (S.seg || 0);
+  reg.curva = muestraCurva(reg.curva, seg, r.final, r.n);
+  if (typeof pintarTermometro === "function") pintarTermometro();
+}
+
 /* ---------- barra de la sala: código, URL, jugadores ---------- */
 function pintarBarraOnline() {
   let bar = $("barraOnline");
@@ -320,6 +363,8 @@ async function formarGruposAhora() {
   S.clase.grupos = grupos.length;
   S.clase.brujula.fase = "grupos";
   S.clase.brujula.formadoEn = Date.now();
+  // la propuesta del primer debate se arma con los grupos nuevos, no con los de antes
+  if (!S.clase.debates.length) S.clase.propuesta = null;
   // quienes no respondieron pero ya estaban en un grupo elegido a mano vuelven a quedar sin grupo
   const sinPos = Object.keys(ON.jugadores).filter(uid => !de[uid]);
   ON.asignando = {};

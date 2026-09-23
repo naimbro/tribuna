@@ -7,7 +7,7 @@
    ===================================================================== */
 
 const ROT = {
-  SEG_DEBATE: 360, SEG_VOTACION: 45, SEG_VEREDICTO_PUBLICO: 6, SEG_JUEZ: 3, SEG_TOTALES: 6, SEG_RESULTADO: 10, SEG_PROPUESTA: 15,
+  SEG_DEBATE: 360, SEG_VOTACION: 75, SEG_VEREDICTO_PUBLICO: 6, SEG_JUEZ: 3, SEG_TOTALES: 6, SEG_RESULTADO: 10, SEG_PROPUESTA: 15,
   GRUPOS_DEFECTO: 6, GRUPOS_MIN: 2, GRUPOS_MAX: 10,
   INDECISO: 8,          // |pos| ≤ 8 es indeciso y no suma votos
   ESCALA: 12,           // voto suave: tanh(|pos| / 12)
@@ -107,10 +107,10 @@ function acumularOraculos(registro, votantes, ganador) {
 }
 
 function rankingOraculos(registro) {
-  // solo quienes han predicho al menos una vez ocupan un puesto
+  // solo quienes han predicho al menos una vez (o sumaron por una pregunta) ocupan un puesto
   return Object.values(registro || {})
-    .filter(o => o.predicciones > 0)
-    .map(o => ({ ...o, tasa: o.aciertos / o.predicciones }))
+    .filter(o => o.predicciones > 0 || o.puntos > 0)
+    .map(o => ({ ...o, tasa: o.predicciones ? o.aciertos / o.predicciones : 0 }))
     .sort((a, b) => b.puntos - a.puntos || b.tasa - a.tasa || String(a.nombre).localeCompare(String(b.nombre)))
     .map((o, i) => ({ ...o, puesto: i + 1 }));
 }
@@ -150,10 +150,25 @@ function ranking(grupos, debates) {
   return filas;
 }
 
-// Las preguntas que el profesor dejó escritas en el archivo de la semana se usan primero.
+// Las preguntas que el profesor dejó escritas en el archivo de la semana se usan primero. Cada una
+// es un texto o { texto, afirma }, donde afirma es el id del campo de la brújula cuya posición
+// afirma la moción (así A FAVOR le toca al grupo que de verdad piensa eso). Devuelve { texto, afirma }.
+const textoPregunta = p => String(p && typeof p === "object" ? p.texto : p ?? "").trim();
 function proximaPreguntaEscrita(preguntas, usadas) {
-  const ya = new Set((usadas || []).map(x => String(x).trim().toLowerCase()));
-  return (preguntas || []).find(p => !ya.has(String(p).trim().toLowerCase())) || null;
+  const ya = new Set((usadas || []).map(x => textoPregunta(x).toLowerCase()));
+  const p = (preguntas || []).find(x => textoPregunta(x) && !ya.has(textoPregunta(x).toLowerCase()));
+  return p ? { texto: textoPregunta(p), afirma: (typeof p === "object" && p.afirma) || null } : null;
+}
+
+// La pregunta de la tribuna que la moderadora eligió: un punto de oráculo para quien la hizo.
+// No cuenta como predicción (no mueve la tasa de aciertos).
+function sumarPuntoPregunta(registro, v) {
+  const r = { ...(registro || {}) };
+  if (!v || !v.uid) return r;
+  const x = r[v.uid] = { uid: v.uid, nombre: v.nombre || "", puntos: 0, predicciones: 0, aciertos: 0, preguntas: 0, ...(r[v.uid] || {}) };
+  if (v.grupo) x.grupo = v.grupo;
+  x.puntos++; x.preguntas = (x.preguntas || 0) + 1;
+  return r;
 }
 
 // Cómo se muestra una persona en pantalla: su nombre y su grupo, «Naim (grupo 1)».
@@ -163,4 +178,4 @@ function mejorIntervencion(historial) {
   return (historial || []).reduce((m, h) => (!m || h.total > m.total ? h : m), null);
 }
 
-if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, mejorIntervencion, conGrupo };
+if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, sumarPuntoPregunta, mejorIntervencion, conGrupo };

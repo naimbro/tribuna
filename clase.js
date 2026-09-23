@@ -84,6 +84,9 @@ async function cerrarVotacion() {
     if (!ya.has(e.uid)) reg.votos.push({ ...e, voto: null, prediccion: null });
   reg.publico = votoPublico(reg.votos.map(v => v.voto));
   if (typeof barraDelDebate === "function") reg.barra = barraDelDebate();   // participación: solo registro, no puntaje
+  // el público activo (publico.js): cuánto se movió la sala y la frase con más 🔥. No es puntaje.
+  if (S.termo) reg.termo = resumenTermometro(Object.values(S.termo));
+  if (S.reacciones) reg.frase = fraseDelDebate(S.chat.filter(m => m.debate === d.n), S.reacciones);
   S.fase = "veredictoPublico";
   $("btnPrincipal").textContent = "SALTAR ▶";
   publicarEstado();
@@ -115,7 +118,8 @@ function mostrarResultado() {
   S.clase.oraculos = acumularOraculos(S.clase.oraculos, reg.votos, g);
   const antes = S.clase.ranking || [];
   S.clase.ranking = ranking(S.clase.grupos, S.clase.debates);
-  S.clase.ultimo = { n: d.n, pregunta: d.pregunta, A: d.A, B: d.B, res: reg.res, jueces: reg.jueces, panel: reg.panel, publico: reg.publico };
+  S.clase.ultimo = { n: d.n, pregunta: d.pregunta, A: d.A, B: d.B, res: reg.res, jueces: reg.jueces, panel: reg.panel, publico: reg.publico,
+                     termo: reg.termo || null, frase: reg.frase || null };
   S.fase = "resultado";
   pintarMarcador();
   publicarEstado();
@@ -241,7 +245,12 @@ async function prepararPropuesta() {
   const usadas = [...S.clase.debates.map(d => d.pregunta), ...(S.clase.descartadas || [])];
   const escrita = proximaPreguntaEscrita(escritas, usadas);
   if (escrita) {
-    S.clase.propuesta = { ...base, estado: "lista", pregunta: escrita, porQue: "Pregunta escrita por ti en el archivo de la semana.", mejorFavor: "", mejorContra: "", fuente: "escrita" };
+    // si la pregunta dice qué campo afirma, A FAVOR va al grupo del par más cercano a ese campo
+    const campo = escrita.afirma && typeof BRUJULA !== "undefined" ? BRUJULA.campos.find(c => c.id === escrita.afirma) : null;
+    const lados = conBrujula() && campo ? ladoQueAfirma(base, campo.id, BRUJULA.campos, posDe) : base;
+    S.clase.propuesta = { ...lados, estado: "lista", pregunta: escrita.texto,
+      porQue: "Pregunta escrita por ti en el archivo de la semana." + (conBrujula() && campo ? ` A FAVOR, el grupo más cercano a «${campo.nombre}».` : ""),
+      mejorFavor: "", mejorContra: "", fuente: "escrita" };
     if (S.fase === "propuesta") mostrarPropuesta();
     return;
   }
@@ -268,7 +277,11 @@ let cuentaPropuesta = null;
 function mostrarPropuesta() {
   clearInterval(cuentaPropuesta);
   const p = S.clase.propuesta;
-  if (!p) { prepararPropuesta(); return; }
+  // una propuesta armada antes de que hubiera grupos (la sala la prepara al abrirse, en la
+  // portada) llega sin par: con los grupos ya formados se rehace. Si no, el primer debate caía en
+  // «Grupo 1 contra Grupo 2» por defecto: sin el par más lejano de la brújula ni el lado que
+  // afirma la pregunta (encontrado en la prueba de punta a punta del 23-sep-2026).
+  if (!p || ((p.A === null || p.B === null) && gruposDisponibles().length >= 2)) { S.clase.propuesta = null; prepararPropuesta(); return; }
   let el = $("propuesta");
   if (!el) { el = document.createElement("div"); el.id = "propuesta"; document.querySelector("main .col").appendChild(el); }
   const gs = Array.from({ length: S.clase.grupos }, (_, i) => i + 1);

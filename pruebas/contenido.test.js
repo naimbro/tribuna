@@ -43,8 +43,15 @@ test("semana 7: La Tercera, Acemoglu, cinco jueces y preguntas semilla", () => {
   assert.ok(s.CONCEPTOS.some(c => /Acemoglu/.test(c.fuente)), "ningún concepto de Acemoglu");
   for (const n of ["serrano", "girardi", "kaiser", "acemoglu"]) assert.ok(s.FUENTES.includes(n), n);
   assert.equal(s.JUECES.length, 5);
-  for (const j of s.JUECES) assert.match(j.valora, /instrumento/, j.id);
+  // el piso común va una vez (JUECES_COMUN) y cada juez tiene un foco propio, sin repetirlo
+  assert.match(s.JUECES_COMUN, /instrumento/);
+  for (const j of s.JUECES) assert.ok(!j.valora.includes(s.JUECES_COMUN.slice(0, 40)), `${j.id} repite el piso común`);
+  assert.equal(new Set(s.JUECES.map(j => j.valora.split(/\s+/).slice(0, 4).join(" "))).size, 5, "dos jueces parten igual");
   assert.ok(s.PREGUNTAS.length >= 4, "faltan preguntas semilla");
+  // cada pregunta escrita dice qué campo de la brújula afirma, y ese campo existe
+  const campos = new Set(s.BRUJULA.campos.map(c => c.id));
+  for (const p of s.PREGUNTAS) assert.ok(p.texto && campos.has(p.afirma), `pregunta sin campo válido: ${JSON.stringify(p)}`);
+  assert.ok(s.INSTRUMENTOS.length >= 4 && s.INSTRUMENTOS.every(x => x.nombre && x.ej), "INSTRUMENTOS incompleto");
   assert.equal(s.SESION.grupos, 5);
 });
 
@@ -58,7 +65,7 @@ test("semana 5: sin brújula, el juego queda con la elección a mano", () => {
 function cargarSesion(archivo) {
   const ctx = {};
   vm.createContext(ctx);
-  const opc = ["BRUJULA", "JUECES", "EJEMPLOS_SESION", "PREGUNTAS"]
+  const opc = ["BRUJULA", "JUECES", "JUECES_COMUN", "INSTRUMENTOS", "EJEMPLOS_SESION", "PREGUNTAS"]
     .map(k => `${k}: typeof ${k} === 'undefined' ? null : ${k}`).join(", ");
   vm.runInContext(fs.readFileSync(path.join(__dirname, "..", archivo), "utf8") +
     `\n;this.S = { SESION, RONDAS, RUBRICA, CONCEPTOS, FUENTES, AUDIENCIA, EVENTOS, EQUIPOS, ${opc} };`, ctx);

@@ -146,6 +146,49 @@ service cloud.firestore {
                   && request.resource.data.repeticion.respuestas is map && request.resource.data.repeticion.respuestas.size() <= 12));
       }
 
+      // El público activo (publico.js): termómetro, reacciones y preguntas de la tribuna. Solo quien
+      // vota en el debate en curso (no los dos grupos que debaten), con el tramo abierto. El id
+      // amarra el documento a su dueño: uno por persona y debate (o por persona y mensaje).
+      match /termometro/{id} {
+        allow read: if esProfe(codigo) || (conSesion() && id.matches('^[0-9]+_' + request.auth.uid + '$'));
+        allow write: if conSesion() && esJugador(codigo)
+          && id == string(request.resource.data.debate) + '_' + request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.debate == sala(codigo).data.debate.n
+          && sala(codigo).data.fase == 'abierta'
+          && jugador(codigo).data.grupo != sala(codigo).data.debate.A
+          && jugador(codigo).data.grupo != sala(codigo).data.debate.B
+          && request.resource.data.pos is number && request.resource.data.pos >= -100 && request.resource.data.pos <= 100
+          && request.resource.data.pos0 is number && request.resource.data.pos0 >= -100 && request.resource.data.pos0 <= 100;
+      }
+      match /reacciones/{id} {
+        allow read: if esProfe(codigo) || (conSesion() && esJugador(codigo));
+        allow write: if conSesion() && esJugador(codigo)
+          && request.resource.data.msg is string && request.resource.data.msg.size() <= 60
+          && id == request.resource.data.msg + '_' + request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.debate == sala(codigo).data.debate.n
+          && sala(codigo).data.fase == 'abierta'
+          && jugador(codigo).data.grupo != sala(codigo).data.debate.A
+          && jugador(codigo).data.grupo != sala(codigo).data.debate.B
+          && (request.resource.data.r == null || request.resource.data.r in ['fuego', 'fuente', 'concede']);
+      }
+      match /preguntas/{id} {
+        allow read: if esProfe(codigo) || (conSesion() && id.matches('^[0-9]+_' + request.auth.uid + '$'));
+        allow write: if conSesion() && esJugador(codigo)
+          && id == string(request.resource.data.debate) + '_' + request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.debate == sala(codigo).data.debate.n
+          && sala(codigo).data.fase == 'abierta'
+          && jugador(codigo).data.grupo != sala(codigo).data.debate.A
+          && jugador(codigo).data.grupo != sala(codigo).data.debate.B
+          && request.resource.data.texto is string
+          && request.resource.data.texto.size() > 0 && request.resource.data.texto.size() <= 200
+          // el nombre y el grupo son los del alumno: la moderadora la lanza con ese nombre
+          && request.resource.data.nombre == jugador(codigo).data.nombre
+          && request.resource.data.grupo == jugador(codigo).data.grupo;
+      }
+
       // Rotación: el voto binario y la predicción de cada votante en cada debate. Solo en la
       // ventana de votación y solo quien no está debatiendo.
       match /votos/{id} {

@@ -2,13 +2,14 @@
    TRIBUNA — el teléfono del alumno.
    Una sola conversación, como un grupo de WhatsApp: A FAVOR a la izquierda, EN CONTRA a la
    derecha, la moderadora (🎙) y el relator (⚖) al centro. Quien debate escribe abajo; si la
-   moderadora lo nombra, el teléfono vibra y el mensaje se destaca. El público no escribe:
-   lee el debate y, al final, vota quién lo convenció y predice a los jueces.
+   moderadora lo nombra, el teléfono vibra y el mensaje se destaca. El público no escribe en la
+   conversación, pero juega (publico.js): mueve el termómetro, reacciona a los mensajes y deja
+   una pregunta para la moderadora. Al final vota quién argumentó mejor y predice a los jueces.
    Lee salas/{codigo} (estado del juego) y salas/{codigo}/mensajes (la conversación).
    ===================================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy, where } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js?v=20260918a";
 
 const $ = id => document.getElementById(id);
@@ -126,6 +127,7 @@ async function entrarAlJuego() {
     J.primera = false;
   }, e => { $("pJuego").innerHTML = `<div class="sep">No se pudo leer la conversación (${esc(e.code)}).</div>`; }));
   prepararCaja();
+  if (!PA.listo) { PA.listo = true; prepararPublicoActivo(); }
   cargarBrujula().then(() => pintarSala());
   // ¿ya dejó su feedback en esta sala? (o lo saltó en este teléfono)
   J.fbListo = localStorage.getItem("tribuna_fb_" + J.codigo) === "1";
@@ -152,6 +154,11 @@ function avisarNuevos(nuevos) {
       if (rolEn(J.sala) === "P") $("avisoVoto").textContent = aviso;
       else { $("notaCaja").textContent = aviso + " Puedes responderle con @."; $("notaCaja").classList.add("ati"); }
     }
+    if (m.tipo === "mod" && m.datos && m.datos.tribuna === "pregunta" && m.datos.uid === J.uid) {
+      navigator.vibrate?.([80, 50, 80, 50, 200]);
+      $("avisoVoto").textContent = "✋ ¡La moderadora eligió tu pregunta! +1 🔮";
+      confeti(["#f5b301", "#ffffff", "#a78bfa"], 2500);
+    }
     if (m.tipo === "relator" && rolEn(J.sala) === "P") {
       navigator.vibrate?.(150);
       $("voto").classList.add("pide");
@@ -167,13 +174,14 @@ function pintarSala() {
   $("miBancada").textContent = `Grupo ${J.grupo || "?"}${rol === "A" ? ` · ${s.equipos.A.nombre}` : rol === "B" ? ` · ${s.equipos.B.nombre}` : rol === "P" ? " · votas" : ""}${s.oraculoDe && s.oraculoDe[J.uid] ? ` · 🔮 ${s.oraculoDe[J.uid].puntos}` : ""}`;
   $("miBancada").style.color = colorRol; $("miBancada").style.borderColor = colorRol;
   const d = s.debate;
-  $("tramoLbl").textContent = d ? `Debate ${d.n} · ${s.tramo === 1 ? "Réplica" : "Apertura"}.` : "Rotación.";
+  $("tramoLbl").textContent = d ? `Debate ${d.n}.` : "Rotación.";
   $("pauta").textContent = d ? `«${d.pregunta}» — Grupo ${d.A} a favor, Grupo ${d.B} en contra.` : "Esperando la primera pregunta.";
   $("marca").innerHTML = "";
   pintarBarraTel();
   const debatiendo = rol === "A" || rol === "B";
   $("caja").classList.toggle("oculto", !debatiendo);
   $("voto").classList.toggle("oculto", rol !== "P" || s.fase !== "abierta");
+  pintarPublicoActivo(s, rol);
   document.body.classList.toggle("es-publico", rol === "P" && !s.veredicto);
   // cambio de debate: mi grupo fue llamado → aviso
   if (d && J.debateVisto !== d.n) {
@@ -227,7 +235,7 @@ function burbuja(m, s) {
   const hora = new Date(m.t).toTimeString().slice(0, 5);
   if (m.tipo === "sistema") return `<div class="msg sys">${esc(m.texto)}</div>`;
   if (m.tipo === "noticia") return `<div class="msg mod" style="--c:var(--amber);border-color:var(--amber);background:#1f1508"><div class="who">📰 Última hora<span class="hora">${hora}</span></div><div class="tx">${esc(m.texto)}</div></div>`;
-  if (m.tipo === "mod") return `<div class="msg mod ${meNombran(m.texto) && rolEn(J.sala) !== "P" ? "ati" : ""}"><div class="who">🎙 Moderadora<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
+  if (m.tipo === "mod") return `<div class="msg mod ${meNombran(m.texto) && rolEn(J.sala) !== "P" ? "ati" : ""} ${m.datos && m.datos.tribuna ? "trib" : ""}"><div class="who">🎙 Moderadora${m.datos && m.datos.tribuna ? " · ✋ la tribuna" : ""}<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
   if (m.tipo === "relator") {
     const d = m.datos || {};
     return `<div class="msg rel"><div class="who">📣 Relator · llamado a votar<span class="hora">${hora}</span></div>
@@ -247,7 +255,97 @@ function burbuja(m, s) {
   }
   const e = s.equipos[m.equipo] || { color: "var(--dim)" };
   const mia = m.uid === J.uid;
-  return `<div class="msg ${m.equipo} ${mia ? "mia" : ""}" style="--c:${e.color}"><div class="who">${esc(conGrupo(m.nombre, grupoDeMensaje(m)))}${mia ? " (tú)" : ""}<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
+  return `<div class="msg ${m.equipo} ${mia ? "mia" : ""}" style="--c:${e.color}"><div class="who">${esc(conGrupo(m.nombre, grupoDeMensaje(m)))}${mia ? " (tú)" : ""}<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div>${reaccionesDe(m, s)}</div>`;
+}
+
+/* ---------- el público activo (publico.js) ----------
+   Reacciones: el público las pone (una por mensaje: tocar la misma la quita); todos ven cuántas
+   hay. Termómetro: −100 (EN CONTRA) … +100 (A FAVOR); en el deslizador A FAVOR queda a la
+   izquierda, como en la conversación. Pregunta: una por debate, se puede cambiar. */
+const PA = { debate: null, subs: [], conteos: {}, mias: {}, tm: null, tmEnvio: null, preg: null };
+function reaccionesDe(m, s) {
+  if (!s.debate || m.debate !== s.debate.n) return "";
+  const c = PA.conteos[m.id] || {}, mia = PA.mias[m.id];
+  if (rolEn(s) === "P" && s.fase === "abierta")
+    return `<div class="rx">${PUB.REACCIONES.map(r => `<button class="rxb ${mia === r.id ? "on" : ""}" data-m="${m.id}" data-r="${r.id}" title="${r.nombre}">${r.emoji}${c[r.id] ? " " + c[r.id] : ""}</button>`).join("")}</div>`;
+  const xs = PUB.REACCIONES.filter(r => c[r.id]).map(r => `<span class="rxv">${r.emoji} ${c[r.id]}</span>`);
+  return xs.length ? `<div class="rx">${xs.join("")}</div>` : "";
+}
+function suscribirPublicoActivo(n) {
+  if (PA.debate === n) return;
+  PA.subs.forEach(u => u()); PA.subs = [];
+  Object.assign(PA, { debate: n, conteos: {}, mias: {}, tm: null, preg: null });
+  if (!n) return;
+  PA.subs.push(onSnapshot(query(collection(db, "salas", J.codigo, "reacciones"), where("debate", "==", n)), snap => {
+    const xs = []; PA.mias = {};
+    snap.forEach(d => { const x = d.data(); xs.push(x); if (x.uid === J.uid && x.r) PA.mias[x.msg] = x.r; });
+    PA.conteos = contarReacciones(xs);
+    pintarChat();
+  }, () => {}));
+  // tras recargar: el termómetro y la pregunta vuelven a donde estaban
+  getDoc(doc(db, "salas", J.codigo, "termometro", `${n}_${J.uid}`)).then(d => {
+    if (d.exists() && PA.debate === n && !PA.tm) { PA.tm = { pos: d.data().pos, pos0: d.data().pos0 }; pintarPublicoActivo(J.sala, rolEn(J.sala)); }
+  }).catch(() => {});
+  getDoc(doc(db, "salas", J.codigo, "preguntas", `${n}_${J.uid}`)).then(d => {
+    if (d.exists() && PA.debate === n && !PA.preg) { PA.preg = d.data().texto; pintarPublicoActivo(J.sala, rolEn(J.sala)); }
+  }).catch(() => {});
+}
+function pintarPublicoActivo(s, rol) {
+  const d = s.debate;
+  suscribirPublicoActivo(d ? d.n : null);
+  if (!d || rol !== "P" || s.fase !== "abierta") return;
+  $("tmA").innerHTML = `◀ <span style="color:${s.equipos.A.color}">A FAVOR · G${d.A}</span>`;
+  $("tmB").innerHTML = `<span style="color:${s.equipos.B.color}">EN CONTRA · G${d.B}</span> ▶`;
+  const tm = $("tm");
+  if (document.activeElement !== tm) tm.value = PA.tm ? -PA.tm.pos : 0;
+  tm.classList.toggle("nuevo", !PA.tm);
+  const v = PA.tm ? PA.tm.pos : null;
+  $("tmVal").textContent = v === null ? "muévelo cuando algo te convenza" : Math.abs(v) < 8 ? "parejo"
+    : `${Math.abs(v) >= 60 ? "muy " : ""}${v > 0 ? "a favor" : "en contra"}`;
+  $("tmVal").classList.toggle("on", v !== null);
+  $("btnPreg").textContent = PA.preg ? "✋ Tu pregunta está en la fila · cambiarla" : "✋ Preguntar al debate";
+}
+function guardarTermometro() {
+  const s = J.sala, d = s && s.debate;
+  if (!d || rolEn(s) !== "P" || s.fase !== "abierta") return;
+  const pos = -Math.round(+$("tm").value);
+  PA.tm = { pos, pos0: PA.tm ? PA.tm.pos0 : pos };
+  pintarPublicoActivo(s, "P");
+  clearTimeout(PA.tmEnvio);
+  PA.tmEnvio = setTimeout(() => setDoc(doc(db, "salas", J.codigo, "termometro", `${d.n}_${J.uid}`),
+    { uid: J.uid, debate: d.n, grupo: J.grupo, pos: PA.tm.pos, pos0: PA.tm.pos0, t: Date.now() })
+    .catch(e => { $("avisoVoto").textContent = "🌡 No se guardó: " + e.code; }), 600);
+}
+function prepararPublicoActivo() {
+  $("tm").oninput = guardarTermometro;
+  $("pJuego").addEventListener("click", async e => {
+    const b = e.target.closest("button.rxb");
+    if (!b) return;
+    const s = J.sala, d = s && s.debate;
+    if (!d || rolEn(s) !== "P" || s.fase !== "abierta") return;
+    const msg = b.dataset.m, r = PA.mias[msg] === b.dataset.r ? null : b.dataset.r;
+    PA.mias[msg] = r;                                   // se ve al tiro; el conteo llega del servidor
+    navigator.vibrate?.(20);
+    pintarChat();
+    try { await setDoc(doc(db, "salas", J.codigo, "reacciones", `${msg}_${J.uid}`), { uid: J.uid, msg, debate: d.n, r, t: Date.now() }); }
+    catch (err) { $("avisoVoto").textContent = "No se guardó la reacción: " + err.code; }
+  });
+  $("btnPreg").onclick = () => {
+    $("pregCaja").classList.toggle("oculto");
+    if (!$("pregCaja").classList.contains("oculto")) { $("pregTx").value = PA.preg || ""; $("pregTx").focus(); }
+  };
+  $("pregEnviar").onclick = async () => {
+    const s = J.sala, d = s && s.debate, texto = $("pregTx").value.trim().slice(0, PUB.PREGUNTA_MAX);
+    if (!texto || !d || rolEn(s) !== "P" || s.fase !== "abierta") return;
+    try {
+      await setDoc(doc(db, "salas", J.codigo, "preguntas", `${d.n}_${J.uid}`),
+        { uid: J.uid, nombre: J.nombre, grupo: J.grupo, debate: d.n, texto, t: Date.now() });
+      PA.preg = texto;
+      $("pregCaja").classList.add("oculto");
+      $("avisoVoto").textContent = "✋ Tu pregunta quedó en la fila. Si la moderadora la elige, la lanza con tu nombre y sumas +1 🔮.";
+      pintarPublicoActivo(s, "P");
+    } catch (err) { $("avisoVoto").textContent = "No se envió la pregunta: " + err.code; }
+  };
 }
 
 function pintarChat() {
@@ -514,7 +612,7 @@ function cortarDictado(abortar = true) {
   $("btnMic")?.classList.remove("on");
 }
 
-/* ---------- votar: quién te convenció y a quién elegirá el jurado ---------- */
+/* ---------- votar: quién argumentó mejor y a quién elegirá el jurado ---------- */
 // El resumen del relator de este debate, compacto, sobre las preguntas: es lo que pide revisar antes de votar.
 function relatorDe(n) {
   const m = [...J.chat].reverse().find(x => x.tipo === "relator" && x.debate === n);
@@ -547,7 +645,7 @@ function pintarVotar(s) {
   el.innerHTML = `<div class="k">Debate ${d.n} · vota</div>
     <div class="es-mocion" style="font-size:17px">«${esc(d.pregunta)}»</div>
     ${relatorDe(d.n)}
-    <div class="vt-q">¿Quién te convenció?</div><div class="vt-f">${boton("voto", "A")}${boton("voto", "B")}</div>
+    <div class="vt-q">¿Quién argumentó mejor, aunque no pienses como él?</div><div class="vt-f">${boton("voto", "A")}${boton("voto", "B")}</div>
     <div class="vt-q">¿A quién elegirá el jurado?</div><div class="vt-f">${boton("prediccion", "A")}${boton("prediccion", "B")}</div>
     <div class="vt-pie"><span>${mio.voto && mio.prediccion ? "✓ Listo" : ""}</span><span class="mono" id="vtReloj"></span></div>
     <div class="aviso" id="vtError">${esc(mio.error || "")}</div>`;
@@ -671,7 +769,7 @@ function pintarEspera(s) {
   if (el.dataset.clave === clave) return;           // no repintar en cada cambio de la sala
   el.dataset.clave = clave;
   const av = `<div class="av" style="--c:${r.color};--t:92px">${J.foto ? `<img src="${esc(J.foto)}" referrerpolicy="no-referrer" alt="">` : `<span>${iniciales(J.nombre)}</span>`}</div>`;
-  const papel = `Estás en el <b>Grupo ${J.grupo}</b>. Cuando la moderadora lo llame, tu grupo debate A FAVOR o EN CONTRA de la pregunta: escribe en la conversación y responde lo que te pregunten, con argumentos y lecturas del curso. Mientras debaten otros, lees con atención y al final votas quién te convenció y predices a los jueces.`;
+  const papel = `Estás en el <b>Grupo ${J.grupo}</b>. Cuando la moderadora lo llame, tu grupo debate A FAVOR o EN CONTRA de la pregunta: escribe en la conversación y responde lo que te pregunten, con argumentos y lecturas del curso. Mientras debaten otros, juegas desde el teléfono: mueves el termómetro, reaccionas a los mensajes y puedes mandar una pregunta; al final votas quién argumentó mejor y predices a los jueces.`;
   el.innerHTML = s.etapa === "portada"
     ? `${av}<h1 style="margin-top:14px">¡Estás dentro, ${esc(J.nombre.split(" ")[0])}!</h1>
        <span class="chip" style="--c:${r.color}">${r.bandera} ${esc(r.nombre)}${gi ? " · " + esc(gi.nombre) : ""}</span>

@@ -2,8 +2,9 @@
    TRIBUNA — las escenas de la pantalla del profesor que no son el debate:
      1. PORTADA: el QR y el código, y los alumnos que van entrando (foto de Google y nombre),
         con el color de lo que eligieron: A FAVOR, EN CONTRA o PÚBLICO.
-     2. INTRO: cuatro láminas mínimas antes de abrir el primer tramo: el tema, la moción, las
-        dos posiciones y cómo se gana. Se avanza con clic, → o espacio.
+     2. INTRO: láminas mínimas antes de abrir el primer tramo: el tema, cómo funciona, qué hace
+        el público mientras debaten otros, cómo se gana y (si la semana lo define) qué es un
+        instrumento. Se avanza con clic, → o espacio.
      3. CONFETI para la declaración del ganador (la ceremonia vive en app.js).
    S.etapa guarda dónde va la sala: "portada" → "intro" → null (el debate). online.js lo
    publica para que los teléfonos muestren lo mismo.
@@ -159,14 +160,24 @@ function laminasIntro() {
      <div class="in-jueces">
        <div><div class="in-e">🎙</div><b>LA MODERADORA LLAMA</b><span>Plantea una pregunta y llama a dos grupos: uno a favor y otro en contra.</span></div>
        <div><div class="in-e">💬</div><b>DEBATEN</b><span>Un tramo abierto de ${mm(ROT.SEG_DEBATE)}: la posición de entrada y después libre. La moderadora da la palabra.</span></div>
-       <div><div class="in-e">🗳</div><b>LOS DEMÁS VOTAN</b><span>Los grupos que no debaten votan quién los convenció y predicen a los jueces: cada acierto suma un punto de oráculo. Después, rotan.</span></div>
+       <div><div class="in-e">🗳</div><b>LOS DEMÁS VOTAN</b><span>Los grupos que no debaten votan quién argumentó mejor —aunque no piensen como él— y predicen a los jueces: cada acierto suma un punto de oráculo. Después, rotan.</span></div>
+     </div>`,
+    `<div class="in-k">MIENTRAS DEBATEN OTROS · EL PÚBLICO JUEGA</div>
+     <div class="in-jueces">
+       <div><div class="in-e">🌡</div><b>EL TERMÓMETRO</b><span>Mueve el deslizador de tu teléfono cuando algo te convenza. La curva de la sala se ve aquí en vivo.</span></div>
+       <div><div class="in-e">🔥 🤔 🤝</div><b>REACCIONA</b><span>Toca un mensaje: buen punto, ¿de dónde sale?, buena concesión. Si muchos piden la fuente, la moderadora la pide por ustedes.</span></div>
+       <div><div class="in-e">✋</div><b>PREGUNTA</b><span>Deja una pregunta para el debate. Si la moderadora la elige, la lanza con tu nombre y sumas un punto de oráculo.</span></div>
      </div>`,
     `<div class="in-k">CÓMO SE GANA</div>
      <div class="in-jueces">
        <div><div class="in-e">⚖</div><b>LOS JUECES · 50%</b><span>Cinco jueces de IA con perfiles distintos. Como en los clavados, se tachan la nota más alta y la más baja.</span></div>
        <div><div class="in-e">🗳</div><b>EL PÚBLICO · 50%</b><span>Los votos que el grupo gana entre quienes no debaten.</span></div>
        <div><div class="in-e">🏆</div><b>EL RANKING</b><span>Promedio de cada grupo por debate. Al final de la clase, el campeón.</span></div>
-     </div>`
+     </div>`,
+    // lo que piden los jueces: se explica antes, para que nadie se entere en vivo frente a la sala
+    ...(typeof INSTRUMENTOS !== "undefined" && INSTRUMENTOS.length ? [`<div class="in-k">LO QUE PIDEN LOS JUECES · EL INSTRUMENTO</div>
+     <div class="in-sub">«Hay que regular» no basta. ¿Qué le piden (o le niegan) al Estado, quién lo hace cumplir y quién paga?</div>
+     <div class="in-inst">${INSTRUMENTOS.map(x => `<div><b>${escHtml(x.nombre)}</b><span>${escHtml(x.ej)}</span></div>`).join("")}</div>`] : [])
   ];
 }
 
@@ -256,12 +267,19 @@ function mostrarResultadoDebate(u, antes, despues, alTerminar, oraculos = []) {
   const f1 = v => (v === null || v === undefined ? "—" : v.toFixed(1));
   const lado = (k, c) => `<div class="rs-lado" style="--c:${c}"><div class="rs-g">GRUPO ${u[k]}</div><div class="rs-p">${f1(r[k].puntaje)}</div>
     <div class="rs-d">jueces ${u.panel && u.panel[k].total !== null ? f1(u.panel[k].total) + "/30" : "—"} · público ${u.publico && u.publico.n ? u.publico[k] + " votos" : "—"}</div></div>`;
-  const top = (oraculos || []).filter(o => o.predicciones).slice(0, 5);
+  const top = (oraculos || []).slice(0, 5);
+  // el público activo: cuánto se movió la sala (termómetro) y la frase con más 🔥. No son puntaje.
+  const t = u.termo, mueve = t && t.n && t.mov !== null && Math.abs(t.mov) >= 1 ? (t.mov > 0 ? "A" : "B") : null;
+  const extra = [
+    t && t.n ? `<div>🌡 ${mueve ? `El público se movió <b style="color:${EQUIPOS[mueve].color}">${Math.abs(Math.round(t.mov))} puntos hacia el Grupo ${u[mueve]}</b>` : "El público terminó donde empezó"} <small>(${t.n} con el termómetro)</small></div>` : "",
+    u.frase ? `<div>🔥 La frase del debate · <b style="color:${EQUIPOS[u.frase.equipo]?.color || "inherit"}">${escHtml(conGrupo(u.frase.nombre, u.frase.grupo))}</b>: «${escHtml(String(u.frase.texto).slice(0, 160))}${String(u.frase.texto).length > 160 ? "…" : ""}» <small>(${u.frase.fuego} 🔥)</small></div>` : ""
+  ].join("");
   const el = document.createElement("div");
   el.id = "resultado";
   el.innerHTML = `<div class="rs-k">DEBATE ${u.n} · RESULTADO</div>
     <div class="rs-q">«${escHtml(u.pregunta)}»</div>
     <div class="rs-vs">${lado("A", EQUIPOS.A.color)}<div class="rs-x">${gana ? `GANA GRUPO ${gana}` : "EMPATE"}</div>${lado("B", EQUIPOS.B.color)}</div>
+    ${extra ? `<div class="rs-extra">${extra}</div>` : ""}
     <div class="rs-tablas">${tablaRanking(despues, antes)}
       <div class="rs-or"><div class="rs-ork">🔮 ORÁCULOS</div>${top.length ? top.map(o => `<div><span>#${o.puesto}</span><b>${escHtml(conGrupo(o.nombre, o.grupo))}</b><i>${o.puntos}</i></div>`).join("")
         : `<div class="vacio">Nadie ha acertado todavía.</div>`}</div></div>
@@ -306,9 +324,9 @@ function ceremoniaOraculos(el) {
   el.innerHTML = `<div class="cer-k" style="color:#a78bfa">🔮 EL ORÁCULO DE LA CLASE</div>
     <div class="cer-sub">quién predijo mejor a los jueces</div>
     ${ors.length ? `<div class="cer-rk">${[...ors].reverse().map((o, i) => `<div class="cer-fila" id="co${i}"><span class="n">#${o.puesto}</span>
-        <b>${escHtml(conGrupo(o.nombre, o.grupo))}</b><span class="p" style="color:#a78bfa">${o.aciertos} de ${o.predicciones}</span></div>`).join("")}</div>
+        <b>${escHtml(conGrupo(o.nombre, o.grupo))}</b><span class="p" style="color:#a78bfa">${o.aciertos} de ${o.predicciones}${o.preguntas ? ` · ✋ ${o.preguntas}` : ""}</span></div>`).join("")}</div>
       <div class="cer-bloque" id="coG"><div class="cer-g" style="color:#a78bfa">🔮 ${escHtml(conGrupo(top.nombre, top.grupo))}</div>
-        <div class="cer-s">${top.puntos} punto${top.puntos === 1 ? "" : "s"} · acertó ${top.aciertos} de ${top.predicciones} veredictos</div></div>`
+        <div class="cer-s">${top.puntos} punto${top.puntos === 1 ? "" : "s"} · acertó ${top.aciertos} de ${top.predicciones} veredictos${top.preguntas ? ` · ${top.preguntas} pregunta${top.preguntas === 1 ? "" : "s"} elegida${top.preguntas === 1 ? "" : "s"}` : ""}</div></div>`
     : `<div class="cer-bloque on"><div class="cer-g" style="color:var(--dim);font-size:40px">Nadie predijo a los jueces esta clase</div>
         <div class="cer-s">Solo cuentan los debates donde los jueces eligieron un ganador; los empates no suman.</div></div>`}
     <div class="cer-lect" id="co3"><button class="btn" id="coCerrar">Cerrar</button></div>`;
@@ -406,7 +424,7 @@ function contar(el, hasta) {
 
 function mostrarVotacion(d) {
   const el = escena("votacion");
-  el.innerHTML = `<div class="es-k">EL PÚBLICO VOTA · ¿quién convenció?</div>
+  el.innerHTML = `<div class="es-k">EL PÚBLICO VOTA · ¿quién argumentó mejor, aunque no pienses como él?</div>
     <div class="es-q">«${escHtml(d.pregunta)}»</div>
     <div class="vb">${["A", "B"].map(k => `<div class="vb-fila" id="vbf${k}" style="--c:${EQUIPOS[k].color}">
         <div class="vb-n">${EQUIPOS[k].nombre} · GRUPO ${d[k]}</div>

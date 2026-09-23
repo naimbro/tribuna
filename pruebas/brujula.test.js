@@ -208,3 +208,14 @@ test("formarGruposEnK: quien no respondió la brújula queda fuera del reparto",
   assert.equal(de.z, undefined);
   assert.equal(grupos.reduce((s, g) => s + g.miembros.length, 0), 4);
 });
+
+test("ladoQueAfirma: A FAVOR al grupo más cercano al campo que la pregunta afirma", () => {
+  const campos = [{ id: "ley_antes", centro: { x: -5, y: 5 } }, { id: "sin_trabas", centro: { x: 5, y: -5 } }];
+  const posDe = { 1: { x: -6, y: 5 }, 5: { x: 4, y: -4 } };
+  assert.deepEqual(B.ladoQueAfirma({ A: 1, B: 5 }, "ley_antes", campos, posDe), { A: 1, B: 5 });
+  assert.deepEqual(B.ladoQueAfirma({ A: 1, B: 5 }, "sin_trabas", campos, posDe), { A: 5, B: 1 });
+  // campo desconocido o sin posiciones: queda como vino
+  assert.deepEqual(B.ladoQueAfirma({ A: 1, B: 5 }, "otro", campos, posDe), { A: 1, B: 5 });
+  assert.deepEqual(B.ladoQueAfirma({ A: 1, B: 5 }, "sin_trabas", campos, {}), { A: 1, B: 5 });
+  assert.equal(B.ladoQueAfirma(null, "sin_trabas", campos, posDe), null);
+});

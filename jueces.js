@@ -24,6 +24,8 @@ const JUECES_DEFECTO = [
     molesta: "la tecnocracia sin público" }
 ];
 
+// El criterio que comparten los cinco jueces de la semana (JUECES_COMUN en contenido/semanaN.js).
+const criterioComun = () => (typeof JUECES_COMUN === "string" ? JUECES_COMUN : "");
 const juecesDeLaSesion = () => (typeof JUECES !== "undefined" && Array.isArray(JUECES) && JUECES.length) ? JUECES : JUECES_DEFECTO;
 
 function notaJuez(v) {
@@ -43,7 +45,8 @@ function leerJuez(j) {
 function promptJuez(juez, d, transcripcion) {
   return `Eres ${juez.nombre}, jueza o juez de un debate universitario del curso "${SESION.curso}", semana ${SESION.semana}.
 TU PERFIL: valoras ${juez.valora}. Te molesta ${juez.molesta}.
-
+${criterioComun() ? `PISO COMÚN DEL PANEL (los cinco lo exigen; pesa en tu nota, pero no es tu foco): ${criterioComun()}.
+` : ""}
 PREGUNTA EN DEBATE: "${d.pregunta}"
 - El Grupo ${d.A} defiende A FAVOR (sus mensajes aparecen como «A FAVOR»).
 - El Grupo ${d.B} defiende EN CONTRA (sus mensajes aparecen como «EN CONTRA»).
@@ -64,7 +67,9 @@ ${transcripcion || "(nadie escribió)"}
 TU TAREA: desde tu perfil, pon a cada grupo una nota de 0 a 10 (se admiten medios puntos) por la
 CALIDAD de sus argumentos, no por si estás de acuerdo con el lado que defiende. Un grupo que no
 escribió recibe 0. Escribe además una frase de máximo 15 palabras por grupo, en tu voz, que
-explique la nota.
+explique la nota desde TU foco (no repitas el piso común: eso ya lo dicen los demás jueces).
+La frase se proyecta frente a toda la clase: habla del grupo y de sus argumentos, y nunca nombres
+a un estudiante.
 
 Responde SOLO un JSON: {"A": {"nota": n, "frase": "…"}, "B": {"nota": n, "frase": "…"}}`;
 }

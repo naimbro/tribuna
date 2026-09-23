@@ -537,6 +537,20 @@ table.rank{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
 table.rank td,table.rank th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left}
 table.rank th{font-size:9.5px;letter-spacing:.13em;color:var(--dim2);font-weight:400}
 table.rank td.num{font-family:var(--mono);text-align:right}
+/* el público activo (publico.js): termómetro, reacciones y preguntas de la tribuna */
+.termo{padding:6px 12px 10px}
+.termo-svg{width:100%;height:auto;display:block;background:#0a1016;border:1px solid var(--line);border-radius:10px}
+.termo-pie{font-size:11px;color:var(--dim);margin-top:5px}
+.msg .rx{display:flex;gap:8px;margin-top:4px;font-size:11.5px;color:var(--dim)}
+.msg .rx span{background:#0a1016;border:1px solid var(--line);border-radius:99px;padding:0 7px}
+.msg.mod.trib{border-color:var(--amber);background:#221c0c;--c:var(--amber)}
+.rs-extra{display:flex;flex-direction:column;gap:6px;max-width:980px;font-size:16px;color:var(--txt);text-align:left;background:#0c131a;border:1px solid var(--line);border-radius:12px;padding:10px 16px}
+.rs-extra small{color:var(--dim)}
+.in-inst{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;max-width:1100px;margin-top:18px}
+.in-inst div{background:#0f161d;border:1px solid var(--line);border-radius:14px;padding:14px 16px;text-align:left}
+.in-inst b{display:block;color:var(--amber);font-size:19px;margin-bottom:4px}
+.in-inst span{color:var(--dim);font-size:15px}
+.in-sub{color:var(--dim);font-size:19px;max-width:900px;margin-top:6px}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:#1c2732;border-radius:9px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -602,6 +616,10 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   </section>
 
   <aside class="col der">
+    <div id="termoCaja" style="display:none">
+      <div class="cab">🌡 EL PÚBLICO EN VIVO <span class="pt" id="termoPt"></span></div>
+      <div class="termo" id="termo"></div>
+    </div>
     <div class="cab">RANKING DE GRUPOS <span class="pt">promedio por debate</span></div>
     <div class="top3" id="top3"></div>
     <div class="cab">🔮 ORÁCULOS <span class="pt">quién predice mejor a los jueces</span></div>
@@ -632,23 +650,24 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   (function () {
     const pedida = +new URLSearchParams(location.search).get("semana");
     const ok = SESIONES.some(x => x.semana === pedida) ? pedida : SESIONES[0].semana;
-    document.write('<script src="contenido/semana' + ok + '.js?v=20260923c"><\/script>');
+    document.write('<script src="contenido/semana' + ok + '.js?v=20260926p"><\/script>');
   })();
 </script>
-<script src="rotacion.js?v=20260922f"></script>
-<script src="brujula.js?v=20260926a"></script>
+<script src="rotacion.js?v=20260926p"></script>
+<script src="publico.js?v=20260926p"></script>
+<script src="brujula.js?v=20260926p"></script>
 <script src="ritmo.js?v=20260923a"></script>
 <script src="barra.js?v=20260923a"></script>
-<script src="moderacion.js?v=20260923a"></script>
-<script src="app.js?v=20260923c"></script>
-<script src="jueces.js?v=20260922b"></script>
-<script src="clase.js?v=20260923b"></script>
-<script src="escenas.js?v=20260923b"></script>
+<script src="moderacion.js?v=20260926p"></script>
+<script src="app.js?v=20260926p"></script>
+<script src="jueces.js?v=20260926p"></script>
+<script src="clase.js?v=20260926p"></script>
+<script src="escenas.js?v=20260926p"></script>
 <script src="mapavivo.js?v=20260923a"></script>
 <script src="barravista.js?v=20260923a"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260923c"></script>
+<script type="module" src="online.js?v=20260926p"></script>
 </body>
 </html>

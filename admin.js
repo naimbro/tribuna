@@ -299,7 +299,7 @@ async function terminarPartida(codigo, boton) {
     await setDoc(refPriv, JSON.parse(JSON.stringify(priv)));
     const r1 = v => (v === null || v === undefined ? null : +(+v).toFixed(1));
     const r = clase.ranking;
-    const ors = rankingOraculos(clase.oraculos || {}).filter(o => o.predicciones).slice(0, 3);
+    const ors = rankingOraculos(clase.oraculos || {}).slice(0, 3);
     const publico = {
       fase: "fin", debate: null, etapa: null, finVoto: null, actualizado: Date.now(), terminadaDesdePanel: Date.now(),
       ranking: r.map(f => ({ grupo: f.grupo, debates: f.debates, puesto: f.puesto, distincion: f.distincion ?? null,

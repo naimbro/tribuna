@@ -260,25 +260,40 @@ const AUDIENCIA = [
 ];
 
 /* --- El panel de jueces de esta semana --------------------------------
-   Los cinco de MGT300 (nombrar a una persona real y el instrumento que le pide
-   o le niega al Estado, y contestar lo que el rival dijo de verdad), más el
-   modelo de Acemoglu, Gitmez y Shadmehr, que en esta clase sí se expuso. */
+   El criterio que comparten los cinco va una sola vez, en JUECES_COMUN (jueces.js lo pone en el
+   prompt de cada juez como piso común). Cada juez tiene además un foco propio que no se pisa con
+   el de los otros. Antes el criterio común iba repetido en los cinco `valora` y la simulación del
+   23-sep-2026 mostró el efecto: 50 frases casi iguales («sin nombrar a nadie real», «no dicen
+   quién paga») y alumnos que repetían «Manouchehri» como talismán para puntuar. */
+const JUECES_COMUN = "que nombren a una persona real del mapa del NYT o del reportaje de La Tercera, o el modelo de Acemoglu, digan qué instrumento le pide o le niega al Estado y contesten lo que el rival dijo de verdad";
 const JUECES = [
   { id: "academica", nombre: "La académica", emoji: "\u{1F393}",
-    valora: "que nombren a una persona real del mapa del NYT o del reportaje de La Tercera, o el modelo de Acemoglu, digan qué instrumento le pide o le niega al Estado y contesten lo que el rival dijo de verdad; su énfasis propio es usar bien el modelo: qué afirma, bajo qué dos supuestos, y no confundirlo con un pronóstico",
-    molesta: "atribuirle a Acemoglu lo que no dice, confundir los países o los documentos, y la autoridad sin argumento" },
+    valora: "el uso correcto del modelo de Acemoglu, Gitmez y Shadmehr: qué afirma, bajo qué supuestos y que no es un pronóstico; y cada dato atribuido al documento del que sale (NYT, La Tercera, The Economist)",
+    molesta: "atribuirle al modelo lo que no dice, confundir países o documentos, y la autoridad sin argumento" },
   { id: "jurista", nombre: "El jurista", emoji: "\u{2696}",
-    valora: "que nombren a una persona real y digan qué instrumento le pide o le niega al Estado, contestando lo que el rival sostuvo de verdad; su énfasis propio es la precisión del instrumento: prohibición, obligación previa, responsabilidad por daño, representante legal, impuesto o derecho, y quién lo hace cumplir",
-    molesta: "decir «hay que regular» sin decir con qué figura, con qué facultad y contra quién se reclama" },
+    valora: "la precisión del instrumento: prohibición, obligación previa, responsabilidad por daño, representante legal, impuesto o derecho; quién lo hace cumplir y ante quién se reclama",
+    molesta: "decir «hay que regular» sin figura legal, sin facultad y sin responsable" },
   { id: "economista", nombre: "La economista", emoji: "\u{1F4C8}",
-    valora: "que nombren a una persona real y el instrumento que pide, y que respondan al argumento real del rival; su énfasis propio es quién paga: el costo del impuesto o la obligación, el umbral fiscal del modelo de Acemoglu, y qué dicen los datos del empleo (The Economist, el CEP)",
-    molesta: "moralizar sin decir quién paga, y hablar del apocalipsis del empleo como si fuera un dato" },
+    valora: "quién paga y quién cobra: el costo del impuesto o de la obligación, los incentivos que crea, el umbral fiscal del modelo y lo que dicen los datos del empleo (The Economist, el CEP)",
+    molesta: "moralizar sin decir quién paga, y tratar el apocalipsis del empleo como si fuera un dato" },
   { id: "periodista", nombre: "La periodista", emoji: "\u{1F4F0}",
-    valora: "que nombren a una persona real, digan qué instrumento le piden o le niegan al Estado y contesten lo que el rival dijo; su énfasis propio es la escena concreta: la comisión, la indicación sustitutiva, la indagatoria de Hawley, la frase exacta que se citó",
-    molesta: "la jerga, las evasivas y los datos inventados que no están en ningún documento" },
+    valora: "que respondan la pregunta que se les hizo, con hechos verificables y escenas concretas: la comisión, la indicación sustitutiva, la indagatoria de Hawley, la frase exacta que alguien dijo",
+    molesta: "la jerga, las evasivas, repetir un nombre como talismán sin decir qué dijo, y los datos que no están en ningún documento" },
   { id: "activista", nombre: "La activista", emoji: "\u{270A}",
-    valora: "que nombren a una persona real y el instrumento que pide o niega, y que respondan al argumento real; su énfasis propio es quién gana y quién pierde con ese instrumento, y el riesgo de que la IA le abarate al poder vigilar y reprimir a quien protesta",
+    valora: "quién gana y quién pierde con lo que se propone, y si se escucha a los afectados: trabajadores, territorios y quienes protestan y podrían ser vigilados",
     molesta: "la tecnocracia sin público y hablar de los trabajadores sin que nadie los haya escuchado" }
+];
+
+/* --- Qué es un instrumento: una lámina de la intro (escenas.js) ----------
+   En la simulación del 23-sep-2026 varios alumnos se enteraron en vivo, frente a toda la sala, de
+   que los jueces pedían «el instrumento». Se explica antes de empezar. */
+const INSTRUMENTOS = [
+  { nombre: "Prohibición", ej: "No se puede: p. ej. reconocimiento facial en las marchas." },
+  { nombre: "Obligación previa", ej: "Antes de operar: registro, evaluación de riesgos, auditoría." },
+  { nombre: "Responsabilidad por daño", ej: "Si causa daño, responde ante un tribunal (Hawley y Durbin)." },
+  { nombre: "Representante legal", ej: "Alguien en Chile a quien reclamarle (Serrano)." },
+  { nombre: "Impuesto", ej: "Al token (Gates), global (Winter), 50 % una vez (Sanders)." },
+  { nombre: "Derecho", ej: "Lo que la persona puede exigir, también frente al Estado (Kaiser)." }
 ];
 
 /* --- Sala de control: shocks que el profesor lanza en vivo ------------
@@ -339,13 +354,16 @@ const EJEMPLOS_SESION = {
 };
 
 /* --- Preguntas escritas por el profesor -------------------------------
-   Una por cada choque probable entre campos. La moderadora las propone
-   primero, en este orden; después genera las suyas. */
+   Una por cada choque probable entre campos. La moderadora las propone primero, en este orden;
+   después genera las suyas. `afirma` es el campo de la brújula que sostiene la moción: A FAVOR
+   le toca al grupo del par más cercano a ese campo (brujula.js, ladoQueAfirma). Sin eso, en la
+   simulación del 23-sep-2026 dos de cuatro debates pusieron a un grupo a defender lo contrario
+   de lo que pensaba. */
 const PREGUNTAS = [
-  "Chile debe aprobar obligaciones vinculantes para las empresas de IA antes de que llegue la inversión.",
-  "El mayor riesgo de la IA en Chile es un Estado que la use para vigilar, no unas pocas empresas que la controlen.",
-  "Si la automatización abarata la represión, hay que gravar la IA hoy, antes de que el capital prefiera la fuerza al impuesto.",
-  "Orientar la IA a complementar al trabajador basta: no hace falta limitar la automatización por ley."
+  { texto: "Chile debe aprobar obligaciones vinculantes para las empresas de IA antes de que llegue la inversión.", afirma: "ley_antes" },
+  { texto: "El mayor riesgo de la IA en Chile es un Estado que la use para vigilar, no unas pocas empresas que la controlen.", afirma: "no_vigilar" },
+  { texto: "Si la automatización abarata la represión, hay que gravar la IA hoy, antes de que el capital prefiera la fuerza al impuesto.", afirma: "ley_antes" },
+  { texto: "Orientar la IA a complementar al trabajador basta: no hace falta limitar la automatización por ley.", afirma: "sin_trabas" }
 ];
 
 /* --- Brújula corta ------------------------------------------------------
@@ -362,31 +380,41 @@ const PREGUNTAS = [
    y — Cómo te deja: entusiasmo (−) ↔ preocupación (+), como en MGT300.
 
    Al terminar la clase, revisar que los tres ítems de cada eje correlacionen
-   entre sí (ver pruebas/: el análisis se hizo a mano con las respuestas). */
+   entre sí (ver pruebas/: el análisis se hizo a mano con las respuestas).
+
+   23-sep-2026, tras la simulación con 20 alumnos-agente: 15 de 20 cayeron en «Ley antes»
+   y tres de los cinco grupos salieron del mismo campo. Los ítems del eje x preguntaban en
+   abstracto («¿qué te preocupa más?») y en una sala progresista casi todos contestan «las
+   empresas». p1 y p3 ahora ponen al Estado con IA en casos concretos que esa misma sala
+   rechaza (reconocimiento facial en las marchas, acceso estatal a los datos): así el eje
+   separa a quien teme a las empresas de quien teme al Estado que las fiscaliza. Con los
+   mismos 20 alumnos-agente, la brújula nueva repartió 7 / 6 / 5 / 2 (Ley antes / Sin trabas /
+   No vigilen / Con reglas) contra 15 / 3 / 0 / 2 de la anterior. Ojo: varios quedan cerca del
+   centro (|x| ≤ 1), donde el campo depende de una sola respuesta. */
 const BRUJULA = {
   ejes: {
     x: { id: "cuidarse", etiqueta: "¿De quién hay que cuidarse?", min: "de las empresas de IA", max: "del Estado con IA" },
     y: { id: "animo", etiqueta: "Cómo te deja", min: "entusiasmo", max: "preocupación" }
   },
   preguntas: [
-    { id: "p1", texto: "Acemoglu: la misma IA que automatiza el trabajo abarata la vigilancia. ¿Qué te preocupa más?",
+    { id: "p1", texto: "Acemoglu: la IA abarata vigilar. Carabineros pide reconocimiento facial en las marchas. ¿Qué haces?",
       opciones: [
-        { texto: "Que pocas empresas controlen la IA", x: -8 },
-        { texto: "Más las empresas, pero ojo con el Estado", x: -3 },
-        { texto: "Más el Estado, pero ojo con las empresas", x: 3 },
-        { texto: "Un Estado que vigile con IA", x: 8 }] },
+        { texto: "Aprobarlo: es seguridad pública", x: -8 },
+        { texto: "Aprobarlo, con orden judicial caso a caso", x: -3 },
+        { texto: "Solo delitos graves, nunca en marchas", x: 3 },
+        { texto: "Prohibirlo: es vigilar la protesta", x: 8 }] },
     { id: "p2", texto: "Pew (semana 3): la mitad de los adultos en EE.UU. está más preocupada que entusiasmada con la IA. ¿Y tú?",
       opciones: [
         { texto: "Muy entusiasmado", y: -8 },
         { texto: "Más entusiasmado que preocupado", y: -3 },
         { texto: "Más preocupado que entusiasmado", y: 3 },
         { texto: "Muy preocupado", y: 8 }] },
-    { id: "p3", texto: "Serrano (PC): ninguna plataforma global debe operar en Chile sin representante legal. ¿Qué hacemos?",
+    { id: "p3", texto: "Para fiscalizar la IA, una agencia estatal pide acceso a los datos de las plataformas en Chile. ¿Se lo das?",
       opciones: [
-        { texto: "Obligarlas ya: es soberanía", x: -8 },
-        { texto: "Obligarlas, con reglas parejas", x: -3 },
-        { texto: "Esperar la ley, sin improvisar", x: 3 },
-        { texto: "Nada: más control estatal es peor", x: 8 }] },
+        { texto: "Sí, a todo: sin datos no hay fiscalización", x: -8 },
+        { texto: "Sí, con auditores y reglas estrictas", x: -3 },
+        { texto: "Solo informes agregados, no los datos", x: 3 },
+        { texto: "No: el Estado no debe tener esos datos", x: 8 }] },
     { id: "p4", texto: "Agentes de IA se salieron de control y atacaron a Hugging Face. ¿Qué te produce?",
       opciones: [
         { texto: "Nada: una industria que vende miedo", y: -8 },

@@ -122,6 +122,29 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 @keyframes pulso{50%{opacity:.4}}
 #cG .cg{font-size:40px}
 .cmini{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:12.5px;color:var(--dim)}
+/* el público activo: termómetro, reacciones, pregunta */
+.tm-cab{display:flex;align-items:baseline;gap:8px;font-size:11.5px;font-weight:700}
+.tm-cab #tmB{margin-left:auto;text-align:right}
+.tm-cab b{flex:1;text-align:center;color:var(--dim);font-weight:600}
+.tm-cab b.on{color:var(--txt)}
+/* el riel va del color de A FAVOR (izquierda) al de EN CONTRA: no es una barra de progreso */
+#tm{-webkit-appearance:none;appearance:none;width:100%;height:30px;margin:6px 0 2px;background:transparent}
+#tm::-webkit-slider-runnable-track{height:8px;border-radius:99px;background:linear-gradient(90deg,var(--A),#2c3a48 50%,var(--B))}
+#tm::-moz-range-track{height:8px;border-radius:99px;background:linear-gradient(90deg,var(--A),#2c3a48 50%,var(--B))}
+#tm::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-9px;border-radius:50%;background:#e6edf3;border:3px solid #a78bfa;box-shadow:0 0 10px #a78bfa88}
+#tm::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#e6edf3;border:3px solid #a78bfa}
+#tm.nuevo::-webkit-slider-thumb{background:#5b6773;border-color:#8b98a5;box-shadow:none}
+#tm.nuevo::-moz-range-thumb{background:#5b6773;border-color:#8b98a5}
+.tm-acc .btn{margin-top:4px;padding:8px}
+.btn.sm{font-size:13.5px}
+#pregCaja .fila{align-items:flex-end;margin-top:6px}
+#pregTx{min-height:44px;max-height:110px;resize:none;border-radius:16px;padding:9px 12px;font-size:14px}
+#pregEnviar{margin:0;border-radius:50%;width:44px;height:44px;padding:0;font-size:19px;background:var(--amber);color:#1a1200;border:none;flex:0 0 auto;cursor:pointer}
+.rx{display:flex;gap:6px;margin-top:5px}
+.rxb{border:1px solid var(--line);background:#0b141a;color:var(--dim);border-radius:99px;padding:2px 9px;font:inherit;font-size:12.5px;cursor:pointer}
+.rxb.on{border-color:#a78bfa;color:var(--txt);background:#241d3d}
+.rxv{font-size:11.5px;color:var(--dim);background:#0b141a;border-radius:99px;padding:0 7px}
+.msg.mod.trib{border-color:var(--amber);background:#221c0c;--c:var(--amber)}
 .vt-q{font-weight:700;margin:16px 0 8px}
 .vt-rel{max-width:460px;text-align:left;font-size:12.5px;line-height:1.4;color:var(--txt);background:#221c0c;border:1px solid rgba(245,179,1,.5);border-radius:10px;padding:8px 10px;margin-bottom:4px}
 .vt-f{display:flex;gap:10px;width:100%;max-width:460px}
@@ -211,8 +234,16 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
   <div class="nota-caja" id="notaCaja"></div>
 </div>
 
+<!-- el público mientras debaten otros (publico.js): termómetro, reacciones y una pregunta -->
 <div id="voto" class="abajo oculto">
-  <div class="nota-caja" id="avisoVoto">📖 Lee con atención: al final votas quién te convenció y predices a los jueces.</div>
+  <div class="tm-cab"><span id="tmA"></span><b id="tmVal">muévelo cuando algo te convenza</b><span id="tmB"></span></div>
+  <input type="range" id="tm" min="-100" max="100" step="1" value="0" aria-label="Hacia dónde te inclinas">
+  <div class="fila tm-acc"><button id="btnPreg" class="btn sm">✋ Preguntar al debate</button></div>
+  <div id="pregCaja" class="oculto">
+    <div class="fila"><textarea id="pregTx" rows="2" maxlength="200" placeholder="Tu pregunta para los que debaten (una por debate)"></textarea>
+      <button id="pregEnviar" title="Enviar la pregunta">➤</button></div>
+  </div>
+  <div class="nota-caja" id="avisoVoto">🔥 🤔 🤝 Toca un mensaje para reaccionar. Al final votas quién argumentó mejor y predices a los jueces.</div>
 </div>
 
 <!-- votación: pantalla completa con las dos preguntas -->
@@ -220,9 +251,10 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 <!-- brújula corta: una pregunta por pantalla (al entrar y, si el profesor la repite, al cierre) -->
 <div id="brujula" class="capa oculto"></div>
 
-<script src="brujula.js?v=20260926a"></script>
+<script src="brujula.js?v=20260926p"></script>
+<script src="publico.js?v=20260926p"></script>
 <script src="ritmo.js?v=20260923a"></script>
 <script src="barra.js?v=20260923a"></script>
-<script type="module" src="jugar.js?v=20260925c"></script>
+<script type="module" src="jugar.js?v=20260926p"></script>
 </body>
 </html>

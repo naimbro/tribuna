@@ -148,16 +148,43 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
 
 ## El público y los oráculos
 
-En cada debate, los alumnos de los grupos que no debaten son el público. Durante el debate leen
-sin votar. Al terminar, su teléfono se cubre con dos preguntas: «¿Quién te convenció?» y «¿A
-quién elegirá el jurado?». Pueden cambiar sus respuestas hasta que se cierra la votación. Nadie
-vota en el debate de su propio grupo, y el servidor lo hace cumplir.
+En cada debate, los alumnos de los grupos que no debaten son el público. Al terminar, su teléfono
+se cubre con dos preguntas: «¿Quién argumentó mejor, aunque no pienses como él?» y «¿A quién
+elegirá el jurado?». Tienen 75 segundos y pueden cambiar sus respuestas hasta que se cierra la
+votación. Nadie vota en el debate de su propio grupo, y el servidor lo hace cumplir.
 
-La primera pregunta es el voto del público: el grupo que convence a más gana ese veredicto, y su
-parte de los votos es la mitad de su puntaje. La segunda es el juego de los **oráculos**: quien
-acierta al ganador de los jueces suma un punto, y los puntos se acumulan toda la clase. Las
-predicciones nunca se muestran en el proyector. En el CSV hay una fila por votante y por debate,
-con su voto, su predicción y si acertó.
+La primera pregunta es el voto del público: el grupo que gana más votos gana ese veredicto, y su
+parte de los votos es la mitad de su puntaje. Hasta el 23-sep-2026 decía «¿quién te
+convenció?», y la simulación con 20 alumnos-agente mostró que así el público vota lo que ya
+pensaba: un grupo en minoría en la sala casi no podía ganar. La segunda es el juego de los
+**oráculos**: quien acierta al ganador de los jueces suma un punto, y los puntos se acumulan toda
+la clase. Las predicciones nunca se muestran en el proyector. En el CSV hay una fila por votante
+y por debate, con su voto, su predicción y si acertó.
+
+## El público activo (`publico.js`)
+
+Mientras dos grupos debaten, los otros tres no se quedan mirando: en esa misma simulación, 19 de
+20 alumnos pidieron poder hacer algo siendo público. El teléfono del público tiene tres cosas:
+
+- **🌡 Termómetro.** Un deslizador A FAVOR ↔ EN CONTRA que el alumno mueve cuando algo lo
+  convence (A FAVOR a la izquierda, como en la conversación). El proyector dibuja la curva de la
+  sala en vivo arriba de la columna derecha, y el resultado del debate dice cuánto se movió el
+  público y hacia qué grupo. **No entra en el puntaje.**
+- **🔥 🤔 🤝 Reacciones.** Sobre cada mensaje de quien debate: buen punto, ¿de dónde sale?,
+  buena concesión. Todos ven los conteos. Si un mensaje junta 🤔 de al menos 2 personas o un
+  quinto del público (lo que sea mayor), la moderadora le pide la fuente a quien lo escribió «en
+  nombre de la tribuna». El mensaje con más 🔥 (mínimo 2) es **la frase del debate** y se muestra
+  en el resultado.
+- **✋ La pregunta de la tribuna.** Cada votante puede dejar una pregunta por debate (200
+  caracteres; se puede cambiar). Desde el minuto 1:30, la moderadora recibe la fila y puede
+  lanzar una tal cual, con el nombre de quien la escribió; si a los 3 minutos no salió ninguna,
+  lanza una. Hay un máximo de dos por debate. Quien la escribió suma **+1 punto de oráculo** (que
+  no cuenta como predicción) y su teléfono se lo avisa.
+
+Los datos van en `salas/{codigo}/termometro`, `reacciones` y `preguntas`, uno por persona y
+debate (o por persona y mensaje). Solo los escribe quien vota en el debate en curso, con el tramo
+abierto (`firestore.rules`). La lógica pura está en `publico.js` y se prueba con
+`node --test pruebas/`.
 
 ## Inicio, intro y cierre
 
@@ -212,13 +239,17 @@ cuántos: 2 a 10) y la moderadora los hace debatir de a dos, por turnos:
 1. **Propuesta.** La moderadora propone una pregunta dentro del tema general y llama a dos
    grupos. El profesor la ve primero: la publica, pide otra, escribe la suya o cambia los
    grupos. Sin acción, sale sola a los 15 segundos.
-2. **Apertura y réplica,** 3 minutos cada una, en la misma conversación.
-3. **Votación,** 45 segundos: cada votante responde en su teléfono «¿quién te convenció?» y
-   «¿a quién elegirá el jurado?». El proyector muestra las barras en vivo y declara al ganador
-   del público.
+2. **Debate,** un tramo abierto de 6 minutos en la misma conversación. El público juega mientras
+   tanto desde el teléfono (termómetro, reacciones y la pregunta de la tribuna).
+3. **Votación,** 75 segundos: cada votante responde en su teléfono «¿quién argumentó mejor,
+   aunque no pienses como él?» y «¿a quién elegirá el jurado?». El proyector muestra las barras
+   en vivo y declara al ganador del público.
 4. **El panel de jueces:** cinco jueces de IA independientes (`jueces.js`; cada semana puede
    definir los suyos en `JUECES`) levantan una tarjeta de 0 a 10 por grupo. Como en los clavados,
-   se tachan la más alta y la más baja y se suman las tres del medio, sobre 30.
+   se tachan la más alta y la más baja y se suman las tres del medio, sobre 30. El criterio que
+   comparten los cinco va una sola vez en `JUECES_COMUN`, y cada juez tiene un foco propio: con el
+   criterio repetido en los cinco perfiles, sus frases salían casi iguales. Las frases se
+   proyectan, así que nunca nombran a un estudiante.
 5. **Resultado:** el puntaje de cada grupo (mitad jueces, mitad público), el ranking de grupos y
    los **oráculos**: quienes predicen mejor a los jueces suman un punto por acierto durante toda
    la clase.
@@ -237,10 +268,14 @@ suman al grupo más cercano). Quien llega tarde responde la brújula y entra al 
 su campo. En cada debate se enfrentan los dos grupos más lejanos entre los que menos han debatido,
 y la moderadora escribe la moción sobre lo que los separa: el grupo cuya posición afirma queda A
 FAVOR (el profesor puede intercambiar los lados con **⇄ lados**). Al final, **🧭 REPETIR
-BRÚJULA** muestra una flecha por alumno con cuánto se movió. Las preguntas escritas a mano en `PREGUNTAS` no
-miran los campos: si la moderadora no dice qué grupo afirma la moción, A FAVOR va al grupo que
-menos veces lo ha sido. Apagada, los alumnos eligen grupo a
-mano. La lógica está en `brujula.js` y se prueba con `node --test pruebas/`.
+BRÚJULA** muestra una flecha por alumno con cuánto se movió. Las preguntas escritas a mano en
+`PREGUNTAS` pueden decir qué campo afirman (`{ texto, afirma: "ley_antes" }`): A FAVOR le toca al
+grupo del par más cercano a ese campo. Sin `afirma`, A FAVOR va al grupo que menos veces lo ha
+sido, y en la simulación del 23-sep-2026 eso dejó a dos de cuatro grupos defendiendo lo contrario
+de lo que pensaban. La propuesta del primer debate se arma después de FORMAR GRUPOS: antes se
+preparaba al abrir la sala, sin grupos, y el primer debate caía en «Grupo 1 contra Grupo 2».
+Si la semana define `INSTRUMENTOS`, la intro trae una lámina con lo que piden los jueces.
+Apagada, los alumnos eligen grupo a mano. La lógica está en `brujula.js` y se prueba con `node --test pruebas/`.
 
 ## Pantalla del profesor
 
