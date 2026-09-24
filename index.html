@@ -194,12 +194,24 @@ main .col{position:relative}
 #propuesta .pr-aviso{color:var(--amber);font-size:12.5px;margin-bottom:6px}
 #propuesta .pr-error{color:var(--hot);font-size:13px;font-weight:600;margin:0 0 8px}
 #propuesta .pr-error:empty{display:none}
+/* el minuto de preparación: la pregunta y la postura de cada lado, con la cuenta regresiva */
+#preparacion{position:absolute;left:14px;right:14px;bottom:88px;z-index:20;background:#0f1822;border:1px solid var(--neon);border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55)}
+#preparacion .pr-k{font-size:10.5px;letter-spacing:.2em;color:var(--neon);margin-bottom:8px;display:flex;justify-content:space-between}
+#preparacion .pr-k span{font-size:22px;letter-spacing:0;color:var(--txt)}
+#preparacion .prep-q{font:600 18px/1.35 system-ui;margin-bottom:8px}
+#preparacion .pr-lados{display:flex;gap:10px;margin:8px 0}
+#preparacion .pr-lados div{flex:1;border-top:3px solid var(--c);background:var(--panel);border-radius:8px;padding:9px 11px;font-size:14px;color:var(--txt)}
+#preparacion .pr-lados b{display:block;color:var(--c);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px}
+#preparacion .pr-porque{color:var(--dim);font-size:12.5px}
 .po-sw{display:flex;gap:8px;align-items:center;color:var(--txt);font-size:15px;margin-top:22px;cursor:pointer}
 .po-cfg .po-sw input{width:18px;height:18px;display:inline-block;margin:0;padding:0}
 .po-mapa{display:flex;gap:26px;align-items:center;width:100%}
 .po-mapa .mapa{width:min(52vh,460px);height:auto;flex:none}
 .po-mapa .pt.nuevo{animation:llega .6s cubic-bezier(.2,1.6,.4,1);transform-box:fill-box;transform-origin:center}
 .po-formar{display:flex;flex-direction:column;gap:10px;max-width:260px}
+.po-tira{width:100%;display:flex;flex-wrap:wrap;gap:10px 6px;margin-top:4px}
+.po-tira .po-j{width:64px;position:relative}
+.po-ok{position:absolute;top:-2px;right:6px;width:18px;height:18px;border-radius:50%;background:var(--neon);color:#04140b;font:800 11px/18px system-ui;text-align:center;font-style:normal}
 /* la brújula en vivo (mapavivo.js): los puntos se deslizan en vez de saltar */
 .mapa.vivo .pv{transition:transform .9s cubic-bezier(.22,.8,.28,1);transform-box:view-box}
 .mapa.vivo .pv.llega{animation:mvLlega .6s cubic-bezier(.2,1.6,.4,1)}
@@ -260,6 +272,7 @@ main .col{position:relative}
 #esSig{position:fixed;right:28px;bottom:26px;z-index:58;font-size:17px;padding:12px 26px}
 .es-q{font:700 30px/1.3 Georgia,serif;max-width:1100px;text-align:center}
 .es-pie{color:var(--dim);font-size:18px}
+.es-oraculo{margin-top:14px;padding:10px 18px;border:1px dashed #a78bfa;border-radius:12px;color:#c4b5fd;font-size:17px;background:#17132a}
 .es-delib{font-size:34px;color:var(--dim);animation:pulso 1.2s infinite;margin-top:20px}
 .es-ganador{font-size:40px;font-weight:800;letter-spacing:.06em;opacity:0;transform:scale(.7);transition:all .7s cubic-bezier(.2,1.5,.4,1)}
 .es-ganador.on{opacity:1;transform:none}
@@ -318,6 +331,10 @@ main .col{position:relative}
 /* ---------- mesa de escritura ---------- */
 .mesa{padding:12px 16px;border-top:1px solid var(--line);background:#0c1219;flex:0 0 auto;order:3}
 .feed{order:2}
+/* «Grupo N está escribiendo…», bajo la conversación */
+.escribiendo{order:2;display:flex;gap:18px;min-height:22px;padding:2px 16px 4px;font-size:12.5px;font-weight:600;flex:0 0 auto}
+.escribiendo:empty{visibility:hidden}
+.escribiendo i{animation:pulso 1.2s infinite;font-style:normal}
 /* la conversación, estilo WhatsApp */
 .pauta-bar{padding:8px 16px;font-size:12px;color:var(--dim);border-bottom:1px solid var(--line);background:#0b1117}
 .pauta-bar b{color:var(--amber);letter-spacing:.06em}
@@ -594,6 +611,7 @@ table.rank td.num{font-family:var(--mono);text-align:right}
     <div class="pauta-bar" id="pauta"></div>
     <div class="participantes"><span class="pl" style="--c:var(--A)" id="listaA"></span><span class="pl" style="--c:var(--B)" id="listaB"></span></div>
     <div class="feed chat" id="feed"></div>
+    <div class="escribiendo" id="escribiendo"></div>
 
     <div class="mesa">
       <div class="compositor">
@@ -650,24 +668,24 @@ table.rank td.num{font-family:var(--mono);text-align:right}
   (function () {
     const pedida = +new URLSearchParams(location.search).get("semana");
     const ok = SESIONES.some(x => x.semana === pedida) ? pedida : SESIONES[0].semana;
-    document.write('<script src="contenido/semana' + ok + '.js?v=20260926p"><\/script>');
+    document.write('<script src="contenido/semana' + ok + '.js?v=20260927a"><\/script>');
   })();
 </script>
-<script src="rotacion.js?v=20260926p"></script>
-<script src="publico.js?v=20260926p"></script>
-<script src="brujula.js?v=20260926p"></script>
+<script src="rotacion.js?v=20260927a"></script>
+<script src="publico.js?v=20260927a"></script>
+<script src="brujula.js?v=20260927a"></script>
 <script src="ritmo.js?v=20260923a"></script>
 <script src="barra.js?v=20260923a"></script>
-<script src="moderacion.js?v=20260926p"></script>
-<script src="app.js?v=20260926p"></script>
-<script src="jueces.js?v=20260926p"></script>
-<script src="clase.js?v=20260926p"></script>
-<script src="escenas.js?v=20260926p"></script>
+<script src="moderacion.js?v=20260927a"></script>
+<script src="app.js?v=20260927a"></script>
+<script src="jueces.js?v=20260927a"></script>
+<script src="clase.js?v=20260927a"></script>
+<script src="escenas.js?v=20260927a"></script>
 <script src="mapavivo.js?v=20260923a"></script>
 <script src="barravista.js?v=20260923a"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260926p"></script>
+<script type="module" src="online.js?v=20260927a"></script>
 </body>
 </html>

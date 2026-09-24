@@ -12,10 +12,10 @@ function gruposDisponibles() {
   return Array.from({ length: S.clase.grupos }, (_, i) => i + 1);
 }
 
-function publicarDebate({ pregunta, A, B }) {
+function publicarDebate({ pregunta, A, B, favor, contra }) {
   const n = S.clase.debates.length + 1;
   const anterior = S.debate;
-  S.debate = { n, pregunta: String(pregunta).trim().slice(0, 300), A, B };
+  S.debate = { n, pregunta: String(pregunta).trim().slice(0, 300), A, B, posturas: posturasDebate({ favor, contra }) };
   S.clase.debates.push({ n, pregunta: S.debate.pregunta, A, B, res: null, votantes: [] });
   S.clase.propuesta = null;
   S.tramo = 0;
@@ -25,9 +25,36 @@ function publicarDebate({ pregunta, A, B }) {
   if (typeof window.alCambiarDebate === "function") window.alCambiarDebate(n);   // online: votos del debate n
   $("propuesta")?.remove();
   pintarRonda(); pintarMarcador();
-  S.fase = "listo";
-  abrirRonda();                                          // abre la apertura; abrirTramoChat anuncia
+  empezarPreparacion();
   publicarEstado();
+}
+
+// Un minuto antes de abrir el chat: cada grupo ve en el teléfono qué lado defiende y qué sostiene,
+// y acuerda su primera frase. En la clase del 24-sep-2026 cada debate perdía dos minutos antes
+// del primer mensaje con contenido. Al llegar a cero el chat se abre solo; ▶ ABRIR YA lo adelanta.
+function empezarPreparacion() {
+  const d = S.debate;
+  S.fase = "listo";
+  S.finPrep = Date.now() + ROT.SEG_PREPARACION * 1000;
+  clearInterval(S.reloj);
+  let el = $("preparacion");
+  if (!el) { el = document.createElement("div"); el.id = "preparacion"; document.querySelector("main .col").appendChild(el); }
+  const lado = k => `<div style="--c:${EQUIPOS[k].color}"><b>${EQUIPOS[k].nombre} · ${esc(nombreGrupo(d[k]))}</b>${esc(d.posturas[k])}</div>`;
+  el.innerHTML = `<div class="pr-k">DEBATE ${d.n} · PREPARACIÓN <span class="mono" id="prepReloj"></span></div>
+    <div class="prep-q">«${esc(d.pregunta)}»</div>
+    <div class="pr-lados">${lado("A")}${lado("B")}</div>
+    <div class="pr-porque">Cada grupo ve su postura en el teléfono y acuerda su primera frase. El chat se abre solo al llegar a cero.</div>`;
+  const tic = () => {
+    if (S.fase !== "listo" || !S.finPrep) return;
+    const resta = Math.max(0, Math.ceil((S.finPrep - Date.now()) / 1000));
+    $("reloj").textContent = fmt(resta);
+    if ($("prepReloj")) $("prepReloj").textContent = fmt(resta);
+    if (resta <= 0) abrirRonda();
+  };
+  S.reloj = setInterval(tic, 500);
+  tic();
+  $("btnPrincipal").textContent = "▶ ABRIR YA";
+  tick(`Debate ${d.n}: un minuto para que los grupos ${d.A} y ${d.B} preparen su primera frase.`);
 }
 
 // Lo que escribió cada lado en el debate (para los jueces simulados sin motor).
@@ -139,18 +166,26 @@ function terminarClase(sinPreguntar = false) {
   if (["abierta", "listo", "votando", "veredictoPublico", "veredictoJueces"].includes(S.fase)) {
     if (sinPreguntar !== true && !confirm("Hay un debate en curso. ¿Terminar la clase igual? Ese debate no cuenta para el ranking.")) return;
     clearInterval(S.reloj);
+    S.finPrep = null;
+    $("preparacion")?.remove();
     cerrarEscena();
     const reg = S.debate && S.clase.debates[S.debate.n - 1];
     if (reg && !reg.res) { S.clase.debates.pop(); S.debate = null; }
   }
+  // la cuenta de «se publica en 15 s» seguía corriendo y abría un debate nuevo sobre la clase
+  // terminada: el podio nunca llegaba (clase del 24-sep-2026, sala 2GUU)
+  clearInterval(cuentaPropuesta);
+  S.clase.propuesta = null;
   S.fase = "fin";
   if (typeof saltarEscena === "function") saltarEscena();     // corta la espera de cualquier escena en curso
   S.clase.ranking = ranking(S.clase.grupos, S.clase.debates);
   $("propuesta")?.remove();
   pintarMarcador();
   $("btnPrincipal").textContent = "🏆 VER CAMPEÓN";
-  tick("Clase terminada. Los teléfonos piden feedback; revela al campeón cuando quieras.");
+  tick("Clase terminada. Los teléfonos piden feedback.");
   publicarEstado();
+  // desde el botón, directo al podio (desde el panel no hay nadie mirando el proyector)
+  if (sinPreguntar !== true && typeof ceremoniaRanking === "function") ceremoniaRanking();
 }
 
 // El botón principal hace lo que corresponde a cada momento.
@@ -233,7 +268,7 @@ ${sinUsar}
 
 ${bloqueCampos(par)}TU TAREA: propone la próxima pregunta de debate. Tiene que ser una afirmación discutible de una sola línea (máximo 25 palabras), dentro del tema general, que se pueda defender a favor y en contra con el material del curso. Prefiere lo que quedó en disputa o lo que nadie ha tocado. Español de Chile, sin groserías.
 
-Responde SOLO un JSON: {"pregunta": "…", "porQue": "máx. 20 palabras: por qué esta y por qué ahora", "mejorFavor": "máx. 20 palabras", "mejorContra": "máx. 20 palabras"${bloqueCampos(par) ? ', "afirma": número del grupo cuya posición afirma la moción' : ""}}`;
+Responde SOLO un JSON: {"pregunta": "…", "porQue": "máx. 20 palabras: por qué esta y por qué ahora", "mejorFavor": "máx. 20 palabras", "mejorContra": "máx. 20 palabras", "favor": "máx. 18 palabras: qué sostiene A FAVOR (la postura, no el argumento)", "contra": "máx. 18 palabras: qué sostiene EN CONTRA (la postura, no el argumento)"${bloqueCampos(par) ? ', "afirma": número del grupo cuya posición afirma la moción' : ""}}`;
 }
 
 async function prepararPropuesta() {
@@ -248,7 +283,7 @@ async function prepararPropuesta() {
     // si la pregunta dice qué campo afirma, A FAVOR va al grupo del par más cercano a ese campo
     const campo = escrita.afirma && typeof BRUJULA !== "undefined" ? BRUJULA.campos.find(c => c.id === escrita.afirma) : null;
     const lados = conBrujula() && campo ? ladoQueAfirma(base, campo.id, BRUJULA.campos, posDe) : base;
-    S.clase.propuesta = { ...lados, estado: "lista", pregunta: escrita.texto,
+    S.clase.propuesta = { ...lados, estado: "lista", pregunta: escrita.texto, favor: escrita.favor || "", contra: escrita.contra || "",
       porQue: "Pregunta escrita por ti en el archivo de la semana." + (conBrujula() && campo ? ` A FAVOR, el grupo más cercano a «${campo.nombre}».` : ""),
       mejorFavor: "", mejorContra: "", fuente: "escrita" };
     if (S.fase === "propuesta") mostrarPropuesta();
@@ -264,6 +299,7 @@ async function prepararPropuesta() {
     // el grupo cuya posición afirma la moción defiende A FAVOR; si no lo dice, queda el emparejamiento
     const lados = conBrujula() && +j.afirma === base.B ? { A: base.B, B: base.A } : base;
     S.clase.propuesta = { ...lados, estado: "lista", pregunta, porQue: String(j.porQue || "").slice(0, 200),
+      favor: String(j.favor || "").slice(0, 200), contra: String(j.contra || "").slice(0, 200),
       mejorFavor: String(j.mejorFavor || "").slice(0, 200), mejorContra: String(j.mejorContra || "").slice(0, 200), fuente: "ia" };
   } catch (e) {
     console.warn("propuesta:", e);
@@ -330,10 +366,13 @@ function mostrarPropuesta() {
 
 function publicarPropuestaActual() {
   clearInterval(cuentaPropuesta);
+  if (S.fase !== "propuesta") return;                        // p. ej., la clase ya terminó
   const pregunta = ($("prTexto")?.value || S.clase.propuesta?.pregunta || "").trim();
   const A = +($("prA")?.value || S.clase.propuesta?.A), B = +($("prB")?.value || S.clase.propuesta?.B);
   const error = t => { tick(t); if ($("prError")) $("prError").textContent = t; };
   if (!pregunta) { error("Escribe una pregunta o pide otra a la moderadora."); return; }
   if (!A || !B || A === B) { error("Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA."); return; }
-  publicarDebate({ pregunta, A, B });
+  // la postura escrita de cada lado vale solo si el profesor no reescribió la pregunta
+  const p = S.clase.propuesta, igual = p && (p.pregunta || "").trim() === pregunta;
+  publicarDebate({ pregunta, A, B, favor: igual ? p.favor : "", contra: igual ? p.contra : "" });
 }

@@ -358,12 +358,22 @@ const EJEMPLOS_SESION = {
    después genera las suyas. `afirma` es el campo de la brújula que sostiene la moción: A FAVOR
    le toca al grupo del par más cercano a ese campo (brujula.js, ladoQueAfirma). Sin eso, en la
    simulación del 23-sep-2026 dos de cuatro debates pusieron a un grupo a defender lo contrario
-   de lo que pensaba. */
+   de lo que pensaba. `favor` y `contra`: lo que sostiene cada lado, en una frase, para el minuto
+   de preparación (la postura, no el argumento). En la clase del 24-sep-2026 cada debate perdió
+   dos minutos antes del primer mensaje con contenido. */
 const PREGUNTAS = [
-  { texto: "Chile debe aprobar obligaciones vinculantes para las empresas de IA antes de que llegue la inversión.", afirma: "ley_antes" },
-  { texto: "El mayor riesgo de la IA en Chile es un Estado que la use para vigilar, no unas pocas empresas que la controlen.", afirma: "no_vigilar" },
-  { texto: "Si la automatización abarata la represión, hay que gravar la IA hoy, antes de que el capital prefiera la fuerza al impuesto.", afirma: "ley_antes" },
-  { texto: "Orientar la IA a complementar al trabajador basta: no hace falta limitar la automatización por ley.", afirma: "sin_trabas" }
+  { texto: "Chile debe aprobar obligaciones vinculantes para las empresas de IA antes de que llegue la inversión.", afirma: "ley_antes",
+    favor: "Primero la ley: las empresas de IA tienen que llegar a Chile con obligaciones ya fijadas.",
+    contra: "Primero la inversión: fijar obligaciones antes de que llegue la IA es un error o llega demasiado pronto." },
+  { texto: "El mayor riesgo de la IA en Chile es un Estado que la use para vigilar, no unas pocas empresas que la controlen.", afirma: "no_vigilar",
+    favor: "El peligro principal es el Estado: una IA en manos del gobierno para vigilar amenaza más que las empresas.",
+    contra: "El peligro principal son las empresas: que pocas compañías controlen la IA amenaza más que el Estado." },
+  { texto: "Si la automatización abarata la represión, hay que gravar la IA hoy, antes de que el capital prefiera la fuerza al impuesto.", afirma: "ley_antes",
+    favor: "Hay que gravar la IA ahora: esperar deja que reprimir salga más barato que pagar impuestos.",
+    contra: "No hay que gravar la IA hoy: el impuesto no es la respuesta a ese riesgo, o llega antes de tiempo." },
+  { texto: "Orientar la IA a complementar al trabajador basta: no hace falta limitar la automatización por ley.", afirma: "sin_trabas",
+    favor: "Basta con orientar la IA a complementar el trabajo: una ley que limite la automatización sobra.",
+    contra: "Orientar no basta: hace falta una ley que le ponga límites a la automatización." }
 ];
 
 /* --- Brújula corta ------------------------------------------------------

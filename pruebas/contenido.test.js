@@ -51,6 +51,9 @@ test("semana 7: La Tercera, Acemoglu, cinco jueces y preguntas semilla", () => {
   // cada pregunta escrita dice qué campo de la brújula afirma, y ese campo existe
   const campos = new Set(s.BRUJULA.campos.map(c => c.id));
   for (const p of s.PREGUNTAS) assert.ok(p.texto && campos.has(p.afirma), `pregunta sin campo válido: ${JSON.stringify(p)}`);
+  // el minuto de preparación: cada lado lee su postura en una frase (la postura, no el argumento)
+  for (const p of s.PREGUNTAS) for (const k of ["favor", "contra"])
+    assert.ok(p[k] && p[k].length >= 30 && p[k].length <= 200, `${k} de «${p.texto.slice(0, 30)}…»`);
   assert.ok(s.INSTRUMENTOS.length >= 4 && s.INSTRUMENTOS.every(x => x.nombre && x.ej), "INSTRUMENTOS incompleto");
   assert.equal(s.SESION.grupos, 5);
 });

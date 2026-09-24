@@ -68,7 +68,7 @@ function burbuja(m) {
       ${d.revisar?.length ? `<div class="tx"><b>Antes de votar, revisen:</b><ul>${d.revisar.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
       ${d.criterios?.length ? `<div class="tx"><b>Criterios:</b><ul>${d.criterios.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
       ${!d.resumenA && m.texto ? `<div class="tx">${esc(m.texto)}</div>` : ""}
-      <div class="tx pedido">🗳 Público: mueve tu posición. El jurado está evaluando…</div></div>`;
+      <div class="tx pedido">🗳 Público: vota en tu teléfono quién argumentó mejor y apuesta a quién eligen los jueces 🔮.</div></div>`;
   }
   if (m.tipo === "resultado") {
     const d = m.datos || {}, e = EQUIPOS[m.equipo];

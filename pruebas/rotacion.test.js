@@ -215,3 +215,37 @@ test("sumarPuntoPregunta: +1 punto de oráculo sin contar como predicción", () 
   assert.equal(r.length, 1); assert.equal(r[0].tasa, 0);
   assert.deepEqual(R.sumarPuntoPregunta({ x: 1 }, null), { x: 1 });
 });
+
+test("preparación: un minuto antes de abrir el chat", () => {
+  assert.equal(R.ROT.SEG_PREPARACION, 60);
+});
+
+test("proximaPreguntaEscrita: trae la postura de cada lado si la pregunta la define", () => {
+  const ps = [{ texto: "Ley ya.", afirma: "ley_antes", favor: "Hay que legislar ahora.", contra: "Legislar ahora es un error." }];
+  assert.deepEqual(R.proximaPreguntaEscrita(ps, []),
+    { texto: "Ley ya.", afirma: "ley_antes", favor: "Hay que legislar ahora.", contra: "Legislar ahora es un error." });
+});
+
+test("posturasDebate: usa la postura escrita y, si no hay, una genérica que no regala argumentos", () => {
+  assert.deepEqual(R.posturasDebate({ favor: " Sí, ya. ", contra: "No, todavía." }), { A: "Sí, ya.", B: "No, todavía." });
+  const g = R.posturasDebate({});
+  assert.ok(g.A && g.B && g.A !== g.B);
+  assert.deepEqual(R.posturasDebate(null), g);
+  assert.equal(R.posturasDebate({ favor: "x".repeat(400) }).A.length, 240);
+});
+
+test("gruposEscribiendo: los grupos del debate con alguien tecleando hace poco, sin contarme a mí", () => {
+  const ahora = 100000;
+  const xs = [
+    { uid: "a", grupo: 4, debate: 2, t: 5, visto: ahora - 1000 },
+    { uid: "b", grupo: 4, debate: 2, t: 9, visto: ahora - 2000 },
+    { uid: "c", grupo: 1, debate: 2, t: 7, visto: ahora - 9000 },   // hace rato: ya no
+    { uid: "d", grupo: 1, debate: 1, t: 7, visto: ahora },          // otro debate
+    { uid: "e", grupo: 2, debate: 2, t: 0, visto: ahora },          // envió: t=0 limpia
+    { uid: "yo", grupo: 5, debate: 2, t: 3, visto: ahora }
+  ];
+  assert.deepEqual(R.gruposEscribiendo(xs, { debate: 2, ahora, yo: "yo" }), [4]);
+  assert.deepEqual(R.gruposEscribiendo(xs, { debate: 2, ahora }), [4, 5]);
+  assert.deepEqual(R.gruposEscribiendo([], { debate: 2, ahora }), []);
+  assert.deepEqual(R.gruposEscribiendo(xs, { debate: null, ahora }), []);
+});

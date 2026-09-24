@@ -42,8 +42,9 @@ function estadoPublico() {
     equipos: { A: { nombre: EQUIPOS.A.nombre, bandera: EQUIPOS.A.bandera, color: EQUIPOS.A.color, lema: EQUIPOS.A.lema || "" },
                B: { nombre: EQUIPOS.B.nombre, bandera: EQUIPOS.B.bandera, color: EQUIPOS.B.color, lema: EQUIPOS.B.lema || "" } },
     modo: "rotacion", grupos: S.clase.grupos, temaGeneral: S.clase.tema || SESION.tema,
-    debate: S.debate ? { n: S.debate.n, pregunta: S.debate.pregunta, A: S.debate.A, B: S.debate.B } : null,
+    debate: S.debate ? { n: S.debate.n, pregunta: S.debate.pregunta, A: S.debate.A, B: S.debate.B, posturas: S.debate.posturas || null } : null,
     tramo: S.tramo, finVoto: S.fase === "votando" ? S.finVoto || null : null,
+    finPrep: S.fase === "listo" ? S.finPrep || null : null,       // el minuto de preparación
     ranking: (S.clase.ranking || []).map(f => ({ grupo: f.grupo, debates: f.debates, puesto: f.puesto, distincion: f.distincion,
       jurado: f.jurado === null ? null : +f.jurado.toFixed(1), publico: f.publico === null ? null : +f.publico.toFixed(1),
       puntaje: f.puntaje === null ? null : +f.puntaje.toFixed(1) })),
@@ -172,6 +173,7 @@ function activarOnline() {
   onSnapshot(collectionJugadores(), snap => {
     ON.jugadores = {};
     snap.forEach(d => ON.jugadores[d.id] = d.data());
+    notarEscribiendo(ON.jugadores);
     asignarRezagados();
     if (S.publico) S.publico.elegibles = elegibles();
     pintarBarraOnline(); pintarFeed(); actualizarPortada(ON.jugadores);
@@ -237,6 +239,32 @@ function activarOnline() {
 }
 
 const collectionJugadores = () => collection(db, "salas", ON.codigo, "jugadores");
+
+/* ---------- «Grupo N está escribiendo…» ----------
+   El teléfono marca en su ficha de jugador escribe: { debate, t } mientras teclea (t = 0 al
+   enviar). Aquí se anota cuándo llegó cada marca nueva y se muestra por grupo, nunca por nombre:
+   con el nombre, sus compañeros se quedan esperando a que termine (como en WhatsApp). */
+const ESCRIBE = {};                       // uid → { t, visto }
+let escribePrimera = true;                // la primera foto trae marcas viejas: no cuentan como «ahora»
+function notarEscribiendo(jugadores) {
+  for (const [uid, j] of Object.entries(jugadores)) {
+    const e = j.escribe;
+    if (!e) continue;
+    if (!ESCRIBE[uid] || ESCRIBE[uid].t !== e.t) ESCRIBE[uid] = { t: e.t, visto: escribePrimera ? 0 : Date.now() };
+  }
+  escribePrimera = false;
+  pintarEscribiendo();
+}
+function pintarEscribiendo() {
+  const el = $("escribiendo"); if (!el) return;
+  const d = S.fase === "abierta" && S.debate;
+  const xs = Object.entries(ON.jugadores).map(([uid, j]) => ({ uid, grupo: j.grupo, debate: j.escribe && j.escribe.debate,
+    t: j.escribe && j.escribe.t, visto: ESCRIBE[uid] ? ESCRIBE[uid].visto : 0 }));
+  const gs = d ? gruposEscribiendo(xs, { debate: d.n, ahora: Date.now() }) : [];
+  el.innerHTML = gs.map(g => { const k = g === d.A ? "A" : "B";
+    return `<span style="color:${EQUIPOS[k].color}">✍ Grupo ${g} está escribiendo<i>…</i></span>`; }).join("");
+}
+setInterval(pintarEscribiendo, 1000);
 
 // Cambia de escena y la publica: los teléfonos muestran lo mismo (espera en la portada,
 // la moción durante la intro, la conversación en el debate).

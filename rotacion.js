@@ -8,6 +8,8 @@
 
 const ROT = {
   SEG_DEBATE: 360, SEG_VOTACION: 75, SEG_VEREDICTO_PUBLICO: 6, SEG_JUEZ: 3, SEG_TOTALES: 6, SEG_RESULTADO: 10, SEG_PROPUESTA: 15,
+  SEG_PREPARACION: 60,  // antes de abrir el chat, cada grupo ve su postura y acuerda su primera frase
+  SEG_ESCRIBIENDO: 6,   // «Grupo N está escribiendo…» dura esto desde la última tecla vista
   GRUPOS_DEFECTO: 6, GRUPOS_MIN: 2, GRUPOS_MAX: 10,
   INDECISO: 8,          // |pos| ≤ 8 es indeciso y no suma votos
   ESCALA: 12,           // voto suave: tanh(|pos| / 12)
@@ -157,7 +159,31 @@ const textoPregunta = p => String(p && typeof p === "object" ? p.texto : p ?? ""
 function proximaPreguntaEscrita(preguntas, usadas) {
   const ya = new Set((usadas || []).map(x => textoPregunta(x).toLowerCase()));
   const p = (preguntas || []).find(x => textoPregunta(x) && !ya.has(textoPregunta(x).toLowerCase()));
-  return p ? { texto: textoPregunta(p), afirma: (typeof p === "object" && p.afirma) || null } : null;
+  if (!p) return null;
+  const out = { texto: textoPregunta(p), afirma: (typeof p === "object" && p.afirma) || null };
+  if (typeof p === "object" && p.favor) out.favor = p.favor;
+  if (typeof p === "object" && p.contra) out.contra = p.contra;
+  return out;
+}
+
+// Lo que sostiene cada lado, en una frase, para el minuto de preparación. Es la postura, no el
+// argumento: los argumentos los buscan ellos en las lecturas. Sin postura escrita, una genérica.
+function posturasDebate(p) {
+  const f = x => String(x || "").replace(/\s+/g, " ").trim().slice(0, 240);
+  return {
+    A: f(p && p.favor) || "Ustedes defienden la afirmación tal como está: tienen que mostrar por qué es cierta.",
+    B: f(p && p.contra) || "Ustedes la rechazan: tienen que mostrar por qué no se sostiene."
+  };
+}
+
+// «Grupo N está escribiendo…»: los grupos del debate con alguien que tecleó hace poco. Cada
+// registro es { uid, grupo, debate, t, visto }: t lo pone el teléfono (0 = ya envió) y visto es
+// cuándo lo vio llegar ESTE aparato, para no depender de que los relojes coincidan.
+function gruposEscribiendo(xs, { debate, ahora, yo = null }) {
+  if (!debate) return [];
+  const gs = new Set((xs || []).filter(x => x.uid !== yo && x.debate === debate && x.t > 0 && x.grupo > 0
+    && ahora - (x.visto || 0) < ROT.SEG_ESCRIBIENDO * 1000).map(x => x.grupo));
+  return [...gs].sort((a, b) => a - b);
 }
 
 // La pregunta de la tribuna que la moderadora eligió: un punto de oráculo para quien la hizo.
@@ -178,4 +204,4 @@ function mejorIntervencion(historial) {
   return (historial || []).reduce((m, h) => (!m || h.total > m.total ? h : m), null);
 }
 
-if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, sumarPuntoPregunta, mejorIntervencion, conGrupo };
+if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, posturasDebate, gruposEscribiendo, sumarPuntoPregunta, mejorIntervencion, conGrupo };

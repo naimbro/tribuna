@@ -523,6 +523,9 @@ function pintarRonda() {
 const fmt = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
 function abrirRonda() {
+  clearInterval(S.reloj);                                // la cuenta del minuto de preparación
+  S.finPrep = null;
+  $("preparacion")?.remove();
   S.fase = "abierta";
   $("chatTx").focus();
   // El reloj se calcula con la hora real, no descontando segundos: Chrome frena los

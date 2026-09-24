@@ -106,8 +106,11 @@ async function entrarAlJuego() {
   subs.push(onSnapshot(doc(db, "salas", J.codigo), snap => { J.sala = snap.data(); pintarSala(); }));
   // quiénes están en la sala: para sugerir nombres al escribir @
   subs.push(onSnapshot(collection(db, "salas", J.codigo, "jugadores"), snap => {
-    J.gente = []; snap.forEach(d => J.gente.push({ uid: d.id, nombre: d.data().nombre || "", grupo: d.data().grupo || 0 }));
-    pintarBarraTel();
+    J.gente = []; snap.forEach(d => J.gente.push({ uid: d.id, nombre: d.data().nombre || "", grupo: d.data().grupo || 0, escribe: d.data().escribe || null }));
+    for (const g of J.gente) if (g.escribe && (!ESCR.visto[g.uid] || ESCR.visto[g.uid].t !== g.escribe.t))
+      ESCR.visto[g.uid] = { t: g.escribe.t, en: ESCR.primera ? 0 : Date.now() };   // la primera foto trae marcas viejas
+    ESCR.primera = false;
+    pintarBarraTel(); pintarEscribiendo();
   }));
   // el profesor puede moverme de grupo: el rol y lo que escribo dependen de mi grupo actual
   subs.push(onSnapshot(doc(db, "salas", J.codigo, "jugadores", J.uid), snap => {
@@ -213,7 +216,13 @@ function pintarSala() {
 function pintarReloj() {
   const s = J.sala; if (!s) return;
   const el = $("reloj");
-  if (s.fase === "abierta" && s.abreEn) {
+  pintarEscribiendo();
+  if (s.fase === "listo" && s.finPrep) {
+    const resta = Math.max(0, Math.ceil((s.finPrep - Date.now()) / 1000));
+    el.textContent = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, "0")}`;
+    el.classList.remove("urgente");
+    if ($("prepReloj")) $("prepReloj").textContent = el.textContent;
+  } else if (s.fase === "abierta" && s.abreEn) {
     const resta = Math.max(0, s.seg - Math.floor((Date.now() - s.abreEn) / 1000));
     el.textContent = `${String(Math.floor(resta / 60)).padStart(2, "0")}:${String(resta % 60).padStart(2, "0")}`;
     el.classList.toggle("urgente", resta <= 20);
@@ -453,6 +462,7 @@ function prepararCaja() {
   });
   tx.addEventListener("beforeinput", e => { if (e.inputType) registro().tipos.add(e.inputType); });
   tx.addEventListener("input", () => {
+    marcarEscribiendo(tx.value.trim() ? Date.now() : 0);
     cortarDictado();                                // empezó a tipear: el dictado termina donde está
     const r = registro(), largo = tx.value.length;
     if (r.primera === null && largo > 0) r.primera = Date.now();
@@ -466,6 +476,31 @@ function prepararCaja() {
   $("btnEnviar").onclick = enviar;
   pintarCaja();
 }
+/* ---------- «Grupo N está escribiendo…» ----------
+   Mientras tecleo, mi ficha de jugador lleva escribe: { debate, t } (una escritura cada 3 s como
+   mucho; t = 0 al enviar). Se muestra por grupo y nunca por nombre, y no me cuento a mí: con el
+   nombre, los compañeros se quedan esperando a que termine, como en WhatsApp. */
+const ESCR = { ultimo: 0, visto: {}, primera: true };
+function marcarEscribiendo(t) {
+  const s = J.sala, rol = s && rolEn(s);
+  if (!s || s.fase !== "abierta" || !s.debate || (rol !== "A" && rol !== "B")) return;
+  if (t && Date.now() - ESCR.ultimo < 3000) return;
+  if (!t && !ESCR.ultimo) return;                   // nada que limpiar
+  ESCR.ultimo = t ? Date.now() : 0;
+  setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { escribe: { debate: s.debate.n, t } }, { merge: true }).catch(() => {});
+}
+function pintarEscribiendo() {
+  const el = $("escribiendo"), s = J.sala;
+  if (!el || !s) return;
+  const d = s.fase === "abierta" && s.debate;
+  const xs = J.gente.map(g => ({ uid: g.uid, grupo: g.grupo, debate: g.escribe && g.escribe.debate, t: g.escribe && g.escribe.t,
+    visto: ESCR.visto[g.uid] ? ESCR.visto[g.uid].en : 0 }));
+  const gs = d ? gruposEscribiendo(xs, { debate: d.n, ahora: Date.now(), yo: J.uid }) : [];
+  const html = gs.map(g => { const k = g === d.A ? "A" : "B";
+    return `<span style="color:${s.equipos[k].color}">✍ Grupo ${g} está escribiendo<i>…</i></span>`; }).join("");
+  if (el.innerHTML !== html) el.innerHTML = html;
+}
+
 /* ---------- @menciones: al escribir @ se sugieren nombres de la sala ----------
    Primero los del debate en curso (a quienes tiene sentido responder), después el resto.
    Se inserta nombre y primer apellido: así la mención se destaca entera y la persona la recibe. */
@@ -543,6 +578,7 @@ async function enviar() {
       huella: r.huella, tipos: [...r.tipos].slice(0, 12), dictado: Math.min(r.dictado || 0, texto.length)
     }).catch(() => {});
     TEL.r = null;
+    marcarEscribiendo(0);
     $("tx").value = ""; $("tx").style.height = "auto"; $("sugiere").innerHTML = "";
     $("notaCaja").textContent = ""; $("notaCaja").classList.remove("ati");
     $("pJuego").scrollTop = $("pJuego").scrollHeight;
@@ -645,8 +681,12 @@ function pintarVotar(s) {
   el.innerHTML = `<div class="k">Debate ${d.n} · vota</div>
     <div class="es-mocion" style="font-size:17px">«${esc(d.pregunta)}»</div>
     ${relatorDe(d.n)}
-    <div class="vt-q">¿Quién argumentó mejor, aunque no pienses como él?</div><div class="vt-f">${boton("voto", "A")}${boton("voto", "B")}</div>
-    <div class="vt-q">¿A quién elegirá el jurado?</div><div class="vt-f">${boton("prediccion", "A")}${boton("prediccion", "B")}</div>
+    <div class="vt-q">🗳 Tu voto: ¿quién argumentó mejor, aunque no pienses como él?</div><div class="vt-f">${boton("voto", "A")}${boton("voto", "B")}</div>
+    <div class="vt-or">
+      <div class="vt-q">🔮 Oráculo: ¿a quién elegirán los 5 jueces de IA?</div>
+      <div class="vt-or-e">No es tu opinión: es tu apuesta. Si aciertas, +1 punto de oráculo. Al final de la clase se premia al mejor oráculo.</div>
+      <div class="vt-f">${boton("prediccion", "A")}${boton("prediccion", "B")}</div>
+    </div>
     <div class="vt-pie"><span>${mio.voto && mio.prediccion ? "✓ Listo" : ""}</span><span class="mono" id="vtReloj"></span></div>
     <div class="aviso" id="vtError">${esc(mio.error || "")}</div>`;
   el.onclick = async e => {
@@ -831,14 +871,31 @@ function listoFeedback() {
 function pintarEntre(s) {
   const el = $("entre");
   const rol = rolEn(s), d = s.debate;
-  const fases = ["propuesta", "resultado", "veredictoPublico", "veredictoJueces", "votando"];
+  const fases = ["propuesta", "listo", "resultado", "veredictoPublico", "veredictoJueces", "votando"];
   const toca = s.modo === "rotacion" && s.etapa == null && fases.includes(s.fase) && !(s.fase === "votando" && rol === "P");
   el.classList.toggle("oculto", !toca);
   if (!toca) return;
   const orac = s.oraculoDe && s.oraculoDe[J.uid];
   const pie = (J.grupo ? (() => { const mio = (s.ranking || []).find(f => f.grupo === J.grupo);
       return mio && mio.puesto ? `<div class="es-papel">Tu grupo va <b>#${mio.puesto}</b> con ${mio.puntaje} puntos.</div>` : ""; })() : "")
-    + (orac ? `<div class="es-papel">🔮 Tus predicciones: <b>${orac.puntos}</b> punto${orac.puntos === 1 ? "" : "s"} · #${orac.puesto} entre los oráculos</div>` : "");
+    + (orac ? `<div class="es-papel">🔮 Oráculo: <b>${orac.puntos}</b> punto${orac.puntos === 1 ? "" : "s"} · #${orac.puesto} de la clase<br><small style="color:var(--dim)">+1 por acertar a los jueces, +1 si la moderadora elige tu pregunta</small></div>` : "");
+  if (s.fase === "listo" && d) {
+    const pos = d.posturas || {};
+    const lado = k => `<div style="--c:${s.equipos[k].color}"><b>${esc(s.equipos[k].nombre)} · Grupo ${d[k]}</b>${esc(pos[k] || "")}</div>`;
+    const reloj = `<div class="prep-reloj mono" id="prepReloj">${s.finPrep ? "" : "…"}</div>`;
+    el.innerHTML = rol === "A" || rol === "B"
+      ? `<div class="k">Debate ${d.n} · preparación</div>
+         <h1 style="color:${s.equipos[rol].color}">Tu grupo defiende ${esc(s.equipos[rol].nombre)}</h1>
+         <div class="es-mocion" style="font-size:17px">«${esc(d.pregunta)}»</div>
+         <div class="prep-postura" style="--c:${s.equipos[rol].color}"><b>Lo que ustedes sostienen</b>${esc(pos[rol] || "")}</div>${reloj}
+         <div class="es-papel">Júntense con su grupo y acuerden la primera frase. Cuando se abra el chat, escríbanla de inmediato: cualquiera del grupo puede partir.</div>`
+      : `<div class="k">Debate ${d.n} · preparación</div><h1>Los grupos ${d.A} y ${d.B} se preparan</h1>
+         <div class="es-mocion" style="font-size:17px">«${esc(d.pregunta)}»</div>
+         <div class="es-lados">${lado("A")}${lado("B")}</div>${reloj}
+         <div class="es-papel">Cuando se abra el chat: mueve el termómetro, reacciona a los mensajes y manda una pregunta. Al final votas quién argumentó mejor y apuestas a quién eligen los jueces 🔮.</div>` + pie;
+    pintarReloj();
+    return;
+  }
   if (s.fase === "votando") {
     const c = s.conteoVotos || {};
     el.innerHTML = `<div class="k">Debate ${d.n}</div><h1>La sala está votando tu debate</h1>
@@ -859,7 +916,7 @@ function pintarEntre(s) {
     let acierto = "";
     if (mio && mio.prediccion && u.panel) {
       const ok = u.panel.ganador && mio.prediccion === u.panel.ganador;
-      acierto = !u.panel.ganador ? `<h1>Los jueces empataron</h1>` : ok ? `<h1 style="color:var(--neon)">¡Acertaste! +1 🔮</h1>` : `<h1>Esta vez no</h1>`;
+      acierto = !u.panel.ganador ? `<h1>Los jueces empataron</h1>` : ok ? `<h1 style="color:var(--neon)">🔮 ¡Acertaste a los jueces! +1</h1>` : `<h1>🔮 Esta vez los jueces eligieron al otro</h1>`;
       if (J.aciertoVisto !== u.n) { J.aciertoVisto = u.n; navigator.vibrate?.(ok ? [60, 40, 60, 40, 200] : 150); }
     }
     const res = (g, r) => `<div style="--c:${g === u.A ? s.equipos.A.color : s.equipos.B.color}"><b>Grupo ${g}</b>${r.puntaje ?? "—"} pts<br><small>jueces ${r.jurado ?? "—"} · público ${r.publico ?? "—"}</small></div>`;

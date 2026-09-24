@@ -99,7 +99,8 @@ function actualizarMapaPortada() {
     g.innerHTML = `<div class="po-mapa"><div id="poMapaVivo"></div>
       <div class="po-formar"><button class="btn pri" id="poFormar">FORMAR GRUPOS</button>
         <button class="btn" id="poAmpliar" title="El mapa a pantalla completa, para proyectarlo">⛶ AMPLIAR MAPA</button>
-        <div class="aviso" id="poFormarAviso"></div></div></div>`;
+        <div class="aviso" id="poFormarAviso"></div></div></div>
+      <div class="po-tira" id="poTira"></div>`;
     PORTADA.mapa = crearMapaVivo($("poMapaVivo"), { campos: BRUJULA.campos, ejes: BRUJULA.ejes, tam: 460 });
     $("poAmpliar").onclick = abrirMapaGrande;
     $("poFormar").onclick = async () => {
@@ -114,6 +115,22 @@ function actualizarMapaPortada() {
     };
   }
   PORTADA.mapa.actualizar(puntos);
+  // bajo el mapa, las caras de quienes van entrando (✓: ya respondió). El mapa sigue anónimo:
+  // la cara dice que llegó, no dónde quedó.
+  const hechos = new Set(puntos.filter(p => !p.parcial).map(p => p.uid));
+  const lista = Object.entries(window.jugadoresSala ? window.jugadoresSala() : {})
+    .map(([uid, j]) => ({ uid, ...j })).sort((a, b) => (a.unido || 0) - (b.unido || 0));
+  const antes = PORTADA.vistos.size;
+  $("poTira").innerHTML = lista.map(j => caraPortada(j, 44, hechos.has(j.uid) ? `<i class="po-ok">✓</i>` : "", false)).join("");
+  if (PORTADA.vistos.size > antes && !PORTADA.primera) sonar("pop");
+  PORTADA.primera = false;
+}
+
+// Una cara de la portada; la primera vez que aparece alguien, entra con un salto.
+function caraPortada(j, tam, extra = "", clic = true) {
+  const nuevo = !PORTADA.vistos.has(j.uid);
+  if (nuevo) PORTADA.vistos.add(j.uid);
+  return `<div class="po-j ${nuevo && !PORTADA.primera ? "llega" : ""}" data-uid="${j.uid}"${clic ? ` title="Clic para mover de grupo"` : ""}>${avatarHtml({ ...j, equipo: "" }, tam)}${extra}<div class="po-n">${escHtml(j.nombre)}</div></div>`;
 }
 
 function actualizarPortada(jugadores) {
@@ -131,12 +148,8 @@ function actualizarPortada(jugadores) {
   const enGrupo = g => lista.filter(j => j.grupo === g);
   const sinGrupo = lista.filter(j => !(j.grupo > 0));
   $("poCuenta").innerHTML = `<b>${lista.length}</b> en la sala${sinGrupo.length ? ` <span style="color:var(--dim)">· ${sinGrupo.length} eligiendo</span>` : ""}`;
-  let nuevos = 0;
-  const cara = j => {
-    const nuevo = !PORTADA.vistos.has(j.uid);
-    if (nuevo) { PORTADA.vistos.add(j.uid); nuevos++; }
-    return `<div class="po-j ${nuevo && !PORTADA.primera ? "llega" : ""}" data-uid="${j.uid}" title="Clic para mover de grupo">${avatarHtml({ ...j, equipo: "" }, 50)}<div class="po-n">${escHtml(j.nombre)}</div></div>`;
-  };
+  const antes = PORTADA.vistos.size;
+  const cara = j => caraPortada(j, 50);
   g.innerHTML = `<div class="po-grupos">${Array.from({ length: N }, (_, i) => i + 1).map(k =>
       `<div class="po-g"><div class="po-gk">GRUPO ${k}${(S.clase.gruposInfo || []).find(x => x.n === k) ? ` · ${escHtml(S.clase.gruposInfo.find(x => x.n === k).nombre)}` : ""} <span>${enGrupo(k).length}</span></div>${enGrupo(k).map(cara).join("")}</div>`).join("")}</div>
     ${sinGrupo.length ? `<div class="po-sin">${sinGrupo.map(cara).join("")}</div>` : ""}`;
@@ -144,7 +157,7 @@ function actualizarPortada(jugadores) {
     const destino = +prompt(`¿A qué grupo mueves a ${el.textContent.trim()}? (1 a ${N})`);
     if (destino >= 1 && destino <= N) window.moverAlumno?.(el.dataset.uid, destino);
   });
-  if (nuevos && !PORTADA.primera) sonar("pop");
+  if (PORTADA.vistos.size > antes && !PORTADA.primera) sonar("pop");
   PORTADA.primera = false;
 }
 
@@ -429,7 +442,8 @@ function mostrarVotacion(d) {
     <div class="vb">${["A", "B"].map(k => `<div class="vb-fila" id="vbf${k}" style="--c:${EQUIPOS[k].color}">
         <div class="vb-n">${EQUIPOS[k].nombre} · GRUPO ${d[k]}</div>
         <div class="vb-barra"><i id="vb${k}"></i></div><div class="vb-c mono" id="vbc${k}">0</div></div>`).join("")}</div>
-    <div class="es-pie mono" id="vbPie"></div>`;
+    <div class="es-pie mono" id="vbPie"></div>
+    <div class="es-oraculo">🔮 En el teléfono, además: apuesten a quién eligen los 5 jueces de IA. Cada acierto, +1 punto de oráculo.</div>`;
   actualizarVotacion();
 }
 
