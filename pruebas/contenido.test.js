@@ -72,7 +72,7 @@ function cargarSesion(archivo) {
   return ctx.S;
 }
 
-const SEMANAS = ["contenido/semana5.js", "contenido/semana7.js", "contenido/semana307.js"];
+const SEMANAS = ["contenido/semana5.js", "contenido/semana7.js", "contenido/semana307.js", "contenido/semana402.js"];
 
 test("toda semana: los pesos `mueve` y los `efecto` apuntan a ids que existen", () => {
   for (const archivo of SEMANAS) {
@@ -156,4 +156,64 @@ test("clase 7 de MGT300: brújula de 5 preguntas, dos ejes y 4 campos chilenos",
   // cada combinación extrema cae en un campo distinto
   const extremos = [0, 3].flatMap(i => [0, 3].map(j => Object.fromEntries(b.preguntas.map(p => [p.id, typeof p.opciones[0].x === "number" ? i : j]))));
   assert.equal(new Set(extremos.map(r => B.campoDe(B.posicion(r, b.preguntas), b.campos))).size, 4);
+});
+
+/* --- Doctorado, Usos de la IA en Investigación Académica, clase 2 (semana402.js) --- */
+
+test("clase 2 del doctorado: brújula corta de 6 preguntas, 3 por eje, cada una sobre un solo eje", () => {
+  const b = cargar("contenido/semana402.js");
+  assert.ok(b, "semana402.js no define BRUJULA");
+  assert.equal(b.preguntas.length, 6);
+  for (const p of b.preguntas) {
+    assert.equal(p.opciones.length, 4, p.id);
+    assert.ok(p.texto.length <= 120, `${p.id}: enunciado de ${p.texto.length} caracteres`);
+    for (const o of p.opciones) assert.ok(o.texto.length <= 50, `${p.id}: opción de ${o.texto.length} caracteres: ${o.texto}`);
+    const eje = typeof p.opciones[0].x === "number" ? "x" : "y";
+    const vs = p.opciones.map(o => o[eje]);
+    assert.ok(vs.every(v => typeof v === "number"), `${p.id}: opciones en ejes distintos`);
+    assert.ok(vs.every((v, i) => i === 0 || v > vs[i - 1]), `${p.id}: opciones desordenadas`);
+    assert.ok(vs[0] < 0 && vs[3] > 0, `${p.id}: no cubre los dos extremos`);
+  }
+  const ejes = b.preguntas.map(p => typeof p.opciones[0].x === "number" ? "x" : "y");
+  assert.equal(ejes.filter(e => e === "x").length, 3);
+  assert.equal(ejes.filter(e => e === "y").length, 3);
+  assert.equal(b.campos.length, 4);
+  for (const c of b.campos) assert.ok(c.id && c.nombre && c.afirma && c.color && c.centro, c.id);
+  const extremos = [0, 3].flatMap(i => [0, 3].map(j => Object.fromEntries(b.preguntas.map(p => [p.id, typeof p.opciones[0].x === "number" ? i : j]))));
+  assert.equal(new Set(extremos.map(r => B.campoDe(B.posicion(r, b.preguntas), b.campos))).size, 4);
+});
+
+test("clase 2 del doctorado: las dos lecturas, cinco jueces, preguntas con campo y 3 grupos", () => {
+  const s = cargarSesion("contenido/semana402.js");
+  assert.equal(s.SESION.semana, 402);
+  assert.equal(s.SESION.grupos, 3);
+  // el manifiesto la ofrece y su curso coincide con el del archivo
+  const man = {};
+  vm.createContext(man);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "contenido/sesiones.js"), "utf8") + "\n;this.SESIONES = SESIONES;", man);
+  const fila = man.SESIONES.find(x => x.semana === 402);
+  assert.ok(fila, "semana 402 no está en contenido/sesiones.js");
+  assert.equal(fila.curso, s.SESION.curso);
+  // sólo se juzga lo leído: cada concepto dice de qué texto sale, y están las dos lecturas
+  assert.ok(s.CONCEPTOS.length >= 12 && s.CONCEPTOS.length <= 16, `${s.CONCEPTOS.length} conceptos`);
+  for (const c of s.CONCEPTOS) {
+    assert.ok(c.id && c.etiqueta && c.fuente && c.claves.length, c.id);
+    assert.ok([-1, 0, 1].includes(c.lado), `${c.id}: lado ${c.lado}`);
+    assert.match(c.fuente, /Mollick|Karpf|Bloque 1/, `${c.id}: fuente sin texto`);
+  }
+  assert.ok(s.CONCEPTOS.some(c => /^Mollick/.test(c.fuente)), "ningún concepto de Mollick");
+  assert.ok(s.CONCEPTOS.some(c => /^Karpf/.test(c.fuente)), "ningún concepto de Karpf");
+  for (const n of ["mollick", "karpf"]) assert.ok(s.FUENTES.includes(n), n);
+  assert.equal(s.JUECES.length, 5);
+  // el piso común va una vez (JUECES_COMUN) y cada juez tiene un foco propio, sin repetirlo
+  assert.match(s.JUECES_COMUN, /agente/);
+  for (const j of s.JUECES) assert.ok(!j.valora.includes(s.JUECES_COMUN.slice(0, 40)), `${j.id} repite el piso común`);
+  assert.equal(new Set(s.JUECES.map(j => j.valora.split(/\s+/).slice(0, 4).join(" "))).size, 5, "dos jueces parten igual");
+  // las preguntas escritas dicen qué campo de la brújula afirman, y ese campo existe
+  assert.ok(s.PREGUNTAS.length >= 1, "falta la pregunta del primer debate");
+  const campos = new Set(s.BRUJULA.campos.map(c => c.id));
+  for (const p of s.PREGUNTAS) assert.ok(p.texto && campos.has(p.afirma), `pregunta sin campo válido: ${JSON.stringify(p)}`);
+  // los ejemplos separan los marcadores: la arenga no atribuye, el manual sí
+  for (const r of ["apertura", "refutacion", "cierre"])
+    for (const k of ["A", "B"]) assert.ok(s.EJEMPLOS_SESION[r][k].length > 200, `${r}.${k}`);
 });
