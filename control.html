@@ -71,6 +71,9 @@ select{min-height:48px;appearance:none;background-image:linear-gradient(45deg,tr
 .banco.cero .t{color:var(--dim2)}
 .habla{font-size:15px;margin-bottom:12px}
 .habla b{color:var(--neon)}
+.pto{color:var(--amber)}
+.pto b{color:var(--txt)}
+.pto.cerrado{color:var(--dim)}
 .shock{display:flex;gap:8px;margin-top:10px}
 .shock select{flex:1 1 auto;min-width:0}
 .shock .b{flex:0 0 auto}
@@ -140,6 +143,7 @@ select{min-height:48px;appearance:none;background-image:linear-gradient(45deg,tr
       <div class="k">En vivo</div>
       <div class="bancos oculto" id="bancos"></div>
       <div class="habla" id="habla"></div>
+      <div class="habla pto oculto" id="pto"></div>
       <div class="ca">
         <button class="b" id="btnMas30">+30 s</button>
         <button class="b" id="btnModera">🎙 Moderadora</button>

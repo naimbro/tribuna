@@ -196,6 +196,7 @@ function pintarRelojes() {
   $("reloj").classList.toggle("urgente", s !== null && s <= 20 && ["abierta", "votando"].includes(c.fase));
   const cuenta = c.fase === "propuesta" && c.propuesta ? restaDe(c.propuesta.cuentaHasta) : null;
   $("prCuenta").textContent = cuenta ? `se publica en ${Math.ceil(cuenta / 1000)} s` : "";
+  if (c.fase === "abierta") pintarPunto(c);
   if (c.fase === "abierta" && C.foto) {
     const r = bancoRestante(C.foto, Date.now());
     const d = c.debate || {};
@@ -208,6 +209,21 @@ function pintarRelojes() {
   }
 }
 setInterval(pintarRelojes, 250);
+
+// El punto de información en curso (lo decide la pantalla): una línea con su cuenta regresiva.
+function pintarPunto(c) {
+  const p = c.punto, d = c.debate || {};
+  const quien = p ? `<b>${esc(p.nombre || "Alguien")}</b> (${esc(nombreDe(p.grupo))})` : "";
+  const ms = p && p.fin && (p.estado === "pedido" || p.estado === "aceptado") ? restaDe(p.fin) : null;
+  const s = ms === null ? "" : ` · <span class="mono">${Math.ceil(ms / 1000)} s</span>`;
+  const html = !p ? "" : p.estado === "pedido" ? `✋ ${quien} pide un punto; responde ${esc(nombreDe(d[p.para]))}${s}`
+    : p.estado === "aceptado" ? `✋ Punto aceptado: ${quien} tiene la palabra${s}`
+    : p.estado === "rechazado" ? "✋ Punto rechazado." : p.estado === "vencido" ? "✋ Nadie respondió el punto."
+    : p.estado === "terminado" ? "✋ Terminó el punto de información." : "";
+  if ($("pto").innerHTML !== html) $("pto").innerHTML = html;
+  $("pto").classList.toggle("cerrado", !!p && !["pedido", "aceptado"].includes(p.estado));
+  mostrar("pto", !!html);
+}
 
 function pintarInterruptores(c) {
   const ops = c.opciones || {};

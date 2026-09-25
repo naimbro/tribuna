@@ -306,9 +306,55 @@ $("btnMasMin").onclick = () => sumarTiempo(60000);
 function sumarTiempo(ms) {
   if (S.fase !== "abierta") { tick("El tiempo se suma con el tramo abierto."); return; }
   if (S.banco) { S.banco = sumarBanco(S.banco, ms); S.bancoExtra = (S.bancoExtra || 0) + ms; }
-  else S.finRonda += ms;
+  S.finRonda += ms;                   // con banco, el límite de pared (LÍMITE) se corre lo mismo que bancoTerminado
   tick(ms === 60000 ? "+1 minuto." : `+${Math.round(ms / 1000)} s.`);
   publicarEstado();
+}
+
+/* ---------------- el debate a viva voz: reloj de ajedrez y punto de información ----------------
+   Corre en el tic de 250 ms del tramo (app.js, abrirRonda). Quién habla lo sabe online.js
+   (window.hablaSala: las fichas con `habla` y un latido reciente); sin sala, nadie habla. */
+// Una publicación liviana (sin el respaldo privado): el banco y el punto cambian seguido.
+const publicarLigero = () => { if (typeof window.publicarEstado === "function") window.publicarEstado({ ligera: true }); };
+function hablaAhora() {
+  try { return typeof window.hablaSala === "function" ? window.hablaSala() || [] : []; } catch (e) { return []; }
+}
+function hablandoAhora() {
+  const d = S.debate, hs = hablaAhora();
+  return d ? { A: hs.some(h => h.grupo === d.A), B: hs.some(h => h.grupo === d.B) } : { A: false, B: false };
+}
+// Las últimas palabras: si el tramo se cierra porque los dos bancos llegaron a cero, quien hablaba
+// alcanza a soltar (su teléfono envía lo dicho apenas se agota el banco) y recién ahí se cierra,
+// con un tope de 3 s. RESPIRO: el mensaje puede llegar un instante después que la ficha sin habla.
+// El límite de pared, en cambio, cierra en el acto.
+const ULTIMAS = { TOPE: 3000, RESPIRO: 600 };
+// Devuelve true si cerró el tramo.
+function pasoVivo() {
+  const ahora = Date.now();
+  let cambio = false;
+  if (S.punto) {
+    const p = vencerPunto(S.punto, ahora);
+    if (p !== S.punto) { S.punto = p; cambio = true; }
+  }
+  if (S.banco && S.debate) {
+    const dt = ahora - (S.bancoT || ahora); S.bancoT = ahora;
+    const hablando = hablandoAhora();
+    const r = avanzarBanco(S.banco, hablando, dt);
+    S.banco = r.banco;
+    const antes = S.bancoCorre || {};
+    if (hablando.A !== !!antes.A || hablando.B !== !!antes.B || r.agotados.length) { S.bancoCorre = hablando; cambio = true; }
+    for (const k of r.agotados) tick(`${nombreG(S.debate[k])} se quedó sin tiempo: solo puede escribir.`);
+    const seg = tramoActual().seg, extra = S.bancoExtra || 0;
+    if (bancoTerminado(S.banco, { abre: S.abreEnLocal, seg, ahora, extra })) {
+      if (ahora - S.abreEnLocal >= (seg + AJ.MARGEN) * 1000 + extra) { cerrarRonda(); return true; }
+      if (!S.cierreBanco) { S.cierreBanco = { desde: ahora, callado: 0 }; tick("Los dos lados se quedaron sin tiempo: las últimas palabras y se cierra."); }
+      const c = S.cierreBanco;
+      c.callado = hablaAhora().length ? 0 : c.callado || ahora;
+      if (ahora - c.desde >= ULTIMAS.TOPE || (c.callado && ahora - c.callado >= ULTIMAS.RESPIRO)) { cerrarRonda(); return true; }
+    } else S.cierreBanco = null;                            // +30 s devolvió tiempo: sigue el debate
+  }
+  if (cambio) publicarLigero();
+  return false;
 }
 
 // Los interruptores del debate en vivo, desde el control. Apagar la música o la voz de la IA

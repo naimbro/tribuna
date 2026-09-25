@@ -547,19 +547,31 @@ function abrirRonda() {
   $("preparacion")?.remove();
   S.fase = "abierta";
   $("chatTx").focus();
+  // El debate a viva voz (clase.js): el punto de información y lo sumado con +30 s son de este tramo.
+  S.punto = null; S.puntoUltimo = {}; S.bancoExtra = 0; S.cierreBanco = null;
+  // El reloj de ajedrez (ajedrez.js): con la voz y el reloj encendidos cada lado tiene su banco, y
+  // el reloj de la cabecera muestra el límite de pared (el tramo más el margen). Si no, como antes.
+  const conBanco = !!S.debate && typeof nuevoBanco === "function" && opcionActiva(S.clase.opciones, "voz") && opcionActiva(S.clase.opciones, "reloj");
+  S.banco = conBanco ? nuevoBanco(tramoActual().seg) : null;
+  S.bancoCorre = { A: false, B: false };
+  S.bancoT = S.abreEnLocal = Date.now();
   // El reloj se calcula con la hora real, no descontando segundos: Chrome frena los
   // temporizadores de las pestañas ocultas y el reloj se atrasaba (40 s duraron varios minutos).
-  S.finRonda = Date.now() + tramoActual().seg * 1000;
+  // Con banco, finRonda es el mismo límite de pared que bancoTerminado (desde abreEnLocal).
+  S.finRonda = S.abreEnLocal + (tramoActual().seg + (conBanco ? AJ.MARGEN : 0)) * 1000;
   S.seg = tramoActual().seg;
   $("reloj").classList.add("corriendo");
   const tic = () => {
     if (S.fase !== "abierta") return;
+    // el banco y el punto (clase.js): si los dos bancos se agotaron, el tramo se cierra ahí
+    if (typeof pasoVivo === "function" && pasoVivo()) return;
     S.seg = Math.max(0, Math.ceil((S.finRonda - Date.now()) / 1000));
     $("reloj").textContent = fmt(S.seg);
     $("reloj").classList.toggle("urgente", S.seg <= 20);
     if (S.seg <= 0) cerrarRonda();
   };
-  S.reloj = setInterval(tic, 500);
+  // cada 250 ms: el banco descuenta mientras alguien habla y los subtítulos no esperan
+  S.reloj = setInterval(tic, 250);
   if (!S.relojVisible) { S.relojVisible = true; document.addEventListener("visibilitychange", () => { if (!document.hidden) tic(); }); }
   $("btnPrincipal").textContent = "⚖ PEDIR VOTACIÓN";
   sonar("campana");
@@ -598,6 +610,7 @@ function recogerEntregas() {
 async function cerrarRonda() {
   if (S.fase !== "abierta") return;
   clearInterval(S.reloj);
+  S.punto = null; S.cierreBanco = null;          // un punto de información no sobrevive al tramo
   $("reloj").classList.remove("corriendo", "urgente");
   votarDebate();
 }

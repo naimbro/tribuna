@@ -186,9 +186,26 @@ function moderadorTalvez(forzar = false) {
   if (!M || M.enCurso || S.fase !== "abierta") return;
   // la tribuna: a los 3 minutos, si hay preguntas del público y no salió ninguna, entra una
   // (una vez por minuto como mucho: si la moderadora las descarta todas no se insiste en bucle)
+  const pedida = forzar;                                   // el profesor (🎙) o alguien con @Moderadora
   const T = estadoTribuna();
   if (T.forzar && Date.now() - (M.tribunaForzadaEn || 0) > 60000) { M.tribunaForzadaEn = Date.now(); forzar = true; }
-  if (!debeIntervenir(estadoTramo(), { ahora: Date.now(), abre: M.abre, forzar }).toca) return;
+  // debate a viva voz: nunca le quita la palabra a quien tiene el botón apretado ni corta un punto
+  // de información. Si la llamaron mientras alguien habla, entra en el próximo silencio (esta
+  // función corre cada 6 s): M.forzarPendiente guarda el llamado.
+  const voz = opcionActiva(S.clase.opciones, "voz");
+  const hablando = voz && ((typeof window.hablaSala === "function" && window.hablaSala().length > 0)
+    || (typeof puntoActivo === "function" && puntoActivo(S.punto)));
+  const ultimaVoz = typeof window.ultimaVoz === "function" ? window.ultimaVoz() || 0 : 0;
+  const r = debeIntervenir(estadoTramo(), { ahora: Date.now(), abre: M.abre, forzar: forzar || !!M.forzarPendiente, hablando, ultimaVoz, voz });
+  if (!r.toca) {
+    if (forzar && r.motivo === "hablan") {
+      if (pedida && !M.forzarPendiente) tick("🎙 La moderadora entra cuando terminen de hablar.");
+      M.forzarPendiente = true;
+    }
+    return;
+  }
+  forzar = forzar || !!M.forzarPendiente;
+  M.forzarPendiente = false;
   M.enCurso = true;
   intervenirModerador(forzar).finally(() => { M.enCurso = false; });
 }
