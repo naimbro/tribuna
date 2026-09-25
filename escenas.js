@@ -589,23 +589,25 @@ async function mostrarVeredictoJueces(d, jueces, panel) {
 // entrada). Todo lo que dura pasa por esperar(), así el botón principal lo salta; después de
 // cada espera se comprueba que la escena siga abierta (el profesor pudo terminar la clase).
 
-const R_ANILLO = 54, C_ANILLO = 2 * Math.PI * R_ANILLO;
+// Las siglas del retrato: «HU» y «HA», no «JH» para Huang y para Hawley.
+const siglasPersonaje = p => (p.corto ? p.corto.slice(0, 2) : iniciales(p.nombre)).toUpperCase();
+const ESC_R_ANILLO = 54, ESC_C_ANILLO = 2 * Math.PI * ESC_R_ANILLO;
 // El color de un grupo en escena: el de su personaje si la semana los tiene; si no, el del lado.
-const colorDe = (n, k) => (personajeDe(n, PERS) || {}).color || EQUIPOS[k].color;
+const escColorDe = (n, k) => (personajeDe(n, PERS) || {}).color || EQUIPOS[k].color;
 // La letra de la moción según su largo: una de 25 palabras no cabe con la letra de una de 8.
-const claseLargo = t => { const n = String(t || "").length; return n > 150 ? "larga" : n > 90 ? "media" : ""; };
-const mismoTexto = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+const escClaseLargo = t => { const n = String(t || "").length; return n > 150 ? "larga" : n > 90 ? "media" : ""; };
+const escMismoTexto = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 // Lo que va bajo el nombre: el cargo del personaje o el campo de la brújula («Frenar por ley»).
-const subtituloGrupo = n => (personajeDe(n, PERS) || {}).cargo || ((S.clase.gruposInfo || []).find(x => x.n === n) || {}).nombre || "";
+const escSubtitulo = n => (personajeDe(n, PERS) || {}).cargo || ((S.clase.gruposInfo || []).find(x => x.n === n) || {}).nombre || "";
 
 // El tic de la ruleta: un clic por paso, solo si la música está encendida.
-function ticRuleta() {
+function escTicRuleta() {
   if (typeof musicaActiva !== "function" || typeof musicaTic !== "function" || !musicaActiva()) return;
   const ac = audioCtx(); if (ac) musicaTic(ac, ac.currentTime + 0.005, true);
 }
 // El golpe visual de un nombre: un destello del color en toda la pantalla y un remezón corto
 // (sin remezón si el sistema pide menos movimiento: lo resuelve el CSS).
-function destello(el, fondo) {
+function escDestello(el, fondo) {
   const f = document.createElement("div");
   f.className = "rv-flash"; f.style.background = fondo;
   el.appendChild(f);
@@ -613,14 +615,14 @@ function destello(el, fondo) {
   const c = el.querySelector(".rv-cuerpo");
   if (c) { c.classList.remove("sacude"); void c.offsetWidth; c.classList.add("sacude"); }
 }
-const halo = c => `radial-gradient(60% 60% at 50% 50%,${c} 0%,transparent 75%)`;
+const escHalo = c => `radial-gradient(60% 60% at 50% 50%,${c} 0%,transparent 75%)`;
 
-function retrato(n) {   // círculo con iniciales en el color del personaje, y su nombre debajo
+function escRetrato(n) {   // círculo con iniciales en el color del personaje, y su nombre debajo
   const p = personajeDe(n, PERS) || { nombre: nombreG(n), color: "var(--dim)" };
-  return `<div class="pp-ret" style="--c:${p.color}"><i>${escHtml(iniciales(p.nombre))}</i><b>${escHtml(p.nombre)}</b></div>`;
+  return `<div class="pp-ret" style="--c:${p.color || "var(--dim)"}"><i>${escHtml(siglasPersonaje(p))}</i><b>${escHtml(p.nombre)}</b></div>`;
 }
-const tarjetaDuelo = x => `<div class="pp-duelo" data-t="${escHtml(x.texto)}" data-a="${x.A}" data-b="${x.B}">
-  ${retrato(x.A)}<div class="pp-dm"><span>VS</span><q>${escHtml(x.texto)}</q></div>${retrato(x.B)}</div>`;
+const escTarjetaDuelo = x => `<div class="pp-duelo" data-t="${escHtml(x.texto)}" data-a="${x.A}" data-b="${x.B}">
+  ${escRetrato(x.A)}<div class="pp-dm"><span>VS</span><q>${escHtml(x.texto)}</q></div>${escRetrato(x.B)}</div>`;
 
 // PREPARACIÓN: nada más que la moción (o los duelos que quedan), las dos posturas y el anillo.
 // Sin nombres de grupo: nadie sabe quién pasa al frente.
@@ -630,9 +632,9 @@ function mostrarPreparacion(d, { tema, duelos, ultimo } = {}) {
   const cuerpo = conDuelos
     ? `<div class="es-k">${ultimo ? "ÚLTIMO DUELO" : "¿QUÉ DUELO SIGUE?"} · PREPARACIÓN</div>
        <div class="pp-tema">${escHtml(tema || "")}</div>
-       <div class="pp-duelos${duelos.length > 3 ? " muchos" : ""}">${duelos.map(tarjetaDuelo).join("")}</div>`
+       <div class="pp-duelos${duelos.length > 3 ? " muchos" : ""}">${duelos.map(escTarjetaDuelo).join("")}</div>`
     : `<div class="es-k">DEBATE ${d.n} · PREPARACIÓN · TODOS PREPARAN LOS DOS LADOS</div>
-       <div class="pp-q ${claseLargo(d.pregunta)}">«${escHtml(d.pregunta)}»</div>
+       <div class="pp-q ${escClaseLargo(d.pregunta)}">«${escHtml(d.pregunta)}»</div>
        <div class="pp-lados">${["A", "B"].map(k => `<div class="pp-lado" style="--c:${EQUIPOS[k].color}">
          <b>${k === "A" ? "A FAVOR" : "EN CONTRA"}</b><span>${escHtml((d.posturas || {})[k] || "")}</span></div>`).join("")}</div>`;
   const pie = conDuelos && ultimo ? "Es el último duelo: al llegar a cero, suben al escenario."
@@ -640,10 +642,15 @@ function mostrarPreparacion(d, { tema, duelos, ultimo } = {}) {
     : "Nadie sabe quién pasa al frente. Al llegar a cero, el relator lo revela.";
   el.innerHTML = `${cuerpo}
     <div class="pp-pie"><div class="pp-reloj" id="ppReloj">
-        <svg id="ppAnillo" viewBox="0 0 120 120"><circle class="pp-riel" cx="60" cy="60" r="${R_ANILLO}"/>
-          <circle class="pp-arco" id="ppArco" cx="60" cy="60" r="${R_ANILLO}" style="stroke-dasharray:${C_ANILLO.toFixed(1)};stroke-dashoffset:0"/></svg>
+        <svg id="ppAnillo" viewBox="0 0 120 120"><circle class="pp-riel" cx="60" cy="60" r="${ESC_R_ANILLO}"/>
+          <circle class="pp-arco" id="ppArco" cx="60" cy="60" r="${ESC_R_ANILLO}" style="stroke-dasharray:${ESC_C_ANILLO.toFixed(1)};stroke-dashoffset:0"/></svg>
         <b id="ppNum" class="mono"></b></div>
       <span>${pie}</span></div>`;
+  // restaurada tras cerrar la pestaña: no hay minuto corriendo, se revela con el botón
+  if (!S.finPrep) {
+    $("ppNum").textContent = "▶";
+    el.querySelector(".pp-pie span").textContent = "Pulsa REVELAR ▶ para revelar.";
+  }
   botonEscena("REVELAR YA ▶");
 }
 
@@ -653,7 +660,7 @@ function actualizarPreparacion(resta, total) {
   const arco = $("ppArco"); if (!arco) return;
   const ms = S.finPrep ? Math.max(0, S.finPrep - Date.now()) : resta * 1000;
   const frac = total ? Math.min(1, ms / (total * 1000)) : 0;
-  arco.style.strokeDashoffset = (C_ANILLO * (1 - frac)).toFixed(1);
+  arco.style.strokeDashoffset = (ESC_C_ANILLO * (1 - frac)).toFixed(1);
   $("ppNum").textContent = resta;
   const urge = resta <= 10;
   $("ppReloj").classList.toggle("urgente", urge);
@@ -667,7 +674,7 @@ async function mostrarRevelacion(d, { duelos } = {}) {
 }
 
 // La tragamonedas: pasa por los nombres al azar y se frena al final, como una ruleta.
-async function tragamonedas(slot, nombres, dur) {
+async function revTragamonedas(slot, nombres, dur) {
   const t0 = Date.now();
   let ultimo = "";
   while (!ESC.rapido && slot.isConnected) {
@@ -677,7 +684,7 @@ async function tragamonedas(slot, nombres, dur) {
     ultimo = otros[Math.floor(Math.random() * otros.length)] || "";
     const paso = Math.round(70 + 260 * p * p);
     slot.innerHTML = `<span style="animation-duration:${paso}ms">${escHtml(ultimo)}</span>`;
-    ticRuleta();
+    escTicRuleta();
     await esperar(paso);
   }
 }
@@ -689,7 +696,7 @@ async function revelarGrupos(d) {
   const largo = Math.max(...pool.map(g => nombreGrupo(g).length)) > 16;
   el.innerHTML = `<div class="rv-cuerpo">
       <div class="rv-t">¿QUIÉN PASA AL FRENTE?</div>
-      ${["A", "B"].map(k => `<div class="rv-fila" id="rvf${k}" style="--c:${colorDe(d[k], k)}">
+      ${["A", "B"].map(k => `<div class="rv-fila" id="rvf${k}" style="--c:${escColorDe(d[k], k)}">
         <div class="rv-lado">${k === "A" ? "A FAVOR…" : "EN CONTRA…"}</div>
         <div class="rv-slot${largo ? " largo" : ""}" id="rvs${k}"><span>&nbsp;</span></div></div>`).join("")}
     </div>`;
@@ -698,24 +705,24 @@ async function revelarGrupos(d) {
     if (!el.isConnected) return;
     $("rvf" + k).classList.add("on");
     redobleRevelacion();
-    await tragamonedas($("rvs" + k), pool.filter(g => k === "A" || g !== d.A).map(nombreGrupo), 2400);
+    await revTragamonedas($("rvs" + k), pool.filter(g => k === "A" || g !== d.A).map(nombreGrupo), 2400);
     if (!el.isConnected) return;
-    const c = colorDe(d[k], k);
+    const c = escColorDe(d[k], k);
     $("rvs" + k).innerHTML = `<span class="rv-golpe">${escHtml(nombreGrupo(d[k]))}</span>`;
     $("rvf" + k).classList.add("fijo");
-    destello(el, halo(c));
+    escDestello(el, escHalo(c));
     golpeRevelacion();
     await esperar(k === "A" ? 1500 : 2000);
   }
 }
 
 // El foco recorre las tarjetas, cada vez más lento, hasta detenerse en la elegida.
-async function recorrer(cartas, elegida, dur) {
+async function revRecorrer(cartas, elegida, dur) {
   const t0 = Date.now();
   for (let i = 0; !ESC.rapido && elegida.isConnected; i++) {
     const c = cartas[i % cartas.length];
     cartas.forEach(x => x.classList.toggle("foco", x === c));
-    ticRuleta();
+    escTicRuleta();
     const p = (Date.now() - t0) / dur;
     if (p >= 1 && c === elegida) break;
     await esperar(p >= 1 ? 420 : Math.round(110 + 240 * p * p));
@@ -735,16 +742,16 @@ async function revelarDuelo(d, duelos) {
   } else {
     el = escena("revelacion");
     el.innerHTML = `<div class="es-k">¿QUÉ DUELO SIGUE?</div><div class="pp-tema">${escHtml(S.clase.tema || SESION.tema)}</div>
-      <div class="pp-duelos${duelos.length > 3 ? " muchos" : ""}">${duelos.map(tarjetaDuelo).join("")}</div>`;
+      <div class="pp-duelos${duelos.length > 3 ? " muchos" : ""}">${duelos.map(escTarjetaDuelo).join("")}</div>`;
   }
   const k0 = el.querySelector(".es-k");
-  if (k0) k0.textContent = "¿QUÉ DUELO SIGUE?";
   const cartas = [...el.querySelectorAll(".pp-duelo")];
-  const elegida = cartas.find(c => mismoTexto(c.dataset.t, d.pregunta)) || cartas.find(c => +c.dataset.a === d.A && +c.dataset.b === d.B);
+  if (k0) k0.textContent = cartas.length === 1 ? "ÚLTIMO DUELO" : "¿QUÉ DUELO SIGUE?";
+  const elegida = cartas.find(c => escMismoTexto(c.dataset.t, d.pregunta)) || cartas.find(c => +c.dataset.a === d.A && +c.dataset.b === d.B);
   if (elegida) {
     if (cartas.length > 1) {
       redobleRevelacion();
-      await recorrer(cartas, elegida, 2400);
+      await revRecorrer(cartas, elegida, 2400);
       if (!el.isConnected) return;
     }
     cartas.forEach(c => c.classList.toggle("apaga", c !== elegida));
@@ -753,7 +760,7 @@ async function revelarDuelo(d, duelos) {
     elegida.style.transform = `translateY(${Math.round(innerHeight / 2 - (r.top + r.height / 2))}px) scale(${crece.toFixed(3)})`;
     elegida.classList.add("elegida");
     golpeRevelacion();
-    destello(el, `linear-gradient(90deg,${colorDe(d.A, "A")} 0%,transparent 45%,transparent 55%,${colorDe(d.B, "B")} 100%)`);
+    escDestello(el, `linear-gradient(90deg,${escColorDe(d.A, "A")} 0%,transparent 45%,transparent 55%,${escColorDe(d.B, "B")} 100%)`);
     await esperar(1200);
     if (!el.isConnected) return;
   }
@@ -762,17 +769,17 @@ async function revelarDuelo(d, duelos) {
   el.className = "escena revelacion";
   el.innerHTML = `<div class="rv-cuerpo">
       <div class="es-k">DEBATE ${d.n} · SUBEN AL ESCENARIO</div>
-      <div class="rv-vs">${["A", "B"].map(k => `<div class="rv-p" id="rvp${k}" style="--c:${colorDe(d[k], k)}">
-          <i>${escHtml(iniciales(p(k).nombre))}</i><b>${escHtml(p(k).nombre)}</b>
+      <div class="rv-vs">${["A", "B"].map(k => `<div class="rv-p" id="rvp${k}" style="--c:${escColorDe(d[k], k)}">
+          <i>${escHtml(siglasPersonaje(p(k)))}</i><b>${escHtml(p(k).nombre)}</b>
           <small>${escHtml(p(k).cargo ? p(k).cargo + " · " : "")}${k === "A" ? "A FAVOR" : "EN CONTRA"}</small></div>`).join(`<div class="rv-x">vs</div>`)}</div>
-      <div class="pp-q ${claseLargo(d.pregunta)}">«${escHtml(d.pregunta)}»</div>
+      <div class="pp-q ${escClaseLargo(d.pregunta)}">«${escHtml(d.pregunta)}»</div>
     </div>`;
   for (const k of ["A", "B"]) {
     await esperar(k === "A" ? 250 : 550);
     if (!el.isConnected) return;
     $("rvp" + k).classList.add("on");
     golpeRevelacion();
-    destello(el, `radial-gradient(45% 60% at ${k === "A" ? "25%" : "75%"} 45%,${colorDe(d[k], k)} 0%,transparent 75%)`);
+    escDestello(el, `radial-gradient(45% 60% at ${k === "A" ? "25%" : "75%"} 45%,${escColorDe(d[k], k)} 0%,transparent 75%)`);
   }
   await esperar(2400);
 }
@@ -787,25 +794,25 @@ async function mostrarEntrada(d, integrantes, segundos) {
   el.innerHTML = `<div class="en-fondo" id="enFondo"></div><div class="en-cuerpo" id="enCuerpo"></div>
     <div class="en-barra"><i style="animation-duration:${total}ms"></i></div>`;
   for (const k of ["A", "B"]) {
-    await esquina(el, d, k, (integrantes || {})[k] || [], mitad);
+    await escEsquina(el, d, k, (integrantes || {})[k] || [], mitad);
     if (!el.isConnected || ESC.rapido) return;
   }
-  el.style.setProperty("--cA", colorDe(d.A, "A")); el.style.setProperty("--cB", colorDe(d.B, "B"));
+  el.style.setProperty("--cA", escColorDe(d.A, "A")); el.style.setProperty("--cB", escColorDe(d.B, "B"));
   $("enFondo").className = "en-fondo frente";
-  $("enCuerpo").innerHTML = `<div class="en-frente">${["A", "B"].map(k => `<div class="en-col" style="--c:${colorDe(d[k], k)}">
+  $("enCuerpo").innerHTML = `<div class="en-frente">${["A", "B"].map(k => `<div class="en-col" style="--c:${escColorDe(d[k], k)}">
       <div class="en-lado">${k === "A" ? "A FAVOR" : "EN CONTRA"}</div>
       <div class="en-nombre chico on">${escHtml(nombreG(d[k]))}</div>
-      <div class="en-caras mini">${((integrantes || {})[k] || []).map(j => caraEntrada(j, colorDe(d[k], k), 52)).join("")}</div></div>`).join(`<div class="en-vs">VS</div>`)}</div>
-    <div class="pp-q ${claseLargo(d.pregunta)} en-mocion">«${escHtml(d.pregunta)}»</div>`;
+      <div class="en-caras mini">${((integrantes || {})[k] || []).map(j => escCaraEntrada(j, escColorDe(d[k], k), 52)).join("")}</div></div>`).join(`<div class="en-vs">VS</div>`)}</div>
+    <div class="pp-q ${escClaseLargo(d.pregunta)} en-mocion">«${escHtml(d.pregunta)}»</div>`;
   await esperar(Math.max(0, total - (Date.now() - t0)));
 }
 
 // Una cara de la entrada: la foto de Google (o las iniciales) con el color del lado.
-const caraEntrada = (j, c, tam) => `<div class="en-j">${avatarHtml({ ...j, equipo: "" }, tam).replace(/--c:[^;]+;/, `--c:${c};`)}
+const escCaraEntrada = (j, c, tam) => `<div class="en-j">${avatarHtml({ ...j, equipo: "" }, tam).replace(/--c:[^;]+;/, `--c:${c};`)}
   <div class="en-n">${escHtml(String(j.nombre || "").split(/\s+/).slice(0, 2).join(" "))}</div></div>`;
 
-async function esquina(el, d, k, gente, ms) {
-  const t0 = Date.now(), c = colorDe(d[k], k), nombre = nombreG(d[k]), sub = subtituloGrupo(d[k]);
+async function escEsquina(el, d, k, gente, ms) {
+  const t0 = Date.now(), c = escColorDe(d[k], k), nombre = nombreG(d[k]), sub = escSubtitulo(d[k]);
   el.style.setProperty("--c", c);
   const f = $("enFondo"); f.className = "en-fondo"; void f.offsetWidth; f.classList.add("on");
   const tam = Math.round(Math.min(112, innerHeight * 0.12) * (gente.length > 6 ? 0.78 : 1));
@@ -823,7 +830,7 @@ async function esquina(el, d, k, gente, ms) {
   const paso = gente.length ? Math.min(550, Math.max(150, (ms - 3500) / gente.length)) : 0;
   for (const j of gente) {
     if (!el.isConnected || ESC.rapido) return;
-    $("enCaras").insertAdjacentHTML("beforeend", caraEntrada(j, c, tam));
+    $("enCaras").insertAdjacentHTML("beforeend", escCaraEntrada(j, c, tam));
     await esperar(paso);
   }
   if (el.isConnected) await esperar(Math.max(0, ms - (Date.now() - t0)));
