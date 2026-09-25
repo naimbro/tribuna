@@ -250,6 +250,7 @@ function avisarNuevos(nuevos) {
 
 function pintarSala() {
   const s = J.sala; if (!s) return;
+  bancoMio(s);                                      // anota cuándo llegó esta foto del reloj de ajedrez
   const rol = rolEn(s);
   const colorRol = { A: s.equipos.A.color, B: s.equipos.B.color, P: "#a78bfa" }[rol] || "var(--dim)";
   $("miBancada").textContent = `${J.grupo ? nomG(J.grupo) : PJ() ? "Sin personaje" : "Grupo ?"}${rol === "A" ? ` · ${s.equipos.A.nombre}` : rol === "B" ? ` · ${s.equipos.B.nombre}` : rol === "P" ? " · votas" : ""}${s.oraculoDe && s.oraculoDe[J.uid] ? ` · 🔮 ${s.oraculoDe[J.uid].puntos}` : ""}`;
@@ -312,6 +313,7 @@ function pintarReloj() {
   const s = J.sala; if (!s) return;
   const el = $("reloj");
   pintarEscribiendo();
+  pintarBotonHablar(s);                             // el banco llega a cero o termina el punto: el botón se apaga
   if (s.fase === "listo" && s.finPrep) {
     const resta = Math.max(0, Math.ceil((s.finPrep - Date.now()) / 1000));
     el.textContent = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, "0")}`;
@@ -659,33 +661,47 @@ function pintarCaja() {
   $("tx").placeholder = abierta ? "Escribe a la conversación…" : "La conversación se abre cuando el profesor abra el tramo.";
   if ($("btnMic")) $("btnMic").disabled = !abierta;
   if (!abierta) cortarDictado();
+  if (!abierta && HABLA.apretado) soltarHablar({ enviar: false });   // se cerró el tramo mientras hablaba: no se envía
+  pintarHablarEnCaja(J.sala);
   $("btnEnviar").disabled = !abierta || !$("tx").value.trim();
   if (!abierta) { $("notaCaja").textContent = ""; $("notaCaja").classList.remove("ati"); }
+}
+// Publica un mensaje del alumno y su telemetría. Lo usan la caja (teclado o dictado) y el botón de
+// mantener para hablar (voz: true, se ve con 🎤). Lo hablado no pasa por la caja: su telemetría no
+// toca el registro de lo que se está tecleando y cuenta entero como dictado. desde: cuándo empezó
+// a hablar. Devuelve false si el tramo ya no está abierto; si Firestore rechaza, lanza el error.
+async function enviarTexto(texto, { voz = false, desde = 0 } = {}) {
+  texto = String(texto || "").trim().slice(0, 1500);
+  if (!texto || !J.sala || J.sala.fase !== "abierta" || !J.sala.debate) return false;
+  const id = "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  await setDoc(doc(db, "salas", J.codigo, "mensajes", id),
+    { tipo: "alumno", uid: J.uid, nombre: J.nombre, email: J.email, grupo: J.grupo, equipo: rolEn(J.sala),
+      debate: J.sala.debate.n, tramo: J.sala.tramo, ronda: J.sala.ronda, texto, t: Date.now(), ...(voz ? { voz: true } : {}) });
+  // la telemetría del mensaje va aparte y solo la lee el profesor; si falla, el mensaje igual salió
+  const ahora = Date.now();
+  const r = voz ? { ...registroNuevo(), primera: desde || ahora, dictado: texto.length } : registro();
+  setDoc(doc(db, "salas", J.codigo, "telemetria", id), {
+    uid: J.uid, nombre: J.nombre, grupo: J.grupo, debate: J.sala.debate.n, msg: id, t: ahora,
+    largoFinal: texto.length, msComposicion: r.primera ? ahora - r.primera : 0,
+    pegados: r.pegados.slice(0, 30), maxInsercion: r.maxInsercion,
+    salidas: r.salidas, msFuera: r.msFuera + (r.ocultoDesde ? ahora - r.ocultoDesde : 0),
+    huella: r.huella, tipos: [...r.tipos].slice(0, 12), dictado: Math.min(r.dictado || 0, texto.length), ...(voz ? { voz: true } : {})
+  }).catch(() => {});
+  if (!voz) TEL.r = null;
+  return true;
 }
 async function enviar() {
   cortarDictado();                                  // si envía hablando, va lo que se ve en la caja
   const texto = $("tx").value.trim();
   if (!texto || !J.sala || J.sala.fase !== "abierta") return;
   $("btnEnviar").disabled = true;
-  const id = "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   try {
-    await setDoc(doc(db, "salas", J.codigo, "mensajes", id),
-      { tipo: "alumno", uid: J.uid, nombre: J.nombre, email: J.email, grupo: J.grupo, equipo: rolEn(J.sala),
-        debate: J.sala.debate.n, tramo: J.sala.tramo, ronda: J.sala.ronda, texto: texto.slice(0, 1500), t: Date.now() });
-    // la telemetría del mensaje va aparte y solo la lee el profesor; si falla, el mensaje igual salió
-    const r = registro(), ahora = Date.now();
-    setDoc(doc(db, "salas", J.codigo, "telemetria", id), {
-      uid: J.uid, nombre: J.nombre, grupo: J.grupo, debate: J.sala.debate.n, msg: id, t: ahora,
-      largoFinal: texto.length, msComposicion: r.primera ? ahora - r.primera : 0,
-      pegados: r.pegados.slice(0, 30), maxInsercion: r.maxInsercion,
-      salidas: r.salidas, msFuera: r.msFuera + (r.ocultoDesde ? ahora - r.ocultoDesde : 0),
-      huella: r.huella, tipos: [...r.tipos].slice(0, 12), dictado: Math.min(r.dictado || 0, texto.length)
-    }).catch(() => {});
-    TEL.r = null;
-    marcarEscribiendo(0);
-    $("tx").value = ""; $("tx").style.height = "auto"; $("sugiere").innerHTML = "";
-    $("notaCaja").textContent = ""; $("notaCaja").classList.remove("ati");
-    $("pJuego").scrollTop = $("pJuego").scrollHeight;
+    if (await enviarTexto(texto)) {
+      marcarEscribiendo(0);
+      $("tx").value = ""; $("tx").style.height = "auto"; $("sugiere").innerHTML = "";
+      $("notaCaja").textContent = ""; $("notaCaja").classList.remove("ati");
+      $("pJuego").scrollTop = $("pJuego").scrollHeight;
+    }
   } catch (e) { $("notaCaja").textContent = "No se envió: " + e.code; }
   pintarCaja();
 }
@@ -714,7 +730,7 @@ function ponerTexto(valor) {
 }
 function empezarDictado() {
   const tx = $("tx");
-  if (tx.disabled) return;
+  if (tx.disabled || HABLA.apretado) return;        // un solo micrófono: mientras aprieta para hablar, no se dicta
   const rec = new Reconocedor();
   rec.lang = "es-CL"; rec.continuous = true; rec.interimResults = true;
   VOZ.rec = rec; VOZ.final = "";
@@ -750,6 +766,237 @@ function cortarDictado(abortar = true) {
   registro().dictado = (registro().dictado || 0) + Math.max(0, $("tx").value.length - VOZ.base.length);
   VOZ.final = "";
   $("btnMic")?.classList.remove("on");
+}
+
+/* ---------- mantener para hablar (viva voz) ----------
+   Quien debate al frente aprieta el botón, habla con el teléfono cerca de la boca y suelta: al
+   soltar, lo dicho entra solo a la conversación con voz: true (🎤), sin revisar antes, porque
+   tiene que sentirse en vivo. Solo transcribe el teléfono que se está apretando: así los teléfonos
+   de la sala no se transcriben entre ellos. Mientras aprieta, su ficha lleva
+   habla: { debate, t0, t, texto } (una escritura cada 800 ms como mucho: el límite sostenido de
+   Firestore por documento es una por segundo); con eso el proyector pone los subtítulos y corre el
+   reloj de ajedrez de su lado. Al soltar, habla: null. Cada apretón es una «toma» con su propio
+   reconocedor y su propio texto: si vuelve a apretar mientras la anterior todavía espera el
+   resultado final, las dos no se mezclan. */
+const HABLA = { apretado: false, toma: null, ultimoLatido: 0, timer: null, CADA: 800, MAX: 60000, ESPERA: 1200 };
+const palabras = t => (String(t || "").match(/\S+/g) || []).length;
+// junta dos trozos reconocidos: después de reiniciar el reconocedor, el primer trozo no trae espacio
+const unir = (a, b) => !a ? b || "" : !b ? a : /\s$/.test(a) || /^\s/.test(b) ? a + b : a + " " + b;
+const textoToma = h => unir(h.final, h.interino).replace(/\s+/g, " ").trim();
+const miLado = s => { const r = s && rolEn(s); return r === "A" || r === "B" ? r : null; };
+
+// El banco que publica el proyector, contado hacia atrás aquí. La hora de la foto es cuando ESTE
+// teléfono la recibió (no el reloj del proyector): cada foto nueva de la sala trae otro objeto
+// banco, así que basta compararlo con el último visto. pintarSala la llama en cada foto.
+function bancoMio(s) {
+  if (!s || !s.banco) { J.bancoDe = null; J.bancoFoto = null; return null; }
+  if (J.bancoDe !== s.banco) { J.bancoDe = s.banco; J.bancoFoto = { ...s.banco, t: Date.now() }; }
+  return bancoRestante(J.bancoFoto, Date.now());
+}
+// Sin reloj (apagado, o un proyector que no publica banco) nadie se queda sin tiempo.
+function sinTiempo(s) {
+  const lado = miLado(s);
+  if (!lado || !opcionActiva(s.opciones, "reloj")) return false;
+  const r = bancoMio(s);
+  return !!r && r[lado] <= 0;
+}
+// Con un punto de información aceptado para mí, tengo la palabra aunque a mi lado no le quede
+// tiempo. No se compara `fin` con el reloj de este teléfono: el proyector publica cuándo termina.
+const hablaPorPunto = s => !!(s && s.punto && s.punto.estado === "aceptado" && s.punto.de === J.uid);
+
+// Un integrante del lado que recibe un punto aceptado no queda bloqueado: decide su banco.
+function puedoHablar(s) {
+  if (!s || !Reconocedor || !opcionActiva(s.opciones, "voz") || s.fase !== "abierta" || !s.debate || !miLado(s)) return false;
+  return !sinTiempo(s) || hablaPorPunto(s);
+}
+
+function avisoHabla(txt) { const m = $("miHabla"); if (m) { m.textContent = txt; m.classList.toggle("aviso", !!txt); } }
+function pintarMiHabla(txt) { const m = $("miHabla"); if (m) { m.textContent = txt; m.classList.remove("aviso"); } }
+
+// Un reconocedor para la toma h. Chrome corta solo tras unos segundos de silencio: si el botón
+// sigue apretado se abre otro y el texto sigue sumando en la misma toma.
+function escuchar(h) {
+  const rec = new Reconocedor();
+  rec.lang = "es-CL"; rec.continuous = true; rec.interimResults = true;
+  rec.onresult = e => {
+    let interino = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) h.final = unir(h.final, e.results[i][0].transcript);
+      else interino += e.results[i][0].transcript;
+    }
+    h.interino = interino;
+    if (HABLA.toma === h) { pintarMiHabla(textoToma(h)); latido(); }
+  };
+  rec.onerror = e => {
+    if (HABLA.toma !== h) return;
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      J.micListo = false;
+      try { localStorage.removeItem("tribuna_mic_ok"); } catch {}
+      soltarHablar({ enviar: false, aviso: "🎤 Permite el micrófono para este sitio (candado de la barra de direcciones) y vuelve a apretar." });
+    } else if (e.error === "audio-capture") soltarHablar({ aviso: "🎤 No encontramos el micrófono de este teléfono: escribe tu mensaje abajo." });
+    else if (e.error === "network") soltarHablar({ aviso: "🎤 Sin conexión para reconocer la voz: escribe tu mensaje abajo." });
+    // no-speech y aborted no son fallas: si sigue apretado, onend abre otro reconocedor
+  };
+  rec.onend = () => {
+    if (h.rec !== rec) return;                      // un reconocedor ya reemplazado o soltado
+    if (h.corte) cortarToma(h);                     // el corte de los 60 s esperaba este final
+    if (h.alTerminar) { h.alTerminar(); return; }   // soltó: la toma esperaba este final para enviar
+    if (!HABLA.apretado || HABLA.toma !== h) return;
+    // un micrófono que se cierra apenas se abre no se reintenta sin fin
+    h.fallas = Date.now() - h.inicio < 500 ? h.fallas + 1 : 0;
+    if (h.fallas >= 4) { soltarHablar({ aviso: "🎤 El micrófono no responde: escribe tu mensaje abajo." }); return; }
+    try { escuchar(h); } catch { soltarHablar({ aviso: "🎤 Se cortó el micrófono. Vuelve a apretar." }); }
+  };
+  h.rec = rec; h.inicio = Date.now();
+  rec.start();
+  return rec;
+}
+
+// A los 60 s de una toma, lo dicho se envía y se sigue escuchando si el botón sigue apretado.
+function cortarToma(h) {
+  const texto = textoToma(h), desde = h.t0;
+  Object.assign(h, { final: "", interino: "", t0: Date.now(), corte: 0 });
+  if (palabras(texto) >= 2) mandarVoz(texto, desde);
+}
+// Devuelve el aviso de error, o "" si salió.
+async function mandarVoz(texto, desde) {
+  try { await enviarTexto(texto, { voz: true, desde }); return ""; }
+  catch (e) { return `🎤 No se envió lo que dijiste (${e.code || e.message}): «${texto.slice(0, 140)}${texto.length > 140 ? "…" : ""}»`; }
+}
+
+function latido(forzar = false) {
+  const h = HABLA.toma;
+  if (!HABLA.apretado || !h || !J.codigo || !J.uid) return;
+  const ahora = Date.now();
+  if (!forzar && ahora - HABLA.ultimoLatido < HABLA.CADA) return;
+  HABLA.ultimoLatido = ahora;
+  setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid),
+    { habla: { debate: h.debate, t0: h.t0, t: ahora, texto: textoToma(h).slice(-300) } }, { merge: true }).catch(() => {});
+}
+
+// Cada 200 ms mientras aprieta: el latido aunque no llegue texto (así el proyector sabe que sigue
+// hablando en un silencio), el corte de los 60 s y lo que obliga a soltar.
+function tickHabla() {
+  const h = HABLA.toma, s = J.sala;
+  if (!HABLA.apretado || !h) return;
+  // se cerró el tramo (o cambió el debate, o ya no está en un lado): se descarta, no se envía
+  if (!s || s.fase !== "abierta" || !s.debate || s.debate.n !== h.debate || !miLado(s)) { soltarHablar({ enviar: false }); return; }
+  // se le acabó el tiempo a su lado, o terminó su punto de información: lo dicho hasta ahí sale
+  if (!puedoHablar(s)) { soltarHablar({ aviso: sinTiempo(s) ? "⏱ Tu lado se quedó sin tiempo: solo puedes escribir." : "" }); return; }
+  const ahora = Date.now();
+  if (!h.corte && ahora - h.t0 >= HABLA.MAX) {
+    h.corte = ahora;
+    try { h.rec.stop(); } catch { cortarToma(h); }
+  } else if (h.corte && ahora - h.corte > HABLA.ESPERA) {
+    // el reconocedor no terminó a tiempo: se corta igual con lo que hay y se abre otro
+    const viejo = h.rec; h.rec = null;
+    try { viejo && viejo.abort(); } catch {}
+    cortarToma(h);
+    try { escuchar(h); } catch { soltarHablar({ aviso: "🎤 Se cortó el micrófono. Vuelve a apretar." }); return; }
+  }
+  latido();
+}
+
+function empezarHablar(e) {
+  if (e) { e.preventDefault(); if (e.button > 0) return; }
+  if (HABLA.apretado) return;
+  const s = J.sala;
+  if (!puedoHablar(s)) {
+    avisoHabla(s && sinTiempo(s) ? "⏱ Tu lado se quedó sin tiempo: solo puedes escribir." : "Podrás hablar cuando se abra el tramo.");
+    return;
+  }
+  cortarDictado();                                  // un solo micrófono: el dictado de la caja termina
+  const h = { rec: null, final: "", interino: "", t0: Date.now(), debate: s.debate.n, corte: 0, fallas: 0, inicio: 0, alTerminar: null };
+  try { escuchar(h); } catch { avisoHabla("🎤 No se pudo abrir el micrófono. Vuelve a apretar."); return; }
+  try { e && e.currentTarget && e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+  Object.assign(HABLA, { apretado: true, toma: h, ultimoLatido: 0 });
+  navigator.vibrate?.(20);
+  pintarMiHabla("");
+  latido(true);
+  clearInterval(HABLA.timer); HABLA.timer = setInterval(tickHabla, 200);
+  pintarBotonHablar(s);
+}
+
+// Al soltar (o si el teléfono se oculta): espera el resultado final (1,2 s como mucho) y, si dijo
+// al menos dos palabras, lo envía. enviar: false descarta (se cerró el tramo, no dio permiso).
+async function soltarHablar({ enviar = true, aviso = "" } = {}) {
+  if (!HABLA.apretado) return;
+  const h = HABLA.toma, rec = h.rec;
+  HABLA.apretado = false;
+  clearInterval(HABLA.timer); HABLA.timer = null;
+  pintarBotonHablar(J.sala);
+  if (enviar && rec) {
+    await new Promise(listo => {
+      const plazo = setTimeout(listo, HABLA.ESPERA);
+      h.alTerminar = () => { clearTimeout(plazo); listo(); };
+      try { rec.stop(); } catch { h.alTerminar(); }
+    });
+  }
+  h.rec = null;
+  if (rec) { rec.onresult = rec.onend = rec.onerror = null; try { rec.abort(); } catch {} }
+  let error = "";
+  if (enviar) {
+    const s = J.sala, texto = textoToma(h);
+    const vigente = s && s.fase === "abierta" && s.debate && s.debate.n === h.debate;
+    if (vigente && palabras(texto) >= 2) error = await mandarVoz(texto, h.t0);
+    else if (vigente && !aviso && !texto) aviso = "🎤 No te escuché: mantén apretado mientras hablas.";
+  }
+  if (HABLA.apretado) return;                       // ya volvió a apretar: la toma nueva manda
+  setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { habla: null }, { merge: true }).catch(() => {});
+  if (HABLA.toma === h) HABLA.toma = null;
+  avisoHabla(error || aviso);
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden && HABLA.apretado) soltarHablar(); });
+
+// El botón y lo que voy diciendo, dentro de `contenedor` (la vista en vivo, o por ahora la fila
+// sobre la caja de escribir). Si ya existen, se mueven ahí; mientras se aprieta no se tocan, para
+// no perder la captura del dedo. Sin reconocimiento de voz no hay botón: queda el teclado.
+function montarBotonHablar(contenedor) {
+  if (!contenedor || !Reconocedor) return null;
+  let b = $("btnHablar");
+  if (!b) {
+    b = document.createElement("button");
+    b.type = "button"; b.id = "btnHablar"; b.className = "hablar"; b.innerHTML = "MANTÉN<br>PARA HABLAR";
+    b.addEventListener("pointerdown", empezarHablar);
+    for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) b.addEventListener(ev, () => soltarHablar());
+    b.addEventListener("contextmenu", e => e.preventDefault());   // apretar largo no abre menús
+  }
+  let m = $("miHabla");
+  if (!m) { m = document.createElement("div"); m.id = "miHabla"; m.className = "mi-habla"; m.setAttribute("aria-live", "polite"); }
+  if (!HABLA.apretado) {
+    if (b.parentNode !== contenedor) contenedor.appendChild(b);
+    if (m.parentNode !== contenedor) contenedor.appendChild(m);
+  }
+  pintarBotonHablar(J.sala);
+  return b;
+}
+
+function pintarBotonHablar(s) {
+  const b = $("btnHablar");
+  if (!b || !s) return;
+  const puede = puedoHablar(s), agotado = s.fase === "abierta" && sinTiempo(s);
+  const estado = HABLA.apretado ? "apretado" : puede ? (agotado ? "punto" : "listo") : agotado ? "agotado" : "cerrado";
+  if (b.dataset.estado === estado) return;
+  b.dataset.estado = estado;
+  b.disabled = !HABLA.apretado && !puede;
+  b.classList.toggle("on", HABLA.apretado);
+  b.innerHTML = { apretado: "TE ESCUCHO<br><small>suelta para enviar</small>", punto: "TIENES LA PALABRA<br><small>mantén para hablar</small>",
+    agotado: "SIN TIEMPO<br><small>solo puedes escribir</small>" }[estado] || "MANTÉN<br>PARA HABLAR";
+  b.setAttribute("aria-label", { apretado: "Te escucho: suelta para enviar", agotado: "Sin tiempo: solo puedes escribir" }[estado] || "Mantén apretado para hablar");
+}
+
+// Mientras no llegue la vista en vivo del teléfono, el botón vive en una fila sobre la caja de
+// escribir, para quien debate y solo con la viva voz encendida.
+function pintarHablarEnCaja(s) {
+  const fila = $("filaHablar");
+  if (!fila || !s) return;
+  const lado = miLado(s);
+  const toca = !!(lado && Reconocedor && opcionActiva(s.opciones, "voz"));
+  fila.classList.toggle("oculto", !toca);
+  if (!toca) return;
+  const p = personajeDe(J.grupo, PJ());
+  fila.style.setProperty("--c", (p && p.color) || s.equipos[lado].color);
+  montarBotonHablar(fila);
 }
 
 /* ---------- votar: quién argumentó mejor y a quién elegirá el jurado ---------- */
