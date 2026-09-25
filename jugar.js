@@ -86,6 +86,7 @@ $("btnEntrar").onclick = async () => {
 function mostrarBancadas() {
   ["pEntrar", "pJuego", "estado", "caja", "voto", "espera", "fb", "entre"].forEach(id => $(id)?.classList.add("oculto"));
   $("pBancada").classList.remove("oculto");
+  document.body.classList.remove("sube"); document.body.style.removeProperty("--c");
   $("mocion1").textContent = J.sala.temaGeneral || J.sala.tema;
   if (PJ()) { pintarPersonajes(); return; }
   const N = J.sala.grupos || 6;
@@ -265,14 +266,16 @@ function pintarSala() {
   $("voto").classList.toggle("oculto", rol !== "P" || s.fase !== "abierta");
   pintarPublicoActivo(s, rol);
   document.body.classList.toggle("es-publico", rol === "P" && !s.veredicto);
-  // cambio de debate: mi grupo fue llamado → aviso. En suspenso todavía no se sabe (no se marca
-  // como visto: el aviso sale al revelar); en la revelación y la entrada vibra pintarEntre.
+  // cambio de debate: mi grupo fue llamado → vibra. En suspenso todavía no se sabe (no se marca
+  // como visto); en la revelación y la entrada vibra pintarEntre, una vez.
   if (d && !enSuspenso(s) && J.debateVisto !== d.n) {
     J.debateVisto = d.n;
-    if (debatiendo) {
-      if (!["revelando", "entrada"].includes(s.fase)) navigator.vibrate?.([120, 60, 120]);
-      $("notaCaja").textContent = `🎙 Tu grupo debate ${s.equipos[rol].nombre}. Escribe cuando se abra el tramo.`; $("notaCaja").classList.add("ati");
-    }
+    if (debatiendo && !["revelando", "entrada"].includes(s.fase)) navigator.vibrate?.([120, 60, 120]);
+  }
+  // el aviso escrito va al abrirse el debate: antes, pintarCaja lo borra (la caja está cerrada)
+  if (d && debatiendo && s.fase === "abierta" && J.avisoAbiertaVisto !== d.n) {
+    J.avisoAbiertaVisto = d.n;
+    $("notaCaja").textContent = `🎙 Tu grupo debate ${s.equipos[rol].nombre}. ¡Adelante!`; $("notaCaja").classList.add("ati");
   }
   // brújula: la repetición del cierre; y si el profesor la apaga, quien no tiene grupo elige a mano
   const bj = s.brujula;
@@ -330,7 +333,10 @@ function pintarReloj() {
     el.textContent = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, "0")}`;
     el.classList.toggle("urgente", resta <= 10);
     if ($("vtReloj")) $("vtReloj").textContent = el.textContent;
-  } else { el.textContent = ""; el.classList.remove("urgente"); }
+  } else {
+    el.textContent = ""; el.classList.remove("urgente");
+    if ($("prepReloj")) { $("prepReloj").textContent = "…"; $("prepReloj").classList.remove("urgente"); }
+  }
 }
 
 /* ---------- la conversación ---------- */
@@ -984,8 +990,11 @@ function pintarEntre(s) {
   const revela = toca && d && ["revelando", "entrada"].includes(s.fase) && !enSuspenso(s);
   // el color del escenario solo mientras dura la revelación: al abrirse el debate, el teléfono vuelve a lo de siempre
   if (!(revela && (rol === "A" || rol === "B"))) { document.body.classList.remove("sube"); document.body.style.removeProperty("--c"); }
+  const prep = toca && s.fase === "listo" && d && s.revelado === false;
+  // .pv se centra con margin:auto: así, si no cabe, se desplaza desde arriba en vez de cortarse
+  el.classList.toggle("con-pv", !!(prep || revela));
   if (!toca) { el.dataset.clave = ""; return; }
-  if (s.fase === "listo" && d && s.revelado === false) { vistaPreparacion(el, s, d); return; }
+  if (prep) { vistaPreparacion(el, s, d); return; }
   if (revela) { vistaRevelacion(el, s, d, rol); return; }
   el.dataset.clave = "";
   const orac = s.oraculoDe && s.oraculoDe[J.uid];
@@ -1049,14 +1058,15 @@ function pintarEntre(s) {
    les tiñe con el color de su lado y vibra; los demás son tribuna. Estas vistas no se repintan en
    cada cambio de la sala (dataset.clave): la animación del título no se repite y el botón del
    micrófono conserva lo que dijo. */
+const SIN_GRUPO = "Todavía no tienes grupo: mira la pantalla y prepárate para votar.";
 function vistaPreparacion(el, s, d) {
   const duelos = Array.isArray(s.duelos) && s.duelos.length ? s.duelos : null;
   const voz = opcionActiva(s.opciones, "voz") && !!Reconocedor;
-  const clave = ["prep", d.n, J.grupo, d.pregunta, duelos ? duelos.map(x => x.texto).join("|") : "", voz].join("#");
+  const clave = ["prep", d.n, J.grupo, d.pregunta, JSON.stringify(d.posturas || null), duelos ? duelos.map(x => x.texto).join("|") : "", voz, !!s.finPrep].join("#");
   if (el.dataset.clave === clave) { pintarReloj(); return; }
   el.dataset.clave = clave;
   const reloj = `<div class="prep-reloj mono" id="prepReloj">${s.finPrep ? "" : "…"}</div>`;
-  const mic = `<button class="btn mic-probar ${voz ? "" : "oculto"}" id="btnProbarMic">${J.micListo ? "✓ Micrófono listo" : "🎤 Probar micrófono"}</button>
+  const mic = `<button class="btn mic-probar ${voz ? "" : "oculto"}" id="btnProbarMic">${micListo() ? "✓ Micrófono listo" : "🎤 Probar micrófono"}</button>
     <div class="mic-nota" id="micNota"></div>`;
   let cuerpo;
   if (duelos) {
@@ -1074,7 +1084,7 @@ function vistaPreparacion(el, s, d) {
         <div class="pr-par">${cara(x.A)}<i>vs</i>${cara(x.B)}${x === mio ? `<em>tu duelo</em>` : ""}</div>
         <div class="pr-q">«${esc(x.texto)}»</div></div>`).join("")}</div>
       ${reloj}
-      <div class="es-papel">${duelos.length === 1 ? "Queda uno solo: al terminar el minuto, sus dos personajes pasan al frente."
+      <div class="es-papel">${!J.grupo ? SIN_GRUPO : duelos.length === 1 ? "Queda uno solo: al terminar el minuto, sus dos personajes pasan al frente."
         : "Nadie sabe qué duelo sigue: al terminar el minuto se revela. Repasa tu dossier: puede ser el tuyo."}</div>`;
   } else {
     const pos = d.posturas || {};
@@ -1084,7 +1094,7 @@ function vistaPreparacion(el, s, d) {
       ${d.pregunta ? `<div class="es-mocion pv-q">«${esc(d.pregunta)}»</div>` : ""}
       <div class="pv-lados">${postura("A")}${postura("B")}</div>
       ${reloj}
-      <div class="es-papel">Nadie sabe quién pasa al frente: al terminar el minuto se revela. Puedes ser tú, de cualquiera de los dos lados.</div>`;
+      <div class="es-papel">${J.grupo ? "Nadie sabe quién pasa al frente: al terminar el minuto se revela. Puedes ser tú, de cualquiera de los dos lados." : SIN_GRUPO}</div>`;
   }
   el.innerHTML = `<div class="pv">${cuerpo}${mic}</div>`;
   prepararProbarMic();
@@ -1127,11 +1137,13 @@ function vistaRevelacion(el, s, d, rol) {
 }
 
 // Probar el micrófono en la preparación: el permiso se pide ahora y no cuando ya estén hablando al
-// frente. Solo lo abre y lo cierra; el mantener para hablar del debate lo usa después.
+// frente. Solo lo abre y lo cierra; el mantener para hablar del debate lo usa después. Queda
+// recordado en este teléfono (el permiso del navegador también queda).
+const micListo = () => { if (J.micListo) return true; try { return localStorage.getItem("tribuna_mic_ok") === "1"; } catch { return false; } };
 function prepararProbarMic() {
   const b = $("btnProbarMic");
   if (!b || b.classList.contains("oculto")) return;
-  b.classList.toggle("ok", !!J.micListo);
+  b.classList.toggle("ok", micListo());
   b.onclick = async () => {
     if (!navigator.mediaDevices?.getUserMedia) { $("micNota").textContent = "Este navegador no deja usar el micrófono."; return; }
     b.disabled = true; b.textContent = "🎤 Pidiendo permiso…"; $("micNota").textContent = "";
@@ -1139,10 +1151,15 @@ function prepararProbarMic() {
       const st = await navigator.mediaDevices.getUserMedia({ audio: true });
       st.getTracks().forEach(t => t.stop());
       J.micListo = true;
+      try { localStorage.setItem("tribuna_mic_ok", "1"); } catch {}
       b.textContent = "✓ Micrófono listo"; b.classList.add("ok");
-    } catch {
-      b.textContent = "🎤 Probar micrófono";
-      $("micNota").textContent = "Permite el micrófono para este sitio (candado de la barra de direcciones).";
+    } catch (e) {
+      J.micListo = false;
+      try { localStorage.removeItem("tribuna_mic_ok"); } catch {}
+      b.textContent = "🎤 Probar micrófono"; b.classList.remove("ok");
+      $("micNota").textContent = e && e.name === "NotFoundError" ? "No encontramos un micrófono en este teléfono."
+        : e && (e.name === "NotAllowedError" || e.name === "SecurityError") ? "Permite el micrófono para este sitio (candado de la barra de direcciones)."
+        : `No se pudo abrir el micrófono: ${(e && e.name) || "error"}.`;
     }
     b.disabled = false;
   };
