@@ -39,7 +39,11 @@ const palabras = t => (t.trim().match(/\S+/g) || []).length;
 // conversación (m.ronda === S.ronda) siguen sirviendo. El tramo dentro del debate es S.tramo.
 const tramoActual = () => TRAMOS[S.tramo] || TRAMOS[0];
 const mocionActual = () => (S.debate && S.debate.pregunta) || SESION.mocion;
-const ladoNombre = k => S.debate ? `${EQUIPOS[k].nombre} · Grupo ${S.debate[k]}` : EQUIPOS[k].nombre;
+// Clase con personajes (semana 308): cada grupo se llama como su personaje (rotacion.js). Sin
+// PERSONAJES en la semana, PERS es null y todo dice «Grupo N» como siempre.
+const PERS = typeof PERSONAJES !== "undefined" ? numerarPersonajes(PERSONAJES) : null;
+const nombreG = n => rotuloGrupo(n, PERS);
+const ladoNombre = k => S.debate ? `${EQUIPOS[k].nombre} · ${nombreG(S.debate[k])}` : EQUIPOS[k].nombre;
 const delDebate = h => !S.debate || h.debate === S.debate.n;
 
 /* ====================== 1. LECTURA DEL TEXTO ========================= */
@@ -357,10 +361,11 @@ function conteo() {
 
 function pintarMarcador() {
   for (const k of ["A", "B"]) {
-    $("nom" + k).textContent = S.debate ? `GRUPO ${S.debate[k]}` : EQUIPOS[k].nombre;
+    $("nom" + k).textContent = S.debate ? nombreG(S.debate[k]).toUpperCase() : EQUIPOS[k].nombre;
     const gi = S.debate ? (S.clase.gruposInfo || []).find(g => g.n === S.debate[k]) : null;
-    $("lema" + k).textContent = S.debate ? EQUIPOS[k].nombre + (gi ? " · " + gi.nombre : "") : EQUIPOS[k].lema;
-    $("chatBanca" + k).textContent = S.debate ? `${EQUIPOS[k].nombre} · G${S.debate[k]}` : `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}`;
+    const per = S.debate ? personajeDe(S.debate[k], PERS) : null;
+    $("lema" + k).textContent = S.debate ? EQUIPOS[k].nombre + (gi ? " · " + gi.nombre : per ? " · " + per.cargo : "") : EQUIPOS[k].lema;
+    $("chatBanca" + k).textContent = S.debate ? `${EQUIPOS[k].nombre} · ${rotuloCorto(S.debate[k], PERS)}` : `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}`;
   }
   const c = conteo(), P = S.publico || {};
   const reg = S.debate && S.clase.debates[S.debate.n - 1];
@@ -399,13 +404,13 @@ function pintarTermometro() {
   const pts = curva.map(p => `${X(p.s).toFixed(1)},${Y(p.m).toFixed(1)}`).join(" ");
   const ult = curva[curva.length - 1];
   const lado = r.final === null ? null : r.final > 4 ? "A" : r.final < -4 ? "B" : null;
-  $("termoPt").innerHTML = r.n ? `${r.n} moviéndolo · ${lado ? `inclinado al <b style="color:${EQUIPOS[lado].color}">Grupo ${d[lado]}</b>` : "parejo"}` : "nadie lo ha movido";
+  $("termoPt").innerHTML = r.n ? `${r.n} moviéndolo · ${lado ? `${PERS ? "inclinado a" : "inclinado al"} <b style="color:${EQUIPOS[lado].color}">${esc(nombreG(d[lado]))}</b>` : "parejo"}` : "nadie lo ha movido";
   const pend = (S.preguntasPub || []).length - (reg.tribuna || []).length;
   $("termo").innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="termo-svg">
       <rect x="0" y="0" width="${W}" height="${H / 2}" fill="${EQUIPOS.A.color}" opacity=".07"/><rect x="0" y="${H / 2}" width="${W}" height="${H / 2}" fill="${EQUIPOS.B.color}" opacity=".07"/>
       <line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#2c3a48" stroke-dasharray="4 4"/>
-      <text x="${m}" y="13" fill="${EQUIPOS.A.color}" font-size="10" font-weight="700">▲ GRUPO ${d.A} · A FAVOR</text>
-      <text x="${m}" y="${H - 5}" fill="${EQUIPOS.B.color}" font-size="10" font-weight="700">▼ GRUPO ${d.B} · EN CONTRA</text>
+      <text x="${m}" y="13" fill="${EQUIPOS.A.color}" font-size="10" font-weight="700">▲ ${esc(nombreG(d.A).toUpperCase())} · A FAVOR</text>
+      <text x="${m}" y="${H - 5}" fill="${EQUIPOS.B.color}" font-size="10" font-weight="700">▼ ${esc(nombreG(d.B).toUpperCase())} · EN CONTRA</text>
       ${pts ? `<polyline points="${pts}" fill="none" stroke="#e6edf3" stroke-width="2.2" stroke-linejoin="round"/>` : ""}
       ${ult ? `<circle cx="${X(ult.s).toFixed(1)}" cy="${Y(ult.m).toFixed(1)}" r="4.5" fill="${ult.m > 4 ? EQUIPOS.A.color : ult.m < -4 ? EQUIPOS.B.color : "#e6edf3"}"/>` : ""}
     </svg>
@@ -420,19 +425,19 @@ function pintarColumna() {
   const t3 = $("top3");
   if (t3) {
     const r = (S.clase.ranking || []).filter(f => f.debates > 0).slice(0, 3);
-    t3.innerHTML = r.length ? r.map(f => `<div class="t3"><span>#${f.puesto}</span><b>Grupo ${f.grupo}</b><i>${f1(f.puntaje)}</i></div>`).join("")
+    t3.innerHTML = r.length ? r.map(f => `<div class="t3"><span>#${f.puesto}</span><b>${esc(nombreG(f.grupo))}</b><i>${f1(f.puntaje)}</i></div>`).join("")
       : `<div class="vacio">El ranking aparece después del primer debate.</div>`;
   }
   const or = $("oraculos");
   if (or) {
     const r = rankingOraculos(S.clase.oraculos || {}).slice(0, 5);
-    or.innerHTML = r.length ? r.map(o => `<div class="t3"><span>#${o.puesto}</span><b>${esc(conGrupo(o.nombre, o.grupo))}</b><i style="color:#a78bfa">🔮 ${o.puntos}</i></div>`).join("")
+    or.innerHTML = r.length ? r.map(o => `<div class="t3"><span>#${o.puesto}</span><b>${esc(conGrupo(o.nombre, o.grupo, PERS))}</b><i style="color:#a78bfa">🔮 ${o.puntos}</i></div>`).join("")
       : `<div class="vacio">Aparecen cuando los jueces dan su primer veredicto.</div>`;
   }
   const up = $("ultimoPanel");
   if (up) {
     const u = S.clase.ultimo;
-    up.innerHTML = u && u.jueces && u.panel ? `<div class="up-q">Debate ${u.n} · Grupo ${u.A} <b>${f1(u.panel.A.total)}</b> · Grupo ${u.B} <b>${f1(u.panel.B.total)}</b></div>` +
+    up.innerHTML = u && u.jueces && u.panel ? `<div class="up-q">Debate ${u.n} · ${esc(nombreG(u.A))} <b>${f1(u.panel.A.total)}</b> · ${esc(nombreG(u.B))} <b>${f1(u.panel.B.total)}</b></div>` +
       u.jueces.map(j => `<div class="up-j"><span>${j.emoji}</span><i>${esc(j.nombre)}</i><b style="color:var(--A)">${j.A ?? "—"}</b><b style="color:var(--B)">${j.B ?? "—"}</b></div>`).join("")
       : `<div class="vacio">Las tarjetas del último panel aparecen aquí.</div>`;
   }
@@ -503,7 +508,7 @@ function pintarFeed() {
   for (const k of ["A", "B"]) {
     const xs = ps.filter(p => p.equipo === k);
     $("lista" + k).innerHTML = `<b style="color:var(--c)">${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}</b> ` +
-      (xs.length ? xs.map(p => `<span class="${p.n ? "" : "cero"}">${esc(conGrupo(p.nombre, p.grupo))} · ${p.n}</span>`).join("") : `<span class="cero">nadie aún</span>`);
+      (xs.length ? xs.map(p => `<span class="${p.n ? "" : "cero"}">${esc(conGrupo(p.nombre, p.grupo, PERS))} · ${p.n}</span>`).join("") : `<span class="cero">nadie aún</span>`);
   }
 }
 
@@ -726,6 +731,8 @@ function exportarCsv() {
     const v = [...x.puntajes.values()];
     filas.push(["debatiente", "", "", x.grupo, "", x.nombre, x.email, (v.reduce((s, y) => s + y, 0) / v.length).toFixed(1), `${v.length} debate${v.length === 1 ? "" : "s"}`, "", ""]);
   }
+  // con personajes, una columna más: el personaje del grupo de cada fila (la columna grupo sigue siendo el número)
+  if (PERS) { cab.push("personaje"); for (const f of filas) f.push(f[3] ? nombreG(+f[3]) : ""); }
   const csv = "﻿" + [cab.join(","), ...filas.map(f => f.map(v => `"${q(v)}"`).join(","))].join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));

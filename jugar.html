@@ -48,6 +48,15 @@ input,textarea{width:100%;background:#080d12;color:var(--txt);border:1px solid v
 .btn:disabled{opacity:.4}
 .fila{display:flex;gap:8px}
 .aviso{color:var(--amber);font-size:13px}
+/* clase con personajes: un botón por personaje, con su cupo */
+.per{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border-left:4px solid var(--c)}
+.per b{font-size:16px;color:var(--c)}
+.per small{color:var(--dim);font-weight:500}
+.per .cu{font-family:ui-monospace,monospace;font-size:12.5px;color:var(--txt)}
+.per.lleno .cu{color:var(--B)}
+.per.mio{background:#10251a;border-color:var(--neon);border-left-color:var(--c)}
+.per-nota{color:var(--dim);font-size:13.5px;margin:0 0 4px;width:100%}
+.per-error{font-size:15px;font-weight:700;margin:0 0 4px;width:100%;padding:10px 12px;border-radius:10px;background:#2a1a08}
 .oculto{display:none!important}
 /* antitrampa: la pregunta y lo que dice la moderación no se pueden seleccionar (encarece pegarlo en un
    chatbot; no lo impide: la captura de pantalla sigue funcionando). Lo que escribe cada alumno sí. */
@@ -199,9 +208,9 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
   <div class="card">
     <div class="k">Tema general</div>
     <p id="mocion1" style="font-weight:600"></p>
-    <h1>Elige tu grupo</h1>
+    <h1 id="tituloBancada">Elige tu grupo</h1>
     <div id="grupos" class="fila" style="flex-wrap:wrap"></div>
-    <p class="aviso">Tu grupo debate cuando la moderadora lo llama y vota cuando debaten otros.</p>
+    <p class="aviso" id="avisoBancada">Tu grupo debate cuando la moderadora lo llama y vota cuando debaten otros.</p>
   </div>
 </section>
 
@@ -265,10 +274,10 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 <div id="brujula" class="capa oculto"></div>
 
 <script src="brujula.js?v=20260927a"></script>
-<script src="publico.js?v=20260927a"></script>
-<script src="ritmo.js?v=20260923a"></script>
+<script src="publico.js?v=20260928a"></script>
+<script src="ritmo.js?v=20260928a"></script>
 <script src="barra.js?v=20260923a"></script>
-<script src="rotacion.js?v=20260927a"></script>
-<script type="module" src="jugar.js?v=20260927a"></script>
+<script src="rotacion.js?v=20260928a"></script>
+<script type="module" src="jugar.js?v=20260928a"></script>
 </body>
 </html>

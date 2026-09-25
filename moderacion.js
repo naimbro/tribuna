@@ -90,7 +90,7 @@ function burbuja(m) {
   }
   // alumno
   const e = EQUIPOS[m.equipo] || { color: "var(--dim)", nombre: "" };
-  return `<div class="msg ${m.equipo}" style="--c:${e.color}"><div class="who">${esc(conGrupo(m.nombre || "?", grupoDeMensaje(m)))}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div>${chipsReacciones(m.id)}</div>`;
+  return `<div class="msg ${m.equipo}" style="--c:${e.color}"><div class="who">${esc(conGrupo(m.nombre || "?", grupoDeMensaje(m), PERS))}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div>${chipsReacciones(m.id)}</div>`;
 }
 
 // 🔥 🤔 🤝 que le puso el público a un mensaje (publico.js); nada si nadie reaccionó.
@@ -141,8 +141,20 @@ function estadoTramo() {
   cargarApellidos(ps.map(p => p.nombre));
   return leerTramo(delDebateEnCurso(), ps, Date.now());
 }
-// Cómo se nombra a un grupo: «@Grupo 3»; sin rotación, el nombre de la bancada.
-const grupoDe = k => S.debate ? `@Grupo ${S.debate[k]}` : ladoNombre(k);
+// Cómo se nombra a un grupo: «@Grupo 3» (con personajes, «@Huang»); sin rotación, el nombre de la bancada.
+const grupoDe = k => S.debate ? mencionGrupo(S.debate[k], PERS) : ladoNombre(k);
+// Con personajes: cómo se trata a cada lado («señor Huang») y a quién encarna (para los prompts).
+const tratoDe = k => { const p = S.debate && personajeDe(S.debate[k], PERS); return p ? p.trato : ""; };
+function bloquePersonajes(d) {
+  if (!PERS || !d) return "";
+  const lado = k => { const p = personajeDe(d[k], PERS); return p ? `- ${EQUIPOS[k].nombre}: el grupo encarna a ${p.nombre} (${p.cargo}). Menciónalo con @${p.corto} y trátalo de usted: «${p.trato}».` : ""; };
+  return `
+LOS GRUPOS ENCARNAN PERSONAJES (hablan en primera persona, como esa persona real, con lo que dice su dossier impreso):
+${lado("A")}
+${lado("B")}
+Háblales como si fueran esas personas, de usted y por su nombre: «@${(personajeDe(d.A, PERS) || {}).corto}, ${tratoDe("A")}, ¿qué le responde a ${(personajeDe(d.B, PERS) || {}).corto}?». Pregúntales también dónde lo dijo su personaje: la fidelidad al personaje es lo que premian los jueces. Nunca digas qué dijo en realidad.
+`;
+}
 
 function abrirTramoChat() {
   const R = tramoActual();
@@ -151,6 +163,11 @@ function abrirTramoChat() {
   // conversación es ella, interviniendo, no un segundo turno con nombre propio. Llama a los
   // grupos, no a una persona: quien quiera responde por su grupo.
   const d = S.debate;
+  if (d && PERS) {
+    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: `Duelo ${d.n}: «${d.pregunta}». ${nombreG(d.A)} defiende ${EQUIPOS.A.nombre}; ${nombreG(d.B)}, ${EQUIPOS.B.nombre}. ` +
+      `${grupoDe("A")}, ${grupoDe("B")}: ${tratoDe("A")}, ${tratoDe("B")}, su posición en una frase y en primera persona. Tienen ${Math.round(R.seg / 60)} minutos.` });
+    return;
+  }
   postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: d
     ? `Debate ${d.n}: «${d.pregunta}». Grupo ${d.A} defiende ${EQUIPOS.A.nombre}; Grupo ${d.B}, ${EQUIPOS.B.nombre}. ` +
       `@Grupo ${d.A} y @Grupo ${d.B}: su posición en una frase, cualquiera del grupo, y de ahí seguimos sueltos. Tienen ${Math.round(R.seg / 60)} minutos.`
@@ -185,7 +202,7 @@ function lanzarPreguntaTribuna(p, destino) {
   if (!reg || !p) return;
   (reg.tribuna = reg.tribuna || []).push({ uid: p.uid, nombre: p.nombre || "", grupo: p.grupo || 0, texto: String(p.texto).slice(0, PUB.PREGUNTA_MAX) });
   S.clase.oraculos = sumarPuntoPregunta(S.clase.oraculos, p);
-  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: textoTribuna(p, destino), datos: { tribuna: "pregunta", uid: p.uid } });
+  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: textoTribuna(p, destino, PERS), datos: { tribuna: "pregunta", uid: p.uid } });
   if (typeof pintarColumna === "function") pintarColumna();
   if (typeof window.publicarEstado === "function") window.publicarEstado();
 }
@@ -209,13 +226,13 @@ function promptModerador(est) {
   const lista = k => est.alumnos.filter(p => p.equipo === k).map(fila).join(", ") || "(nadie aún)";
   const d = S.debate;
   return `Eres la moderadora de un debate universitario en vivo, en un chat grupal. Curso: "${SESION.curso}", semana ${SESION.semana}: ${SESION.tema}.
-MOCIÓN: "${mocionActual()}". ${d ? `Grupo ${d.A}` : ladoNombre("A")} la defiende (${EQUIPOS.A.nombre}); ${d ? `Grupo ${d.B}` : ladoNombre("B")} la rechaza (${EQUIPOS.B.nombre}).
+MOCIÓN: "${mocionActual()}". ${d ? nombreG(d.A) : ladoNombre("A")} la defiende (${EQUIPOS.A.nombre}); ${d ? nombreG(d.B) : ladoNombre("B")} la rechaza (${EQUIPOS.B.nombre}).
 TRAMO: ${R.nombre}. Van ${minutos} de ${Math.round(R.seg / 60)} minutos. Pauta: ${R.pauta}
 
 QUIÉNES DEBATEN
-- ${d ? `Grupo ${d.A}` : ladoNombre("A")}: ${lista("A")}
-- ${d ? `Grupo ${d.B}` : ladoNombre("B")}: ${lista("B")}
-
+- ${d ? nombreG(d.A) : ladoNombre("A")}: ${lista("A")}
+- ${d ? nombreG(d.B) : ladoNombre("B")}: ${lista("B")}
+${bloquePersonajes(d)}
 CONCEPTOS Y LECTURAS DEL CURSO (SOLO PARA TI: ésta es la lectura que ellos tienen que hacer, y soplarla arruina el ejercicio):
 ${CONCEPTOS.map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n")}
 
@@ -233,7 +250,7 @@ tiene la razón, NO se los des: devuélvele la pregunta para que la responda su 
 
 ` : ""}CÓMO MODERAS
 Sigue el ritmo de la conversación, como una buena moderadora humana: responde a lo que se acaba de decir, no a una lista de tareas. Si los grupos se están respondiendo bien entre ellos, no interrumpas: elige "esperar".
-Le hablas a los GRUPOS, no a las personas: "${d ? `@Grupo ${d.A}` : ladoNombre("A")}, ¿qué le responden a…?". Cualquiera del grupo contesta.
+Le hablas a los GRUPOS, no a las personas: "${d ? grupoDe("A") : ladoNombre("A")}, ¿qué le ${PERS ? "responde" : "responden"} a…?". Cualquiera del grupo contesta.
 ${puedeNombrar.length ? `Solo a estas personas, que llevan rato sin escribir nada, puedes nombrarlas con @Nombre (una a la vez, la que tenga más sentido ahora): ${puedeNombrar.join(", ")}.` : "Ahora no nombres a ninguna persona con @: habla a los grupos."}${S.mod && S.mod.pregunta ? ` (Excepción: a ${S.mod.pregunta.nombre}, que te habló.)` : ""}
 Si un alumno dice que alguien no está, créele y no vuelvas a nombrar a esa persona.
 
@@ -247,7 +264,7 @@ ELIGE UNA:
 - "contrastar": pon a un grupo frente al argumento más fuerte del otro que todavía no ha respondido.
 - "pasar_pelota": dale la palabra al grupo que ha hablado menos, o a una persona de la lista de arriba, idealmente sobre algo concreto que dijo el otro lado.
 - "examinar": hazle a un grupo una pregunta factual sobre lo que leyó —quién es una de esas personas, qué pide exactamente— para ver si de verdad lo leyó.${estadoTribuna().ofrecer ? `
-- "tribuna": lanza una de las PREGUNTAS DE LA TRIBUNA de arriba, tal cual (la escribió el público). En "elegida" pon su número; en "mensaje", solo a quién va dirigida ("@Grupo N" o "@Grupo N y @Grupo M").` : ""}
+- "tribuna": lanza una de las PREGUNTAS DE LA TRIBUNA de arriba, tal cual (la escribió el público). En "elegida" pon su número; en "mensaje", solo a quién va dirigida (${PERS && d ? `"${grupoDe("A")}", "${grupoDe("B")}" o los dos` : `"@Grupo N" o "@Grupo N y @Grupo M"`}).` : ""}
 Reglas: eres neutral, no opinas sobre la moción ni dices quién tiene razón.
 PUEDES nombrar a las personas de los documentos que ellos tienen impresos y preguntar qué dijo o qué pide cada una: lo tienen en la mano y preguntarlo no les regala nada. Pero SIEMPRE como pregunta, nunca afirmando el dato, y si contestan mal no los corrijas: pregúntales de dónde lo sacan.
 NO puedes entregarles la lectura: no digas a qué lado le sirve un argumento, no cruces los materiales por ellos, no les sugieras qué concepto usar ni les armes la refutación. Máximo 40 palabras; una sola pregunta o encargo; español de Chile, tono de profesora cercana pero exigente; sin groserías.
@@ -259,7 +276,7 @@ function tribunaParaPrompt() {
   const T = estadoTribuna();
   if (!T.ofrecer) return "";
   return `PREGUNTAS DE LA TRIBUNA (las escribió el público, los grupos que no debaten; quien hizo la elegida gana un punto):
-${T.pendientes.map((p, i) => `${i + 1}. ${p.nombre} (grupo ${p.grupo}): "${p.texto}"`).join("\n")}
+${T.pendientes.map((p, i) => `${i + 1}. ${conGrupo(p.nombre, p.grupo, PERS)}: "${p.texto}"`).join("\n")}
 Elige la que más haga avanzar el debate ahora, si alguna lo hace: una pregunta de verdad, sobre la moción y que el otro lado no haya contestado. Descarta las ofensivas o las que no son preguntas.${T.forzar ? " ESTA VEZ elige \"tribuna\": el público lleva rato esperando (salvo que ninguna sirva)." : ""}
 
 `;
@@ -276,7 +293,11 @@ async function intervenirModerador(forzar = false) {
       const elegida = j.tipo === "tribuna" && T.ofrecer ? T.pendientes[(+j.elegida || 0) - 1] : null;
       if (elegida && S.fase === "abierta") {
         if (S.mod && S.mod.pregunta === pregunta) S.mod.pregunta = null;
-        const destino = String(j.mensaje || "").match(/@Grupo \d+(?:\s*y\s*@Grupo \d+)?/i);
+        // a quién va: con personajes, las menciones de los dos lados que traiga el mensaje (o a los dos)
+        const tx = String(j.mensaje || "").toLowerCase();
+        const van = ["A", "B"].map(grupoDe).filter(m => tx.includes(m.toLowerCase()));
+        const destino = PERS ? [(van.length ? van : ["A", "B"].map(grupoDe)).join(" y ")]
+          : String(j.mensaje || "").match(/@Grupo \d+(?:\s*y\s*@Grupo \d+)?/i);
         lanzarPreguntaTribuna(elegida, destino ? destino[0] : `@Grupo ${S.debate.A} y @Grupo ${S.debate.B}`);
         return;
       }
@@ -286,7 +307,7 @@ async function intervenirModerador(forzar = false) {
     } catch (e) { console.warn("moderadora:", e); }
   } else if (T.forzar && S.fase === "abierta") {
     // sin motor: la primera pregunta de la fila, a los dos grupos
-    lanzarPreguntaTribuna(T.pendientes[0], `@Grupo ${S.debate.A} y @Grupo ${S.debate.B}`);
+    lanzarPreguntaTribuna(T.pendientes[0], `${grupoDe("A")} y ${grupoDe("B")}`);
     return;
   }
   if (S.mod && S.mod.pregunta === pregunta) S.mod.pregunta = null;   // si llegó otra mientras pensaba, queda para la próxima
@@ -412,7 +433,7 @@ function prepararMenciones(tx, caja) {
     const d = S.debate;
     const lado = g => d && g.grupo === d.A ? "A FAVOR" : d && g.grupo === d.B ? "EN CONTRA" : "";
     caja.innerHTML = lista.length ? lista.map((g, i) => `<div class="sg ${i === elegida ? "on" : ""}" data-i="${i}">
-        <span class="sg-n">${esc(g.nombre)}</span><span class="sg-g">${g.mod ? "🎙 moderadora de IA" : (g.grupo ? "grupo " + g.grupo : "") + (lado(g) ? " · " + lado(g) : "")}</span></div>`).join("")
+        <span class="sg-n">${esc(g.nombre)}</span><span class="sg-g">${g.mod ? "🎙 moderadora de IA" : (g.grupo ? (PERS ? rotuloCorto(g.grupo, PERS) : "grupo " + g.grupo) : "") + (lado(g) ? " · " + lado(g) : "")}</span></div>`).join("")
       : `<div class="sg-vacio">Nadie se llama así en la sala.</div>`;
     caja.classList.add("on");
   };

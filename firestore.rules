@@ -17,6 +17,26 @@ service cloud.firestore {
     function jugador(codigo) { return get(/databases/$(database)/documents/salas/$(codigo)/jugadores/$(request.auth.uid)); }
     function esJugador(codigo) { return exists(/databases/$(database)/documents/salas/$(codigo)/jugadores/$(request.auth.uid)); }
 
+    // Clase con personajes (semana 308): el cupo de cada personaje se hace cumplir aquí, no en la
+    // pantalla del profesor. salas/{codigo}/cupos/{g} guarda los uid inscritos en el personaje g; el
+    // alumno cambia su `grupo` y su lugar en el cupo en una sola escritura en lote, amarradas con
+    // getAfter. Dos que tocan el último lugar a la vez: Firestore serializa las dos escrituras sobre
+    // el mismo documento y la segunda ya encuentra el cupo lleno.
+    function conPersonajes(codigo) { return sala(codigo).data.get('personajes', null) != null; }
+    function inscripcionAbierta(codigo) { return sala(codigo).data.get('inscripcion', '') == 'abierta'; }
+    function cupoDoc(codigo, g) { return /databases/$(database)/documents/salas/$(codigo)/cupos/$(string(g)); }
+    function inscritoDespues(codigo, g) {
+      return existsAfter(cupoDoc(codigo, g)) && request.auth.uid in getAfter(cupoDoc(codigo, g)).data.miembros;
+    }
+    // Elegir o cambiar de personaje: solo con la inscripción abierta, entrando al cupo del nuevo y
+    // saliendo del anterior en el mismo lote.
+    function cambioDePersonaje(codigo, antes, despues) {
+      return antes == despues
+        || (inscripcionAbierta(codigo)
+            && (despues == 0 || inscritoDespues(codigo, despues))
+            && (antes == 0 || !inscritoDespues(codigo, antes)));
+    }
+
     // Lista de profesores con permiso para crear salas: un documento por correo (en
     // minúsculas), p. ej. profesores/ayudante@uai.cl con {nombre: "..."}. Solo la edita el admin.
     match /profesores/{email} {
@@ -39,17 +59,40 @@ service cloud.firestore {
         allow read: if conSesion();
         // El alumno escribe su propio documento. Su grupo (rotación) solo cambia mientras la
         // sala está en la portada o si todavía no eligió (0). El profesor puede moverlo.
+        // Con personajes, el grupo cambia solo junto con su lugar en el cupo (cambioDePersonaje).
         allow write: if (conSesion() && uid == request.auth.uid
             && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 40
             && request.resource.data.email == request.auth.token.email
             && request.resource.data.get('equipo', '') in ['', 'A', 'B', 'P']
             && (!('grupo' in request.resource.data)
                 || (request.resource.data.grupo is int && request.resource.data.grupo >= 0 && request.resource.data.grupo <= 10
-                    && (resource == null || resource.data.get('grupo', 0) == 0
-                        || resource.data.get('grupo', 0) == request.resource.data.grupo
-                        || sala(codigo).data.get('etapa', null) == 'portada'))))
+                    && ((!conPersonajes(codigo)
+                         && (resource == null || resource.data.get('grupo', 0) == 0
+                             || resource.data.get('grupo', 0) == request.resource.data.grupo
+                             || sala(codigo).data.get('etapa', null) == 'portada'))
+                        || (conPersonajes(codigo) && resource == null
+                            && cambioDePersonaje(codigo, 0, request.resource.data.grupo))
+                        || (conPersonajes(codigo) && resource != null
+                            && cambioDePersonaje(codigo, resource.data.get('grupo', 0), request.resource.data.grupo))))))
           || (esProfe(codigo) && request.resource.data.get('grupo', 0) is int
               && request.resource.data.get('grupo', 0) >= 0 && request.resource.data.get('grupo', 0) <= 10);
+      }
+
+      // El cupo de cada personaje (miembros: {uid: true}). El profesor crea los documentos con la
+      // sala y los corrige al mover a alguien; cada alumno solo se agrega o se quita a sí mismo, con
+      // la inscripción abierta, y entra solo si queda lugar. Salir siempre se puede.
+      match /cupos/{g} {
+        allow read: if conSesion();
+        allow create, delete: if esProfe(codigo);
+        allow update: if esProfe(codigo)
+          || (conSesion() && esJugador(codigo) && inscripcionAbierta(codigo)
+              && request.resource.data.keys().hasOnly(['miembros'])
+              && request.resource.data.miembros.diff(resource.data.miembros).affectedKeys().hasOnly([request.auth.uid])
+              // estar en este cupo equivale a quedar con este grupo, en el mismo lote
+              && (request.auth.uid in request.resource.data.miembros)
+                 == (getAfter(/databases/$(database)/documents/salas/$(codigo)/jugadores/$(request.auth.uid)).data.grupo == int(g))
+              && (!(request.auth.uid in request.resource.data.miembros)
+                  || request.resource.data.miembros.size() <= sala(codigo).data.cupo));
       }
 
       // Una intervención por alumno y ronda (se sobreescribe cada ronda). Solo su dueño la

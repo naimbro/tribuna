@@ -12,7 +12,7 @@
    ===================================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy, where }
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy, where, writeBatch, deleteField, FieldPath }
   from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-functions.js";
 import { firebaseConfig } from "./firebase-config.js?v=20260918a";
@@ -96,6 +96,9 @@ function estadoPublico() {
     mapa: conBrujulaActiva() && ON.brujula ? barajar(window.datosMapa().puntos.filter(p => !p.parcial).map(p => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2), campo: p.campo }))) : [],
     mapaMov: conBrujulaActiva() && ON.brujula ? barajar(window.datosMapa().movimiento.filter(m => !m.parcial).map(m => ({ x: m.x, y: m.y, dx: m.desde.x, dy: m.desde.y, campo: m.campo }))) : [],
     gruposInfo: S.clase.gruposInfo || [],
+    // clase con personajes: la lista, el cupo y si la inscripción está abierta. firestore.rules hace
+    // cumplir el cupo solo si `personajes` está en la sala; las semanas sin personajes no lo publican.
+    ...(PERS ? { personajes: PERS, cupo: S.clase.cupo || SESION.cupo || 4, inscripcion: S.clase.inscripcion || null } : {}),
     ticker: $("ticker").textContent, motor: $("modoLbl").textContent
   };
 }
@@ -162,7 +165,8 @@ function activarOnline() {
   window.rosterRemoto = () => !S.debate ? [] : Object.values(ON.jugadores)
     .filter(j => j.grupo === S.debate.A || j.grupo === S.debate.B)
     .map(j => ({ nombre: j.nombre, equipo: j.grupo === S.debate.A ? "A" : "B", grupo: j.grupo }));
-  window.moverAlumno = (uid, grupo) => setDoc(doc(db, "salas", ON.codigo, "jugadores", uid), { grupo }, { merge: true })
+  window.moverAlumno = (uid, grupo) => (PERS ? moverPersonaje(uid, grupo)
+    : setDoc(doc(db, "salas", ON.codigo, "jugadores", uid), { grupo }, { merge: true }))
     .then(() => true).catch(e => { tick("No se pudo mover al alumno: " + e.code); return false; });
   window.alCambiarDebate = n => { suscribirVotos(n); suscribirPublicoActivo(n); };
   envolver("lanzarEvento");
@@ -175,6 +179,7 @@ function activarOnline() {
     snap.forEach(d => ON.jugadores[d.id] = d.data());
     notarEscribiendo(ON.jugadores);
     asignarRezagados();
+    asignarAtrasados();
     if (S.publico) S.publico.elegibles = elegibles();
     pintarBarraOnline(); pintarFeed(); actualizarPortada(ON.jugadores);
     if (typeof refrescarMapaVivo === "function") refrescarMapaVivo();
@@ -212,6 +217,8 @@ function activarOnline() {
   }, () => {});
   // quien llegó tarde y no responde la brújula en 90 s queda en el grupo más chico
   setInterval(asignarRezagados, 10000);
+  // con personajes: quien llega con la inscripción cerrada entra al personaje más chico
+  setInterval(asignarAtrasados, 10000);
 
   // Las escenas: portada (QR y quién va entrando) → intro → debate
   $("btnIntro").onclick = () => irA("intro");
@@ -262,7 +269,7 @@ function pintarEscribiendo() {
     t: j.escribe && j.escribe.t, visto: ESCRIBE[uid] ? ESCRIBE[uid].visto : 0 }));
   const gs = d ? gruposEscribiendo(xs, { debate: d.n, ahora: Date.now() }) : [];
   el.innerHTML = gs.map(g => { const k = g === d.A ? "A" : "B";
-    return `<span style="color:${EQUIPOS[k].color}">✍ Grupo ${g} está escribiendo<i>…</i></span>`; }).join("");
+    return `<span style="color:${EQUIPOS[k].color}">✍ ${esc(nombreG(g))} está escribiendo<i>…</i></span>`; }).join("");
 }
 setInterval(pintarEscribiendo, 1000);
 
@@ -270,6 +277,8 @@ setInterval(pintarEscribiendo, 1000);
 // la moción durante la intro, la conversación en el debate).
 function irA(etapa) {
   S.etapa = etapa;
+  // salir de la portada cierra la inscripción: quien no eligió entra al personaje más chico
+  if (PERS && etapa !== "portada" && S.clase.inscripcion === "abierta") window.cerrarInscripcion();
   cerrarPortada();
   if (etapa === "portada") { mostrarPortada(urlJugar(), ON.codigo, () => irA("intro")); actualizarPortada(ON.jugadores); }
   if (etapa === "intro") mostrarIntro(() => irA(null));
@@ -358,7 +367,7 @@ function pintarBarraOnline() {
   const nG = new Set(js.map(j => j.grupo).filter(g => g > 0)).size;
   bar.innerHTML = `<b style="color:var(--neon);letter-spacing:.14em">SALA ${ON.codigo}</b>
     <span title="profesor">${ON.email || ""}</span>
-    <span>${js.length} en la sala · ${nG} de ${S.clase.grupos} grupos con gente</span>
+    <span>${js.length} en la sala · ${nG} de ${S.clase.grupos} ${PERS ? "personajes" : "grupos"} con gente${PERS ? ` · cupo ${S.clase.cupo || SESION.cupo || 4} · inscripción ${S.clase.inscripcion === "abierta" ? "abierta" : S.clase.inscripcion === "cerrada" ? "cerrada" : "sin abrir"}` : ""}</span>
     <span class="mono" style="color:var(--txt)">${urlJugar()}</span>
     ${ON.feedback ? `<span title="Feedback recibido; se lee en MIS PARTIDAS">💬 ${ON.feedback} feedback</span>` : ""}
     <a class="btn" href="admin.html" target="_blank" style="margin-left:auto;text-decoration:none;color:inherit">📋 MIS PARTIDAS</a>
@@ -431,6 +440,60 @@ function asignarRezagados() {
   if (S.clase.gruposInfo.map(g => g.tam).join() !== antes) publicar();
 }
 window.repetirBrujula = () => { S.clase.brujula.fase = "repetir"; publicar(); };
+
+/* ---------- clase con personajes: inscripción con cupo (semana 308) ----------
+   El cupo lo hace cumplir firestore.rules: salas/{codigo}/cupos/{g} guarda los uid inscritos en el
+   personaje g, y el alumno cambia su grupo y su lugar en el cupo en un solo lote (jugar.js). Esta
+   pantalla abre y cierra la inscripción, fija el cupo, y mueve a alguien con el mismo lote. */
+const cupoRef = g => doc(db, "salas", ON.codigo, "cupos", String(g));
+function moverPersonaje(uid, grupo) {
+  const antes = (ON.jugadores[uid] && ON.jugadores[uid].grupo) || 0;
+  const b = writeBatch(db);
+  if (grupo > 0) b.update(cupoRef(grupo), new FieldPath("miembros", uid), true);
+  if (antes > 0 && antes !== grupo) b.update(cupoRef(antes), new FieldPath("miembros", uid), deleteField());
+  b.set(doc(db, "salas", ON.codigo, "jugadores", uid), { grupo }, { merge: true });
+  return b.commit();
+}
+async function crearCupos() {
+  const b = writeBatch(db);
+  for (const p of PERS) b.set(cupoRef(p.n), { miembros: {} });
+  await b.commit();
+}
+const cupoValido = n => Math.max(1, Math.min(30, Math.round(+n) || SESION.cupo || 4));
+window.abrirInscripcion = cupo => {
+  S.clase.cupo = cupoValido(cupo);
+  S.clase.inscripcion = "abierta";
+  tick(`Inscripción abierta: cupo ${S.clase.cupo} por personaje, por orden de llegada.`);
+  publicar(); pintarBarraOnline();
+};
+window.cerrarInscripcion = () => {
+  S.clase.inscripcion = "cerrada";
+  tick("Inscripción cerrada: quien llegue ahora entra al personaje con menos gente.");
+  publicar(); pintarBarraOnline();
+  setTimeout(asignarAtrasados, 800);      // después de que la sala publicó el cierre
+};
+window.fijarCupo = cupo => {
+  S.clase.cupo = cupoValido(cupo);
+  tick(`Cupo: ${S.clase.cupo} por personaje.`);
+  publicar(); pintarBarraOnline();
+};
+// Con la inscripción cerrada, quien no tiene personaje entra al que tiene menos gente entre los
+// que todavía no debaten (rotacion.js). Uno a la vez por alumno; si falla, el próximo repaso
+// (≤ 10 s) lo vuelve a intentar.
+function asignarAtrasados() {
+  if (!PERS || S.clase.inscripcion !== "cerrada") return;
+  ON.asignandoP = ON.asignandoP || {};
+  const conteo = conteoPersonajes(ON.jugadores, PERS);
+  for (const uid of Object.keys(ON.asignandoP)) if (ON.jugadores[uid] && ON.jugadores[uid].grupo > 0) delete ON.asignandoP[uid];
+  for (const n of Object.values(ON.asignandoP)) conteo[n] = (conteo[n] || 0) + 1;
+  for (const [uid, j] of Object.entries(ON.jugadores)) {
+    if (j.grupo > 0 || ON.asignandoP[uid]) continue;
+    const n = personajeParaAtrasado(PERS, conteo, S.clase.debates);
+    if (!n) return;
+    ON.asignandoP[uid] = n; conteo[n]++;
+    window.moverAlumno(uid, n).then(ok => { if (!ok) delete ON.asignandoP[uid]; });
+  }
+}
 window.cerrarRepeticion = () => { S.clase.brujula.fase = "cerrada"; publicar(); };
 
 /* ---------- crear o restaurar la sala ---------- */
@@ -442,9 +505,12 @@ async function crearSala() {
   // brújula corta: encendida por defecto si la semana la define; el profesor la apaga en la portada
   S.clase.brujula = { activa: typeof BRUJULA !== "undefined", fase: typeof BRUJULA !== "undefined" ? "responder" : null };
   S.clase.gruposInfo = [];
+  // con personajes: un grupo por personaje, el cupo que propone la semana y la inscripción sin abrir
+  if (PERS) Object.assign(S.clase, { grupos: PERS.length, cupo: SESION.cupo || 4, inscripcion: null });
   S.fase = "propuesta";
   await setDoc(doc(db, "salas", ON.codigo), limpio({ ...estadoPublico(), creada: Date.now() }));
   await setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado()));
+  if (PERS) await crearCupos();
   location.href = `${location.pathname}?sala=${ON.codigo}&semana=${SESION.semana}`;
 }
 

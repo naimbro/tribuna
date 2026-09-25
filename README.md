@@ -117,7 +117,8 @@ la pantalla publica el estado de la sala y recibe lo que escriben las bancadas.
 - **Datos:** `salas/{codigo}` (público para quien tenga el código; solo el creador escribe),
   `jugadores/{uid}` (cada uno el suyo), `intervenciones/{uid}` (una por alumno y ronda; solo
   por su bancada, con la ronda abierta, máximo 4000 caracteres; la lee su bancada y el
-  profesor) y `privado/estado` (solo el profesor). Reglas en
+  profesor), `cupos/{g}` (clase con personajes: los inscritos en cada personaje; cada alumno se agrega
+  o se quita a sí mismo, con la inscripción abierta y si queda lugar) y `privado/estado` (solo el profesor). Reglas en
   `firestore.rules`. Todos entran **con su cuenta Google** (igual que en `ml2-master-game`):
   el uid es estable, así que el mismo alumno queda identificado de clase a clase y el CSV
   lleva `autor_email`. Salas solo las crea `naim.bro@gmail.com` o un correo listado en la
@@ -277,6 +278,47 @@ preparaba al abrir la sala, sin grupos, y el primer debate caía en «Grupo 1 co
 Si la semana define `INSTRUMENTOS`, la intro trae una lámina con lo que piden los jueces.
 Apagada, los alumnos eligen grupo a mano. La lógica está en `brujula.js` y se prueba con `node --test pruebas/`.
 
+## La clase con personajes (semana 308)
+
+Si la semana define `PERSONAJES` (id, nombre, `corto`, `trato`, cargo, color, duelo y lado), los
+alumnos no se agrupan por brújula ni eligen «Grupo N»: se inscriben bajo un personaje, con cupo y por
+orden de llegada. Por debajo el grupo sigue siendo el número 1..N, en el orden de `PERSONAJES`, así
+que el emparejamiento, el ranking y los votos no cambian. Lo que cambia es el nombre: donde decía
+«Grupo 3», el proyector, los teléfonos, la barra, el ranking, el panel, los jueces y la moderadora dicen
+«Josh Hawley». La moderadora los llama con `@Hawley` y les habla de usted («senador Hawley, ¿qué le
+responde a Altman?»). Las semanas sin `PERSONAJES` se ven exactamente como antes
+(`pruebas/personajes.test.js`).
+
+- **Inscripción.** En la portada, el profesor escribe el **cupo por personaje** (con 24 presentes,
+  cupo 4; la portada sugiere el número) y pulsa **ABRIR INSCRIPCIÓN**. Cada columna muestra «3/4».
+  Mientras está abierta, el cupo se puede subir. **CERRAR INSCRIPCIÓN** (o EMPEZAR ▶) la cierra, y
+  desde ahí nadie se cambia, tampoco durante el recreo en la portada.
+- **Orden de llegada, sin carreras.** El cupo lo hacen cumplir las reglas de Firestore, no la
+  pantalla. `salas/{codigo}/cupos/{g}` guarda los uid inscritos en el personaje g, y el teléfono se
+  agrega ahí y cambia su `grupo` en una sola escritura en lote, amarradas con `getAfter`. Si dos
+  alumnos tocan el último lugar al mismo tiempo, Firestore serializa las dos escrituras: la segunda
+  encuentra el cupo lleno y se rechaza entera, y su teléfono dice «Se llenó Elon Musk: elige otro».
+  Un personaje lleno se apaga en todos los teléfonos. La inscripción no depende de que la pantalla del
+  profesor esté abierta. `pruebas/reglas-emulador.cjs` prueba las reglas contra el emulador (27 casos;
+  en 20 salas con un solo lugar libre y dos toques simultáneos, entró exactamente uno).
+- **Quien llega con la inscripción cerrada** entra solo al personaje con menos gente entre los que
+  todavía no han debatido, para no caer en un duelo que ya pasó.
+- **Duelos fijos.** Cada entrada de `PREGUNTAS` trae su `duelo: { A, B }` (ids de personaje). La
+  moderadora propone los duelos en ese orden en vez de llamar a `emparejar`, y el profesor puede
+  cambiar los grupos. Si un lado no tiene a nadie inscrito, la propuesta lo dice, no se publica sola y
+  **Publicar** se niega. Jugados los tres, la propuesta lo avisa y no inventa un cuarto.
+- **Mover a alguien.** Un clic en la cara, en la portada, lo pasa a otro personaje o lo deja sin
+  personaje (0). Es la misma escritura en lote, así que el cupo guardado sigue cuadrando.
+- **Jueces.** `JUECES_COMUN` de la 308 es la fidelidad al personaje: ¿lo diría esta persona?, ¿se
+  apoya en algo que dijo según su dossier? Sus frases pueden nombrar al personaje, nunca al alumno.
+
+Probado el 25-sep-2026 contra los emuladores con Playwright: 24 alumnos, cupo 4. Los 24 terminaron
+inscritos, cuatro por personaje, y el cupo guardado cuadra uno a uno con el grupo de cada alumno. De dos
+toques con 12 ms de diferencia sobre el último lugar de Musk entró uno, y el otro nunca vio «entraste».
+Un atrasado cayó en Hawley, y los tres duelos corrieron en orden con sus mociones. La semana 307 con
+brújula dio exactamente los mismos grupos, rótulos, propuesta y apertura de la moderadora que el
+código anterior.
+
 ## Pantalla del profesor
 
 Dos paneles, como el panel de debate de `mapuche_panel`: a la izquierda **el hilo** —una
@@ -403,6 +445,9 @@ editan seis cosas:
    Para la sociedad de agentes, además `registro` (cómo habla) y `no_mueve` (lo que no la
    mueve aunque esté bien dicho).
 6. `EVENTOS` — los shocks del profesor.
+
+Opcionales: `BRUJULA` (la brújula corta), `PREGUNTAS` (mociones escritas), `JUECES` y `JUECES_COMUN`,
+`EJEMPLOS_SESION`, `INSTRUMENTOS` y `PERSONAJES` (la clase con personajes; ver arriba).
 
 Dos invariantes al editar:
 

@@ -99,8 +99,10 @@ function turnoTribuna({ seg, emitidas, pendientes }) {
 }
 
 // Cómo se lee en el chat la pregunta que la moderadora eligió: las palabras del alumno, sin tocar.
-function textoTribuna(p, destino) {
-  const quien = p.grupo ? `${p.nombre} (grupo ${p.grupo})` : p.nombre;
+// ps: los personajes de la sala, si los hay (rotacion.js); sin ellos, «Ana (grupo 5)».
+function textoTribuna(p, destino, ps) {
+  const per = Array.isArray(ps) ? ps.find(x => x.n === p.grupo) : null;
+  const quien = p.grupo ? `${p.nombre} (${per ? per.corto : `grupo ${p.grupo}`})` : p.nombre;
   const a = String(destino || "").trim();
   return `✋ La tribuna pregunta — ${quien}: «${String(p.texto).trim().slice(0, PUB.PREGUNTA_MAX)}»${a ? ` ${a}, ¿qué responden?` : " ¿Qué responden?"}`;
 }

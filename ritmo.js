@@ -26,9 +26,12 @@ const normRitmo = s => String(s || "").toLowerCase().normalize("NFD").replace(/[
 
 // ¿El texto nombra a esta persona (o a su grupo) con @? Con el nombre completo, o con el primer
 // nombre si lo que sigue no es otro apellido: «@pablo concha» no nombra a Pablo Sandoval.
-function mencionaA(texto, nombre, grupo) {
+// alias: otros nombres del grupo, ya normalizados (con personajes, «huang» y «jensen huang»).
+function mencionaA(texto, nombre, grupo, alias = []) {
   const t = normRitmo(texto), mi = normRitmo(nombre);
   if (grupo && new RegExp(`@grupo ${grupo}(?!\\d)`).test(t)) return true;
+  // los alias salen de aliasGrupo (rotacion.js): letras y espacios, sin caracteres de regex
+  for (const a of alias || []) if (a && new RegExp(`@${a}(?![a-zñ0-9])`).test(t)) return true;
   if (!mi) return false;
   if (t.includes("@" + mi)) return true;
   const toks = mi.split(" "), primero = toks[0];

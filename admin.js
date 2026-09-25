@@ -38,9 +38,11 @@ function estadoDe(s) {
   return [`tramo ${s.ronda + 1}/${s.totalRondas || 3}`, ""];
 }
 
+// Clase con personajes (semana 308): la sala guarda la lista; sin ella, «Grupo N» como siempre.
+const gN = (s, n) => rotuloGrupo(n, s.personajes);
 // Rotación: el campeón (o quien va primero). Salas antiguas: se calcula con sus marcadores.
 function ganadorDe(s) {
-  if (s.modo === "rotacion") return s.veredicto && s.veredicto.campeon ? `Grupo ${s.veredicto.campeon}` : (s.ranking && s.ranking[0] && s.ranking[0].debates ? `Grupo ${s.ranking[0].grupo} (va primero)` : null);
+  if (s.modo === "rotacion") return s.veredicto && s.veredicto.campeon ? gN(s, s.veredicto.campeon) : (s.ranking && s.ranking[0] && s.ranking[0].debates ? `${gN(s, s.ranking[0].grupo)} (va primero)` : null);
   const v = s.veredicto; if (!v) return null;
   if (v.ganaG) return v.ganaG;
   const noms = [v.ganaP, v.pubN ? v.ganaU : null, v.ganaR].filter(x => x != null);
@@ -142,14 +144,14 @@ function cursoHtml(curso, partidas) {
 function puntajeDe(s, j) {
   if (s.modo !== "rotacion") return "";
   const g = (s.ranking || []).find(f => f.grupo === j.grupo), o = (s.oraculos || []).find(x => x.uid === j.uid);
-  return `\nGrupo ${j.grupo || "?"}: ${g && g.puntaje !== null && g.puntaje !== undefined ? g.puntaje + " pts" : "sin debatir"}` + (o ? ` · 🔮 ${o.puntos}` : "");
+  return `\n${j.grupo ? gN(s, j.grupo) : "Grupo ?"}: ${g && g.puntaje !== null && g.puntaje !== undefined ? g.puntaje + " pts" : "sin debatir"}` + (o ? ` · 🔮 ${o.puntos}` : "");
 }
 
 // Antitrampa: cómo escribió cada alumno, como «Cómo se escribió» de ml2. Una huella por mensaje
 // (el largo del texto cada 2 s): una rampa es alguien tipeando, un escalón es un bloque que llegó
 // entero. Rojo: más de la mitad del texto llegó de una vez. Descriptivo: nunca entra en un puntaje.
 const COLOR_TL = { golpe: "#f43f5e", escrito: "#38bdf8", corto: "#4d5f70" };
-function telemetriaHtml(telemetria, codigo) {
+function telemetriaHtml(telemetria, codigo, ps) {
   if (!telemetria || !telemetria.length) return `<div class="caja" style="margin-top:14px"><h3>CÓMO ESCRIBIERON · antitrampa</h3>
     <p style="color:var(--dim)">Sin registros: nadie escribió desde el teléfono en esta partida.</p></div>`;
   const por = new Map();
@@ -171,7 +173,7 @@ function telemetriaHtml(telemetria, codigo) {
       <b style="color:${COLOR_TL.escrito}">●</b> lo fue tipeando <b style="color:${COLOR_TL.corto}">●</b> muy corto para decir algo.
       Rampa: tipeó. Escalón: llegó entero. Clic en una huella para el detalle. No cambia ningún puntaje.</p>
     <p class="tl-sum"><b>${nRojos}</b> de ${total} mensaje${total === 1 ? "" : "s"} en rojo${salieron.length ? ` · salieron de la app mientras escribían: ${salieron.map(x => `${esc(x.nombre)} (${x.salidas})`).join(", ")}` : ""}</p>
-    <table class="tl-grid">${filas.map(f => `<tr><th>${esc(f.nombre)}${f.grupo ? ` <small>G${f.grupo}</small>` : ""}</th>
+    <table class="tl-grid">${filas.map(f => `<tr><th>${esc(f.nombre)}${f.grupo ? ` <small>${esc(rotuloCorto(f.grupo, ps))}</small>` : ""}</th>
       <td>${f.ms.map(chispa).join("")}</td></tr>`).join("")}</table>
     <div class="tl-det" id="tlDet-${codigo}"></div>
   </div>`;
@@ -184,7 +186,7 @@ async function detalleTelemetria(codigo, i) {
   if (!t || !el) return;
   document.querySelectorAll(`[data-tlc="${codigo}"]`).forEach(b => b.classList.toggle("on", +b.dataset.tli === i));
   const clase = clasificarMensaje(t), seg = Math.round((t.huella || []).length * 2);
-  el.innerHTML = `<div class="tl-dc"><b>${esc(t.nombre)}</b>${t.grupo ? ` · grupo ${t.grupo}` : ""} · debate ${t.debate} · ${new Date(t.t).toTimeString().slice(0, 5)}</div>
+  el.innerHTML = `<div class="tl-dc"><b>${esc(t.nombre)}</b>${t.grupo ? ` · ${p.s.personajes ? esc(gN(p.s, t.grupo)) : `grupo ${t.grupo}`}` : ""} · debate ${t.debate} · ${new Date(t.t).toTimeString().slice(0, 5)}</div>
     <svg viewBox="-4 -16 368 98" class="tl-big"><line x1="0" y1="64" x2="360" y2="64" stroke="#1e2a36"/>
       <polyline points="${puntosHuella(t, 360, 64)}" fill="none" stroke="${COLOR_TL[clase]}" stroke-width="2.2" stroke-linejoin="round"/>
       <text x="0" y="-6" fill="#7d8fa1" font-size="9">${t.largoFinal} caracteres</text><text x="360" y="76" fill="#7d8fa1" font-size="9" text-anchor="end">~${seg} s escribiendo</text></svg>
@@ -203,7 +205,7 @@ function campoAlumno(s, j) {
   if (!b || !b.campo) return "";
   const c = id => cs.find(x => x.id === id) || { nombre: id, color: "var(--dim)" };
   const antes = c(b.campo), despues = b.repeticion && b.repeticion.campo ? c(b.repeticion.campo) : null;
-  return `<small style="display:block;margin-left:34px">G${j.grupo || "?"} · <b style="color:${antes.color}">${esc(antes.nombre)}</b>${despues ? ` → <b style="color:${despues.color}">${esc(despues.nombre)}</b>` : ""}</small>`;
+  return `<small style="display:block;margin-left:34px">${j.grupo ? esc(rotuloCorto(j.grupo, s.personajes)) : "G?"} · <b style="color:${antes.color}">${esc(antes.nombre)}</b>${despues ? ` → <b style="color:${despues.color}">${esc(despues.nombre)}</b>` : ""}</small>`;
 }
 
 function partidaHtml({ s, jugadores, feedback, telemetria }) {
@@ -222,16 +224,16 @@ function partidaHtml({ s, jugadores, feedback, telemetria }) {
         <div>${(s.mapaMov || []).length ? `<p style="color:var(--dim);font-size:12px">Flechas: de la primera respuesta a la del cierre (${s.mapaMov.length}).</p>` : ""}
           ${(s.gruposInfo || []).map(g => `<div>Grupo ${g.n} · <b style="color:${colorCampo(g.campo)}">${esc(g.nombre)}</b> (${g.tam})</div>`).join("")}</div></div></div>` : "";
   const rotHtml = rot ? `${brujulaHtml}<div class="caja" style="margin-bottom:12px"><h3>RANKING</h3>
-      ${(s.ranking || []).map(f => `<div class="com"><div class="q"><b>${f.puesto ? "#" + f.puesto : "·"} Grupo ${f.grupo}</b>
+      ${(s.ranking || []).map(f => `<div class="com"><div class="q"><b>${f.puesto ? "#" + f.puesto : "·"} ${esc(gN(s, f.grupo))}</b>
         <span style="color:var(--dim)">${f.debates} debate${f.debates === 1 ? "" : "s"} · jurado ${f.jurado ?? "—"} · público ${f.publico ?? "—"}</span>
         <span class="mono" style="margin-left:auto;color:var(--neon)">${f.puntaje ?? "—"}</span></div></div>`).join("")}
       <h3 style="margin-top:12px">DEBATES</h3>
-      ${(s.debates || []).map(d => `<div class="com"><div class="q"><b>${d.n}.</b> Grupo ${d.A} vs Grupo ${d.B}
+      ${(s.debates || []).map(d => `<div class="com"><div class="q"><b>${d.n}.</b> ${esc(gN(s, d.A))} vs ${esc(gN(s, d.B))}
         <span class="mono" style="margin-left:auto">${d.puntajeA ?? "—"} · ${d.puntajeB ?? "—"}</span></div><p>${esc(d.pregunta)}</p>
         ${(d.jueces || []).length ? `<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin-top:4px">${d.jueces.map(j => `<span title="${esc(j.fraseA)} / ${esc(j.fraseB)}">${j.emoji} ${j.A ?? "—"} · ${j.B ?? "—"}</span>`).join("")}
           <span>· jueces ${d.totalA ?? "—"} / ${d.totalB ?? "—"} · votos ${d.votosA ?? "—"} / ${d.votosB ?? "—"}${d.barraA != null ? ` · barra ${d.barraA} % / ${d.barraB} %` : ""}</span></div>` : ""}</div>`).join("") || `<p style="color:var(--dim)">Sin debates.</p>`}
       <h3 style="margin-top:12px">🔮 ORÁCULOS</h3>
-      ${(s.oraculos || []).map(o => `<div class="com"><div class="q"><b>#${o.puesto} ${esc(o.nombre)}${o.grupo ? ` (grupo ${o.grupo})` : ""}</b>
+      ${(s.oraculos || []).map(o => `<div class="com"><div class="q"><b>#${o.puesto} ${esc(conGrupo(o.nombre, o.grupo, s.personajes))}</b>
         <span style="color:var(--dim)">${o.aciertos} de ${o.predicciones} aciertos</span><span class="mono" style="margin-left:auto;color:#a78bfa">${o.puntos}</span></div></div>`).join("") || `<p style="color:var(--dim)">Sin predicciones.</p>`}
     </div>` : "";
   const coms = feedback.filter(f => (f.comentario || "").trim() || typeof f.nota === "number").sort((a, b) => (b.t || 0) - (a.t || 0));
@@ -267,7 +269,7 @@ function partidaHtml({ s, jugadores, feedback, telemetria }) {
             : `<span style="color:var(--dim)">Nadie entró.</span>`}</div>
         </div>
       </div>
-      ${telemetriaHtml(telemetria, s.codigo)}
+      ${telemetriaHtml(telemetria, s.codigo, s.personajes)}
       <div class="acc">
         <a class="btn" href="index.html?sala=${s.codigo}&semana=${s.semana}" target="_blank">▶ Abrir pantalla</a>
         <button class="btn" data-txt="${s.codigo}">⬇ Conversación (.txt)</button>

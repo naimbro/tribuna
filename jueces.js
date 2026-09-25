@@ -42,14 +42,23 @@ function leerJuez(j) {
   return { A, B, fraseA: f(j.A.frase), fraseB: f(j.B.frase) };
 }
 
+// Con personajes (semana 308), cada lado encarna a una persona real: el juez sabe a quién, para
+// juzgar la fidelidad, y su frase puede nombrar al personaje (nunca al estudiante).
+const ladoJuez = (d, k) => {
+  const p = typeof PERS !== "undefined" ? personajeDe(d[k], PERS) : null;
+  return p ? `El grupo que encarna a ${p.nombre} (${p.cargo})` : `El Grupo ${d[k]}`;
+};
+const hayPersonajes = d => typeof PERS !== "undefined" && !!personajeDe(d.A, PERS);
+
 function promptJuez(juez, d, transcripcion) {
   return `Eres ${juez.nombre}, jueza o juez de un debate universitario del curso "${SESION.curso}", semana ${SESION.semana}.
 TU PERFIL: valoras ${juez.valora}. Te molesta ${juez.molesta}.
 ${criterioComun() ? `PISO COMÚN DEL PANEL (los cinco lo exigen; pesa en tu nota, pero no es tu foco): ${criterioComun()}.
 ` : ""}
 PREGUNTA EN DEBATE: "${d.pregunta}"
-- El Grupo ${d.A} defiende A FAVOR (sus mensajes aparecen como «A FAVOR»).
-- El Grupo ${d.B} defiende EN CONTRA (sus mensajes aparecen como «EN CONTRA»).
+- ${ladoJuez(d, "A")} defiende A FAVOR (sus mensajes aparecen como «A FAVOR»).
+- ${ladoJuez(d, "B")} defiende EN CONTRA (sus mensajes aparecen como «EN CONTRA»).${hayPersonajes(d) ? `
+Cada grupo habla en primera persona, como su personaje, con lo que trae su dossier impreso.` : ""}
 
 MATERIAL DEL CURSO (conceptos y lecturas de la semana):
 ${CONCEPTOS.map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n")}
@@ -69,7 +78,7 @@ CALIDAD de sus argumentos, no por si estás de acuerdo con el lado que defiende.
 escribió recibe 0. Escribe además una frase de máximo 15 palabras por grupo, en tu voz, que
 explique la nota desde TU foco (no repitas el piso común: eso ya lo dicen los demás jueces).
 La frase se proyecta frente a toda la clase: habla del grupo y de sus argumentos, y nunca nombres
-a un estudiante.
+a un estudiante.${hayPersonajes(d) ? ` Puedes nombrar al personaje («${personajeDe(d.A, PERS).corto}», «${(personajeDe(d.B, PERS) || {}).corto}»).` : ""}
 
 Responde SOLO un JSON: {"A": {"nota": n, "frase": "…"}, "B": {"nota": n, "frase": "…"}}`;
 }

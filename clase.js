@@ -54,7 +54,8 @@ function empezarPreparacion() {
   S.reloj = setInterval(tic, 500);
   tic();
   $("btnPrincipal").textContent = "▶ ABRIR YA";
-  tick(`Debate ${d.n}: un minuto para que los grupos ${d.A} y ${d.B} preparen su primera frase.`);
+  tick(PERS ? `Debate ${d.n}: un minuto para que ${nombreG(d.A)} y ${nombreG(d.B)} preparen su primera frase.`
+    : `Debate ${d.n}: un minuto para que los grupos ${d.A} y ${d.B} preparen su primera frase.`);
 }
 
 // Lo que escribió cada lado en el debate (para los jueces simulados sin motor).
@@ -153,7 +154,7 @@ function mostrarResultado() {
   const seguir = () => {
     if (S.fase !== "resultado") return;
     S.fase = "propuesta";
-    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: `Gracias, Grupo ${d.A} y Grupo ${d.B}. Viene el próximo debate.` });
+    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: `Gracias, ${nombreG(d.A)} y ${nombreG(d.B)}. Viene el próximo debate.` });
     mostrarPropuesta();
     publicarEstado();
   };
@@ -220,10 +221,19 @@ $("btnRepetir").onclick = () => {
 
 /* ---------------- la propuesta de la moderadora ---------------- */
 
-// «Grupo 2 · Frenar por ley» si la partida formó grupos con la brújula; si no, «Grupo 2».
+// «Grupo 2 · Frenar por ley» si la partida formó grupos con la brújula; «Jensen Huang» si la
+// semana tiene personajes; si no, «Grupo 2».
 function nombreGrupo(n) {
   const g = (S.clase.gruposInfo || []).find(x => x.n === n);
-  return g ? `Grupo ${n} · ${g.nombre}` : `Grupo ${n}`;
+  return g ? `Grupo ${n} · ${g.nombre}` : nombreG(n);
+}
+// Cuántos inscritos tiene cada grupo ahora (en línea, los de la sala; sin sala, se asume gente)
+const conteoAhora = () => typeof window.jugadoresSala === "function" ? conteoPersonajes(window.jugadoresSala(), PERS)
+  : Object.fromEntries((PERS || []).map(p => [p.n, 1]));
+// «Dario Amodei no tiene a nadie inscrito…», o "" si los dos lados tienen gente
+function avisoDuelo(A, B) {
+  const faltan = PERS && A && B ? faltanEnDuelo({ A, B }, conteoAhora(), PERS) : [];
+  return faltan.length ? `${faltan.join(" y ")} no ${faltan.length === 1 ? "tiene" : "tienen"} a nadie inscrito: cambia el grupo antes de publicar.` : "";
 }
 const conBrujula = () => (S.clase.gruposInfo || []).length > 0;
 
@@ -279,6 +289,22 @@ async function prepararPropuesta() {
   const escritas = typeof PREGUNTAS !== "undefined" ? PREGUNTAS : [];
   const usadas = [...S.clase.debates.map(d => d.pregunta), ...(S.clase.descartadas || [])];
   const escrita = proximaPreguntaEscrita(escritas, usadas);
+  // clase con personajes: el duelo viene fijo en la pregunta (no se llama a emparejar). Si uno de
+  // los dos personajes no tiene a nadie inscrito, la propuesta lo dice y no se publica sola.
+  const duelo = PERS && escrita ? dueloEnGrupos(escrita.duelo, PERS) : null;
+  if (duelo) {
+    S.clase.propuesta = { ...duelo, estado: "lista", pregunta: escrita.texto, favor: escrita.favor || "", contra: escrita.contra || "",
+      porQue: `Duelo ${S.clase.debates.length + 1} de ${escritas.length}, escrito por ti en el archivo de la semana.`,
+      mejorFavor: "", mejorContra: "", fuente: "escrita", aviso: avisoDuelo(duelo.A, duelo.B) };
+    if (S.fase === "propuesta") mostrarPropuesta();
+    return;
+  }
+  // los duelos fijos ya se jugaron todos: no se inventa otro por detrás
+  if (PERS && !escrita && escritas.some(x => x && x.duelo)) {
+    S.clase.propuesta = { ...base, estado: "hechos", pregunta: "", porQue: "", mejorFavor: "", mejorContra: "", fuente: "escrita" };
+    if (S.fase === "propuesta") mostrarPropuesta();
+    return;
+  }
   if (escrita) {
     // si la pregunta dice qué campo afirma, A FAVOR va al grupo del par más cercano a ese campo
     const campo = escrita.afirma && typeof BRUJULA !== "undefined" ? BRUJULA.campos.find(c => c.id === escrita.afirma) : null;
@@ -318,6 +344,9 @@ function mostrarPropuesta() {
   // «Grupo 1 contra Grupo 2» por defecto: sin el par más lejano de la brújula ni el lado que
   // afirma la pregunta (encontrado en la prueba de punta a punta del 23-sep-2026).
   if (!p || ((p.A === null || p.B === null) && gruposDisponibles().length >= 2)) { S.clase.propuesta = null; prepararPropuesta(); return; }
+  // con personajes, el aviso de «sin nadie inscrito» se calcula de nuevo cada vez que se muestra:
+  // la propuesta del primer duelo se arma al abrir la sala, antes de la inscripción
+  if (PERS && p.estado === "lista") p.aviso = avisoDuelo(p.A, p.B);
   let el = $("propuesta");
   if (!el) { el = document.createElement("div"); el.id = "propuesta"; document.querySelector("main .col").appendChild(el); }
   const gs = Array.from({ length: S.clase.grupos }, (_, i) => i + 1);
@@ -332,6 +361,8 @@ function mostrarPropuesta() {
     <div class="pr-k">PRÓXIMO DEBATE · lo ves solo tú</div>
     ${p.estado === "pensando" ? `<div class="pr-pensando">La moderadora está pensando la próxima pregunta…</div>` : ""}
     ${p.estado === "vacia" ? `<div class="pr-aviso">La moderadora no pudo proponer una pregunta. Escribe la tuya o pide otra.</div>` : ""}
+    ${p.estado === "hechos" ? `<div class="pr-aviso">Los ${S.clase.debates.length} duelos ya se jugaron. Para cerrar, 🏁 TERMINAR CLASE; o escribe otra pregunta y elige los grupos.</div>` : ""}
+    ${p.aviso ? `<div class="pr-aviso" id="prFalta">${esc(p.aviso)}</div>` : ""}
     ${faltan ? `<div class="pr-aviso">Faltan grupos con alumnos conectados: se necesitan al menos dos.</div>` : ""}
     <textarea id="prTexto" rows="2" maxlength="300" placeholder="Escribe la pregunta del debate">${esc(p.pregunta || "")}</textarea>
     ${p.porQue ? `<div class="pr-porque">${esc(p.porQue)}</div>` : ""}
@@ -351,7 +382,7 @@ function mostrarPropuesta() {
     if (p.pregunta) (S.clase.descartadas = S.clase.descartadas || []).push(p.pregunta);   // no volver a proponerla
     S.clase.propuesta = null; prepararPropuesta();
   };
-  const listo = p.estado === "lista" && !faltan;
+  const listo = p.estado === "lista" && !faltan && !p.aviso;
   $("btnPrincipal").textContent = "PUBLICAR PREGUNTA";
   if (listo) {
     let resta = ROT.SEG_PROPUESTA;
@@ -372,6 +403,8 @@ function publicarPropuestaActual() {
   const error = t => { tick(t); if ($("prError")) $("prError").textContent = t; };
   if (!pregunta) { error("Escribe una pregunta o pide otra a la moderadora."); return; }
   if (!A || !B || A === B) { error("Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA."); return; }
+  // con personajes, un duelo con un lado sin nadie inscrito no se publica
+  if (avisoDuelo(A, B)) { error(avisoDuelo(A, B)); return; }
   // la postura escrita de cada lado vale solo si el profesor no reescribió la pregunta
   const p = S.clase.propuesta, igual = p && (p.pregunta || "").trim() === pregunta;
   publicarDebate({ pregunta, A, B, favor: igual ? p.favor : "", contra: igual ? p.contra : "" });

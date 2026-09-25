@@ -46,8 +46,10 @@ function mostrarPortada(url, codigo, alEmpezar) {
       <div class="po-sala">
         <div class="po-cfg">
           <label>Tema general <input id="poTema" value="${escHtml(S.clase.tema || SESION.tema)}"></label>
-          <label>Grupos <select id="poGrupos">${Array.from({ length: ROT.GRUPOS_MAX - ROT.GRUPOS_MIN + 1 }, (_, i) => i + ROT.GRUPOS_MIN)
-            .map(g => `<option ${g === S.clase.grupos ? "selected" : ""}>${g}</option>`).join("")}</select></label>
+          ${PERS ? `<label>Cupo por personaje <input id="poCupo" type="number" min="1" max="30" value="${S.clase.cupo || SESION.cupo || 4}" style="width:64px"></label>
+            <button class="btn pri" id="poInscripcion"></button><span id="poInsEstado" class="po-ins"></span>`
+          : `<label>Grupos <select id="poGrupos">${Array.from({ length: ROT.GRUPOS_MAX - ROT.GRUPOS_MIN + 1 }, (_, i) => i + ROT.GRUPOS_MIN)
+            .map(g => `<option ${g === S.clase.grupos ? "selected" : ""}>${g}</option>`).join("")}</select></label>`}
           ${typeof BRUJULA !== "undefined" ? `<label class="po-sw"><input type="checkbox" id="poBrujula" ${S.clase.brujula && S.clase.brujula.activa ? "checked" : ""}> Usar brújula</label>` : ""}
         </div>
         <div class="po-cuenta" id="poCuenta"></div>
@@ -59,8 +61,10 @@ function mostrarPortada(url, codigo, alEmpezar) {
       <button class="btn pri" id="poEmpezar">EMPEZAR ▶</button>
     </div>`;
   document.body.appendChild(el);
-  // con la brújula encendida, primero se forman los grupos (o se apaga y eligen a mano)
+  // con la brújula encendida, primero se forman los grupos (o se apaga y eligen a mano).
+  // Con personajes, EMPEZAR cierra la inscripción: quien no eligió entra al personaje más chico.
   $("poEmpezar").onclick = () => {
+    if (PERS && S.clase.inscripcion === "abierta") window.cerrarInscripcion?.();
     if (S.clase.brujula && S.clase.brujula.activa && S.clase.brujula.fase === "responder") {
       const a = $("poFormarAviso");
       if (a) a.textContent = "Primero FORMAR GRUPOS (o apaga la brújula para que elijan a mano).";
@@ -75,7 +79,16 @@ function mostrarPortada(url, codigo, alEmpezar) {
     actualizarPortada(window.jugadoresSala?.() || {});
   };
   $("poTema").onchange = e => { S.clase.tema = e.target.value.trim().slice(0, 200) || SESION.tema; window.publicarEstado?.(); };
-  $("poGrupos").onchange = async e => {
+  if (PERS) {
+    $("poInscripcion").onclick = () => {
+      if (S.clase.inscripcion === "abierta") window.cerrarInscripcion?.();
+      else window.abrirInscripcion?.(+$("poCupo").value);
+      actualizarPortada(window.jugadoresSala?.() || {});
+    };
+    // el cupo se puede subir (o corregir) con la inscripción abierta
+    $("poCupo").onchange = () => { window.fijarCupo?.(+$("poCupo").value); actualizarPortada(window.jugadoresSala?.() || {}); };
+  }
+  if ($("poGrupos")) $("poGrupos").onchange = async e => {
     S.clase.grupos = +e.target.value;
     // con los grupos ya formados, cambiar el numero los rehace: el profesor prueba 5 y 6
     // mirando el mapa antes de mandar a nadie a moverse de silla
@@ -138,6 +151,7 @@ function actualizarPortada(jugadores) {
   const conBrujula = S.clase.brujula && S.clase.brujula.activa && typeof BRUJULA !== "undefined";
   // con la brujula encendida el selector fija el k del reparto, asi que se muestra siempre
   if ($("poGrupos")) $("poGrupos").closest("label").style.display = "";
+  if (PERS) { portadaPersonajes(jugadores); return; }
   if ($("poBrujula")) $("poBrujula").closest("label").style.display = conBrujula && S.clase.brujula.fase !== "responder" ? "none" : "";
   if ($("poPie")) $("poPie").textContent = conBrujula
     ? `Entren con su cuenta de Google y respondan la brújula (un minuto). Salen ${S.clase.grupos} grupos, por posición en el mapa.`
@@ -161,6 +175,40 @@ function actualizarPortada(jugadores) {
   PORTADA.primera = false;
 }
 
+// Clase con personajes: una columna por personaje con su cupo («3/4»), y el botón de la
+// inscripción. Clic en una cara para moverla a otro personaje (o sacarla).
+function portadaPersonajes(jugadores) {
+  const g = $("poGente"); if (!g) return;
+  const lista = Object.entries(jugadores).map(([uid, j]) => ({ uid, ...j })).sort((a, b) => (a.unido || 0) - (b.unido || 0));
+  const conteo = conteoPersonajes(jugadores, PERS), cupo = S.clase.cupo || SESION.cupo || 4;
+  const sin = lista.filter(j => !(j.grupo > 0));
+  const ins = S.clase.inscripcion;
+  $("poInscripcion").textContent = ins === "abierta" ? "CERRAR INSCRIPCIÓN" : ins === "cerrada" ? "REABRIR INSCRIPCIÓN" : "ABRIR INSCRIPCIÓN";
+  $("poInsEstado").textContent = ins === "abierta" ? "● abierta" : ins === "cerrada" ? "cerrada: quien llegue entra al personaje más chico" : `sugerido: cupo ${cupoSugerido(lista.length, PERS.length)} para ${lista.length}`;
+  const lleno = ins === "abierta" && sin.length && todosLlenos(conteo, cupo, PERS);
+  $("poCuenta").innerHTML = `<b>${lista.length}</b> en la sala${sin.length ? ` <span style="color:var(--dim)">· ${sin.length} sin personaje</span>` : ""}`
+    + (lleno ? ` <span style="color:var(--hot)">· todos los personajes están llenos: sube el cupo</span>` : "");
+  if ($("poPie")) $("poPie").textContent = ins === "abierta"
+    ? `Elijan su personaje en el teléfono: cupo ${cupo}, por orden de llegada. Si se llena, elijan otro.`
+    : "Entren con su cuenta de Google y el código. La inscripción a los personajes se abre en un momento.";
+  const antes = PORTADA.vistos.size;
+  const cara = j => caraPortada(j, 46);
+  g.innerHTML = `<div class="po-grupos">${PERS.map(p => `<div class="po-g" style="border-color:${p.color}">
+      <div class="po-gk" style="color:${p.color}">${escHtml(p.nombre.toUpperCase())} <span>${conteo[p.n]}/${cupo}</span></div>
+      <div class="po-gc">${escHtml(p.cargo)} · duelo ${p.duelo} · ${p.lado === "A" ? "a favor" : "en contra"}</div>
+      ${lista.filter(j => j.grupo === p.n).map(cara).join("")}</div>`).join("")}</div>
+    ${sin.length ? `<div class="po-sin">${sin.map(cara).join("")}</div>` : ""}`;
+  g.querySelectorAll(".po-j").forEach(el => el.onclick = () => {
+    const menu = PERS.map(p => `${p.n} ${p.nombre}`).join("\n");
+    const r = prompt(`¿A qué personaje mueves a ${el.textContent.trim()}?\n${menu}\n0 sin personaje`);
+    if (r === null || r.trim() === "") return;
+    const destino = +r;
+    if (destino >= 0 && destino <= PERS.length) window.moverAlumno?.(el.dataset.uid, destino);
+  });
+  if (PORTADA.vistos.size > antes && !PORTADA.primera) sonar("pop");
+  PORTADA.primera = false;
+}
+
 function cerrarPortada() { $("portada")?.remove(); }
 
 /* ----------------------------- 2. INTRO ----------------------------- */
@@ -169,9 +217,16 @@ function laminasIntro() {
   return [
     `<div class="in-k">SEMANA ${SESION.semana} · TEMA GENERAL</div>
      <div class="in-tema">${escHtml(S.clase.tema || SESION.tema)}</div>`,
+    ...(PERS ? [`<div class="in-k">SEIS PERSONAJES · TRES DUELOS</div>
+     <div class="in-duelos">${(typeof PREGUNTAS !== "undefined" ? PREGUNTAS : []).filter(q => q.duelo).map((q, i) => {
+       const d = dueloEnGrupos(q.duelo, PERS) || {};
+       const p = n => personajeDe(n, PERS) || { nombre: "?", cargo: "", color: "var(--dim)" };
+       return `<div><b style="color:${p(d.A).color}">${escHtml(p(d.A).nombre)}</b><i>duelo ${i + 1}</i><b style="color:${p(d.B).color}">${escHtml(p(d.B).nombre)}</b>
+         <span>«${escHtml(q.texto)}»</span></div>`; }).join("")}</div>
+     <div class="in-sub">Hablan en primera persona, como su personaje. Los jueces premian la fidelidad: que tu personaje lo diría, y que puedas decir dónde lo dijo.</div>`] : []),
     `<div class="in-k">CÓMO FUNCIONA</div>
      <div class="in-jueces">
-       <div><div class="in-e">🎙</div><b>LA MODERADORA LLAMA</b><span>Plantea una pregunta y llama a dos grupos: uno a favor y otro en contra.</span></div>
+       <div><div class="in-e">🎙</div><b>LA MODERADORA LLAMA</b><span>${PERS ? "Llama a los dos personajes de cada duelo, en orden: uno a favor y otro en contra." : "Plantea una pregunta y llama a dos grupos: uno a favor y otro en contra."}</span></div>
        <div><div class="in-e">💬</div><b>DEBATEN</b><span>Un tramo abierto de ${mm(ROT.SEG_DEBATE)}: la posición de entrada y después libre. La moderadora da la palabra.</span></div>
        <div><div class="in-e">🗳</div><b>LOS DEMÁS VOTAN</b><span>Los grupos que no debaten votan quién argumentó mejor —aunque no piensen como él— y predicen a los jueces: cada acierto suma un punto de oráculo. Después, rotan.</span></div>
      </div>`,
@@ -185,7 +240,7 @@ function laminasIntro() {
      <div class="in-jueces">
        <div><div class="in-e">⚖</div><b>LOS JUECES · 50%</b><span>Cinco jueces de IA con perfiles distintos. Como en los clavados, se tachan la nota más alta y la más baja.</span></div>
        <div><div class="in-e">🗳</div><b>EL PÚBLICO · 50%</b><span>Los votos que el grupo gana entre quienes no debaten.</span></div>
-       <div><div class="in-e">🏆</div><b>EL RANKING</b><span>Promedio de cada grupo por debate. Al final de la clase, el campeón.</span></div>
+       <div><div class="in-e">🏆</div><b>EL RANKING</b><span>${PERS ? "Cada personaje debate una vez. Al final de la clase, el campeón." : "Promedio de cada grupo por debate. Al final de la clase, el campeón."}</span></div>
      </div>`,
     // lo que piden los jueces: se explica antes, para que nadie se entere en vivo frente a la sala
     ...(typeof INSTRUMENTOS !== "undefined" && INSTRUMENTOS.length ? [`<div class="in-k">LO QUE PIDEN LOS JUECES · EL INSTRUMENTO</div>
@@ -264,11 +319,11 @@ $("btnIntro").onclick = () => mostrarIntro();
 function tablaRanking(filas, antes = []) {
   const puestoAntes = g => (antes.find(f => f.grupo === g) || {}).puesto;
   const fmt1 = v => v === null || v === undefined ? "—" : v.toFixed(1);
-  return `<table class="rk"><tr><th></th><th>Grupo</th><th>Debates</th><th>Jurado</th><th>Público</th><th>Puntaje</th></tr>
+  return `<table class="rk"><tr><th></th><th>${PERS ? "Personaje" : "Grupo"}</th><th>Debates</th><th>Jurado</th><th>Público</th><th>Puntaje</th></tr>
     ${filas.map(f => {
       const pa = puestoAntes(f.grupo), mov = pa && f.puesto ? pa - f.puesto : 0;
       return `<tr class="${f.debates ? "" : "sin"}"><td class="pu">${f.puesto ?? "·"}${mov > 0 ? `<i class="sube">▲${mov}</i>` : mov < 0 ? `<i class="baja">▼${-mov}</i>` : ""}</td>
-        <td><b>Grupo ${f.grupo}</b>${f.distincion === "jurado" || f.distincion === "ambos" ? ` <span class="dis">★ mejor argumentado</span>` : ""}${f.distincion === "publico" || f.distincion === "ambos" ? ` <span class="dis">♥ favorito del público</span>` : ""}</td>
+        <td><b>${escHtml(nombreG(f.grupo))}</b>${f.distincion === "jurado" || f.distincion === "ambos" ? ` <span class="dis">★ mejor argumentado</span>` : ""}${f.distincion === "publico" || f.distincion === "ambos" ? ` <span class="dis">♥ favorito del público</span>` : ""}</td>
         <td>${f.debates || "sin debatir"}</td><td>${fmt1(f.jurado)}</td><td>${fmt1(f.publico)}</td><td class="pt">${fmt1(f.puntaje)}</td></tr>`;
     }).join("")}</table>`;
 }
@@ -278,23 +333,23 @@ function mostrarResultadoDebate(u, antes, despues, alTerminar, oraculos = []) {
   $("resultado")?.remove();
   const r = u.res, gana = r.ganador ? u[r.ganador] : null;
   const f1 = v => (v === null || v === undefined ? "—" : v.toFixed(1));
-  const lado = (k, c) => `<div class="rs-lado" style="--c:${c}"><div class="rs-g">GRUPO ${u[k]}</div><div class="rs-p">${f1(r[k].puntaje)}</div>
+  const lado = (k, c) => `<div class="rs-lado" style="--c:${c}"><div class="rs-g">${escHtml(nombreG(u[k]).toUpperCase())}</div><div class="rs-p">${f1(r[k].puntaje)}</div>
     <div class="rs-d">jueces ${u.panel && u.panel[k].total !== null ? f1(u.panel[k].total) + "/30" : "—"} · público ${u.publico && u.publico.n ? u.publico[k] + " votos" : "—"}</div></div>`;
   const top = (oraculos || []).slice(0, 5);
   // el público activo: cuánto se movió la sala (termómetro) y la frase con más 🔥. No son puntaje.
   const t = u.termo, mueve = t && t.n && t.mov !== null && Math.abs(t.mov) >= 1 ? (t.mov > 0 ? "A" : "B") : null;
   const extra = [
-    t && t.n ? `<div>🌡 ${mueve ? `El público se movió <b style="color:${EQUIPOS[mueve].color}">${Math.abs(Math.round(t.mov))} puntos hacia el Grupo ${u[mueve]}</b>` : "El público terminó donde empezó"} <small>(${t.n} con el termómetro)</small></div>` : "",
-    u.frase ? `<div>🔥 La frase del debate · <b style="color:${EQUIPOS[u.frase.equipo]?.color || "inherit"}">${escHtml(conGrupo(u.frase.nombre, u.frase.grupo))}</b>: «${escHtml(String(u.frase.texto).slice(0, 160))}${String(u.frase.texto).length > 160 ? "…" : ""}» <small>(${u.frase.fuego} 🔥)</small></div>` : ""
+    t && t.n ? `<div>🌡 ${mueve ? `El público se movió <b style="color:${EQUIPOS[mueve].color}">${Math.abs(Math.round(t.mov))} puntos hacia ${PERS ? "" : "el "}${escHtml(nombreG(u[mueve]))}</b>` : "El público terminó donde empezó"} <small>(${t.n} con el termómetro)</small></div>` : "",
+    u.frase ? `<div>🔥 La frase del debate · <b style="color:${EQUIPOS[u.frase.equipo]?.color || "inherit"}">${escHtml(conGrupo(u.frase.nombre, u.frase.grupo, PERS))}</b>: «${escHtml(String(u.frase.texto).slice(0, 160))}${String(u.frase.texto).length > 160 ? "…" : ""}» <small>(${u.frase.fuego} 🔥)</small></div>` : ""
   ].join("");
   const el = document.createElement("div");
   el.id = "resultado";
   el.innerHTML = `<div class="rs-k">DEBATE ${u.n} · RESULTADO</div>
     <div class="rs-q">«${escHtml(u.pregunta)}»</div>
-    <div class="rs-vs">${lado("A", EQUIPOS.A.color)}<div class="rs-x">${gana ? `GANA GRUPO ${gana}` : "EMPATE"}</div>${lado("B", EQUIPOS.B.color)}</div>
+    <div class="rs-vs">${lado("A", EQUIPOS.A.color)}<div class="rs-x">${gana ? `GANA ${escHtml(nombreG(gana).toUpperCase())}` : "EMPATE"}</div>${lado("B", EQUIPOS.B.color)}</div>
     ${extra ? `<div class="rs-extra">${extra}</div>` : ""}
     <div class="rs-tablas">${tablaRanking(despues, antes)}
-      <div class="rs-or"><div class="rs-ork">🔮 ORÁCULOS</div>${top.length ? top.map(o => `<div><span>#${o.puesto}</span><b>${escHtml(conGrupo(o.nombre, o.grupo))}</b><i>${o.puntos}</i></div>`).join("")
+      <div class="rs-or"><div class="rs-ork">🔮 ORÁCULOS</div>${top.length ? top.map(o => `<div><span>#${o.puesto}</span><b>${escHtml(conGrupo(o.nombre, o.grupo, PERS))}</b><i>${o.puntos}</i></div>`).join("")
         : `<div class="vacio">Nadie ha acertado todavía.</div>`}</div></div>
     <div class="rs-pie"><button class="btn pri" id="rsSeguir">SEGUIR ▶</button></div>`;
   document.body.appendChild(el);
@@ -313,8 +368,8 @@ function ceremoniaRanking() {
   const el = document.createElement("div");
   el.id = "ceremonia";
   el.innerHTML = `<div class="cer-k" id="cer0">EL RANKING DE LA CLASE</div>
-    <div class="cer-rk">${[...filas].reverse().map((f, i) => `<div class="cer-fila" id="cf${i}"><span class="n">#${f.puesto}</span><b>GRUPO ${f.grupo}</b><span class="p">${f.puntaje.toFixed(1)}</span></div>`).join("")}</div>
-    <div class="cer-bloque" id="cerG"><div class="cer-k">CAMPEÓN</div><div class="cer-g" style="color:var(--amber)">${filas[0] ? `🏆 GRUPO ${filas[0].grupo}` : "SIN DEBATES"}</div></div>
+    <div class="cer-rk">${[...filas].reverse().map((f, i) => `<div class="cer-fila" id="cf${i}"><span class="n">#${f.puesto}</span><b>${escHtml(nombreG(f.grupo).toUpperCase())}</b><span class="p">${f.puntaje.toFixed(1)}</span></div>`).join("")}</div>
+    <div class="cer-bloque" id="cerG"><div class="cer-k">CAMPEÓN</div><div class="cer-g" style="color:var(--amber)">${filas[0] ? `🏆 ${escHtml(nombreG(filas[0].grupo).toUpperCase())}` : "SIN DEBATES"}</div></div>
     <div class="cer-lect" id="cer3"><button class="btn pri" id="cerOr">VER ORÁCULOS ▶</button> <button class="btn" id="cerCerrar">Cerrar</button></div>`;
   document.body.appendChild(el);
   sonar("redoble");
@@ -337,8 +392,8 @@ function ceremoniaOraculos(el) {
   el.innerHTML = `<div class="cer-k" style="color:#a78bfa">🔮 EL ORÁCULO DE LA CLASE</div>
     <div class="cer-sub">quién predijo mejor a los jueces</div>
     ${ors.length ? `<div class="cer-rk">${[...ors].reverse().map((o, i) => `<div class="cer-fila" id="co${i}"><span class="n">#${o.puesto}</span>
-        <b>${escHtml(conGrupo(o.nombre, o.grupo))}</b><span class="p" style="color:#a78bfa">${o.aciertos} de ${o.predicciones}${o.preguntas ? ` · ✋ ${o.preguntas}` : ""}</span></div>`).join("")}</div>
-      <div class="cer-bloque" id="coG"><div class="cer-g" style="color:#a78bfa">🔮 ${escHtml(conGrupo(top.nombre, top.grupo))}</div>
+        <b>${escHtml(conGrupo(o.nombre, o.grupo, PERS))}</b><span class="p" style="color:#a78bfa">${o.aciertos} de ${o.predicciones}${o.preguntas ? ` · ✋ ${o.preguntas}` : ""}</span></div>`).join("")}</div>
+      <div class="cer-bloque" id="coG"><div class="cer-g" style="color:#a78bfa">🔮 ${escHtml(conGrupo(top.nombre, top.grupo, PERS))}</div>
         <div class="cer-s">${top.puntos} punto${top.puntos === 1 ? "" : "s"} · acertó ${top.aciertos} de ${top.predicciones} veredictos${top.preguntas ? ` · ${top.preguntas} pregunta${top.preguntas === 1 ? "" : "s"} elegida${top.preguntas === 1 ? "" : "s"}` : ""}</div></div>`
     : `<div class="cer-bloque on"><div class="cer-g" style="color:var(--dim);font-size:40px">Nadie predijo a los jueces esta clase</div>
         <div class="cer-s">Solo cuentan los debates donde los jueces eligieron un ganador; los empates no suman.</div></div>`}
@@ -440,7 +495,7 @@ function mostrarVotacion(d) {
   el.innerHTML = `<div class="es-k">EL PÚBLICO VOTA · ¿quién argumentó mejor, aunque no pienses como él?</div>
     <div class="es-q">«${escHtml(d.pregunta)}»</div>
     <div class="vb">${["A", "B"].map(k => `<div class="vb-fila" id="vbf${k}" style="--c:${EQUIPOS[k].color}">
-        <div class="vb-n">${EQUIPOS[k].nombre} · GRUPO ${d[k]}</div>
+        <div class="vb-n">${EQUIPOS[k].nombre} · ${escHtml(nombreG(d[k]).toUpperCase())}</div>
         <div class="vb-barra"><i id="vb${k}"></i></div><div class="vb-c mono" id="vbc${k}">0</div></div>`).join("")}</div>
     <div class="es-pie mono" id="vbPie"></div>
     <div class="es-oraculo">🔮 En el teléfono, además: apuesten a quién eligen los 5 jueces de IA. Cada acierto, +1 punto de oráculo.</div>`;
@@ -475,7 +530,7 @@ async function mostrarVeredictoPublico(d, pub) {
   const b = document.createElement("div");
   b.className = "es-ganador on";
   b.innerHTML = !pub.n ? "Nadie votó en este debate"
-    : g ? `GANA EL PÚBLICO: <b style="color:${EQUIPOS[g].color}">GRUPO ${d[g]}</b> · ${Math.round(g === "A" ? pub.parteA : pub.parteB)} %`
+    : g ? `GANA EL PÚBLICO: <b style="color:${EQUIPOS[g].color}">${escHtml(nombreG(d[g]).toUpperCase())}</b> · ${Math.round(g === "A" ? pub.parteA : pub.parteB)} %`
     : "EMPATE EN EL PÚBLICO";
   $("escena").appendChild(b);
   sonar(g ? "fanfarria" : "whoosh");
@@ -493,13 +548,13 @@ async function mostrarVeredictoJueces(d, jueces, panel) {
   const tarjeta = (j, k) => `<div class="tj" id="tj-${j.id}-${k}" style="--c:${EQUIPOS[k].color}">${fmtNota(j[k])}</div>`;
   el.innerHTML = `<div class="es-k">EL PANEL DE JUECES</div>
     <div class="es-q">«${escHtml(d.pregunta)}»</div>
-    <div class="jz-lados"><span style="color:${EQUIPOS.A.color}">■ GRUPO ${d.A} · A FAVOR</span><span style="color:${EQUIPOS.B.color}">■ GRUPO ${d.B} · EN CONTRA</span></div>
+    <div class="jz-lados"><span style="color:${EQUIPOS.A.color}">■ ${escHtml(nombreG(d.A).toUpperCase())} · A FAVOR</span><span style="color:${EQUIPOS.B.color}">■ ${escHtml(nombreG(d.B).toUpperCase())} · EN CONTRA</span></div>
     <div class="jz">${jueces.map(j => `<div class="jz-col" id="jz-${j.id}">
         <div class="jz-e">${j.emoji}</div><div class="jz-n">${escHtml(j.nombre)}</div><div class="jz-p">${escHtml(j.valora)}</div>
         <div class="jz-t">${tarjeta(j, "A")}${tarjeta(j, "B")}</div>
         <div class="jz-f"><i style="color:${EQUIPOS.A.color}">${escHtml(j.fraseA || "")}</i><i style="color:${EQUIPOS.B.color}">${escHtml(j.fraseB || "")}</i></div>
       </div>`).join("")}</div>
-    <div class="jz-tot">${["A", "B"].map(k => `<div style="--c:${EQUIPOS[k].color}"><small>GRUPO ${d[k]}</small><b class="mono" id="jzt${k}">0.0</b><small>/30</small></div>`).join("")}</div>
+    <div class="jz-tot">${["A", "B"].map(k => `<div style="--c:${EQUIPOS[k].color}"><small>${escHtml(nombreG(d[k]).toUpperCase())}</small><b class="mono" id="jzt${k}">0.0</b><small>/30</small></div>`).join("")}</div>
     <div class="es-ganador" id="jzG"></div>
     ${jueces.some(j => j.simulado) ? `<div class="jz-sim">jueces simulados (sin motor)</div>` : ""}`;
   sonar("redoble");
@@ -519,7 +574,7 @@ async function mostrarVeredictoJueces(d, jueces, panel) {
   if (!el.isConnected) return;
   const g = panel.ganador;
   $("jzG").innerHTML = panel.A.total === null ? "Los jueces no alcanzaron a votar"
-    : g ? `GANAN LOS JUECES: <b style="color:${EQUIPOS[g].color}">GRUPO ${d[g]}</b>` : "EMPATE ENTRE LOS JUECES";
+    : g ? `GANAN LOS JUECES: <b style="color:${EQUIPOS[g].color}">${escHtml(nombreG(d[g]).toUpperCase())}</b>` : "EMPATE ENTRE LOS JUECES";
   $("jzG").classList.add("on");
   sonar(g ? "fanfarria" : "whoosh");
   if (g) confeti([EQUIPOS[g].color, "#ffffff", "#ffb020"], 3000);

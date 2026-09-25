@@ -163,8 +163,64 @@ function proximaPreguntaEscrita(preguntas, usadas) {
   const out = { texto: textoPregunta(p), afirma: (typeof p === "object" && p.afirma) || null };
   if (typeof p === "object" && p.favor) out.favor = p.favor;
   if (typeof p === "object" && p.contra) out.contra = p.contra;
+  if (typeof p === "object" && p.duelo) out.duelo = p.duelo;     // clase con personajes: { A: id, B: id }
   return out;
 }
+
+/* --- Clase con personajes (semana 308) ----------------------------------
+   Una semana puede definir PERSONAJES: cada grupo pasa a llamarse como un personaje (Jensen Huang,
+   Dario Amodei…), los alumnos se inscriben a mano con cupo y por orden de llegada, y los duelos
+   vienen fijos en PREGUNTAS. Por debajo el grupo sigue siendo el número 1..N (el orden de
+   PERSONAJES): emparejar, el ranking, los votos y las reglas de Firestore no cambian.
+   `ps` es la lista numerada [{ n, id, nombre, corto, … }]; sin ella todo se ve como antes. */
+function numerarPersonajes(lista) {
+  return Array.isArray(lista) && lista.length ? lista.map((p, i) => ({ ...p, n: i + 1 })) : null;
+}
+const personajeDe = (n, ps) => (Array.isArray(ps) && ps.length && n > 0 ? ps.find(p => p.n === n) || null : null);
+// «Grupo 3» o «Jensen Huang»
+const rotuloGrupo = (n, ps) => { const p = personajeDe(n, ps); return p ? p.nombre : `Grupo ${n}`; };
+// «G3» o «Huang»: donde no cabe el nombre completo
+const rotuloCorto = (n, ps) => { const p = personajeDe(n, ps); return p ? p.corto : `G${n}`; };
+// «@Grupo 3» o «@Huang»: cómo la moderadora llama a un grupo
+const mencionGrupo = (n, ps) => { const p = personajeDe(n, ps); return p ? `@${p.corto}` : `@Grupo ${n}`; };
+// Con qué @ se da por aludido un integrante del grupo, además de «@Grupo N» (ritmo.js)
+const aliasGrupo = (n, ps) => {
+  const p = personajeDe(n, ps);
+  const nm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zñ0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  return p ? [...new Set([nm(p.corto), nm(p.nombre)].filter(Boolean))] : [];
+};
+
+// Cuántos inscritos tiene cada personaje: { 1: 3, 2: 4, … } (jugadores: { uid: { grupo } })
+function conteoPersonajes(jugadores, ps) {
+  const c = {};
+  for (const p of ps || []) c[p.n] = 0;
+  for (const j of Object.values(jugadores || {})) if (j && j.grupo > 0 && j.grupo in c) c[j.grupo]++;
+  return c;
+}
+const personajeLleno = (n, conteo, cupo) => (conteo[n] || 0) >= cupo;
+const todosLlenos = (conteo, cupo, ps) => (ps || []).every(p => personajeLleno(p.n, conteo, cupo));
+// Lo que sugiere la portada: con 24 presentes y seis personajes, cupo 4
+const cupoSugerido = (presentes, k) => Math.max(1, Math.ceil((presentes || 0) / Math.max(1, k || 1)));
+
+// Quien llega con la inscripción cerrada: al personaje con menos gente entre los que todavía no
+// han debatido (así no cae en un duelo que ya pasó); a igual tamaño, el de número menor. Si ya
+// debatieron todos, al más chico de todos.
+function personajeParaAtrasado(ps, conteo, debates) {
+  if (!ps || !ps.length) return null;
+  const jugo = n => (debates || []).some(d => d.A === n || d.B === n);
+  const pendientes = ps.filter(p => !jugo(p.n));
+  const pool = pendientes.length ? pendientes : ps;
+  return pool.reduce((m, p) => ((conteo[p.n] || 0) < (conteo[m.n] || 0) ? p : m)).n;
+}
+
+// El duelo de una pregunta escrita, en números de grupo; null si falta alguno de los dos.
+function dueloEnGrupos(duelo, ps) {
+  if (!duelo || !ps) return null;
+  const n = id => (ps.find(p => p.id === id) || {}).n;
+  return n(duelo.A) && n(duelo.B) ? { A: n(duelo.A), B: n(duelo.B) } : null;
+}
+// Los personajes del duelo que no tienen a nadie inscrito (A primero)
+const faltanEnDuelo = (par, conteo, ps) => ["A", "B"].map(k => par[k]).filter(n => !(conteo[n] > 0)).map(n => rotuloGrupo(n, ps));
 
 // Lo que sostiene cada lado, en una frase, para el minuto de preparación. Es la postura, no el
 // argumento: los argumentos los buscan ellos en las lecturas. Sin postura escrita, una genérica.
@@ -197,11 +253,18 @@ function sumarPuntoPregunta(registro, v) {
   return r;
 }
 
-// Cómo se muestra una persona en pantalla: su nombre y su grupo, «Naim (grupo 1)».
-const conGrupo = (nombre, grupo) => (grupo ? `${nombre} (grupo ${grupo})` : String(nombre || ""));
+// Cómo se muestra una persona en pantalla: su nombre y su grupo, «Naim (grupo 1)»; con
+// personajes, «Naim (Huang)».
+const conGrupo = (nombre, grupo, ps) => {
+  if (!grupo) return String(nombre || "");
+  const p = personajeDe(grupo, ps);
+  return `${nombre} (${p ? p.corto : `grupo ${grupo}`})`;
+};
 
 function mejorIntervencion(historial) {
   return (historial || []).reduce((m, h) => (!m || h.total > m.total ? h : m), null);
 }
 
-if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, posturasDebate, gruposEscribiendo, sumarPuntoPregunta, mejorIntervencion, conGrupo };
+if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, posturasDebate, gruposEscribiendo, sumarPuntoPregunta, mejorIntervencion, conGrupo,
+  numerarPersonajes, personajeDe, rotuloGrupo, rotuloCorto, mencionGrupo, aliasGrupo, conteoPersonajes, personajeLleno, todosLlenos,
+  cupoSugerido, personajeParaAtrasado, dueloEnGrupos, faltanEnDuelo };
