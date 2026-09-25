@@ -214,6 +214,7 @@ async function entrarAlJuego() {
     pintarVivoParcial();
     pintarBarraTel();
     if (J.sala) pintarVotar(J.sala);                  // el resumen del relator llega con la votación ya abierta
+    if (J.sala) pintarPublicoActivo(J.sala, rolEn(J.sala));   // la moderadora usó mi pregunta: el botón lo dice
     if (!J.primera) avisarNuevos(nuevos);
     J.primera = false;
   }, e => { $("pJuego").innerHTML = `<div class="sep">No se pudo leer la conversación (${esc(e.code)}).</div>`; }));
@@ -420,6 +421,8 @@ function suscribirPublicoActivo(n) {
     if (d.exists() && PA.debate === n && !PA.preg) { PA.preg = d.data().texto; pintarPublicoActivo(J.sala, rolEn(J.sala)); }
   }).catch(() => {});
 }
+// ¿La moderadora ya lanzó mi pregunta en este debate? Hay una sola por persona y debate (${n}_${uid}).
+const preguntaUsada = n => J.chat.some(m => m.tipo === "mod" && m.debate === n && m.datos && m.datos.tribuna === "pregunta" && m.datos.uid === J.uid);
 function pintarPublicoActivo(s, rol) {
   const d = s.debate;
   suscribirPublicoActivo(d ? d.n : null);
@@ -433,7 +436,10 @@ function pintarPublicoActivo(s, rol) {
   $("tmVal").textContent = v === null ? "muévelo cuando algo te convenza" : Math.abs(v) < 8 ? "parejo"
     : `${Math.abs(v) >= 60 ? "muy " : ""}${v > 0 ? "a favor" : "en contra"}`;
   $("tmVal").classList.toggle("on", v !== null);
-  $("btnPreg").textContent = PA.preg ? "✋ Tu pregunta está en la fila · cambiarla" : "✋ Preguntar al debate";
+  const usada = preguntaUsada(d.n);
+  $("btnPreg").textContent = usada ? "✋ La moderadora ya usó tu pregunta" : PA.preg ? "✋ Tu pregunta está en la fila · cambiarla" : "✋ Preguntar al debate";
+  $("btnPreg").disabled = usada;
+  if (usada) $("pregCaja").classList.add("oculto");
 }
 function guardarTermometro() {
   const s = J.sala, d = s && s.debate;
@@ -469,7 +475,7 @@ function prepararPublicoActivo() {
   };
   $("pregEnviar").onclick = async () => {
     const s = J.sala, d = s && s.debate, texto = $("pregTx").value.trim().slice(0, PUB.PREGUNTA_MAX);
-    if (!texto || !d || rolEn(s) !== "P" || s.fase !== "abierta") return;
+    if (!texto || !d || rolEn(s) !== "P" || s.fase !== "abierta" || preguntaUsada(d.n)) return;
     try {
       await setDoc(doc(db, "salas", J.codigo, "preguntas", `${d.n}_${J.uid}`),
         { uid: J.uid, nombre: J.nombre, grupo: J.grupo, debate: d.n, texto, t: Date.now() });
@@ -820,10 +826,23 @@ function sinTiempo(s) {
 // tiempo. No se compara `fin` con el reloj de este teléfono: el proyector publica cuándo termina.
 const hablaPorPunto = s => !!(s && s.punto && s.punto.estado === "aceptado" && s.punto.de === J.uid);
 
-// Un integrante del lado que recibe un punto aceptado no queda bloqueado: decide su banco.
+// Con un punto aceptado, el lado que lo recibió (el que venía hablando) cede la palabra: escucha
+// los 15 s de quien lo pidió. Devuelve el punto, o null.
+const cedoPorPunto = s => (s && s.punto && s.punto.estado === "aceptado" && s.punto.para === miLado(s) && s.punto.de !== J.uid ? s.punto : null);
+const quienPunto = p => corto(p.nombre) || "el otro lado";
+
 function puedoHablar(s) {
   if (!s || !Reconocedor || !opcionActiva(s.opciones, "voz") || s.fase !== "abierta" || !s.debate || !miLado(s)) return false;
+  if (cedoPorPunto(s)) return false;
   return !sinTiempo(s) || hablaPorPunto(s);
+}
+// Mi banco (contado aquí) está por llegar a cero: el proyector, que lo ve un poco antes, puede estar
+// ya en las últimas palabras. Lo dicho sale sin esperar el resultado final, o el tramo se cierra antes.
+function alBorde(s) {
+  const lado = miLado(s);
+  if (!lado || !opcionActiva(s.opciones, "reloj")) return false;
+  const r = bancoMio(s);
+  return !!r && r[lado] < 1000;
 }
 
 function avisoHabla(txt) { const m = $("miHabla"); if (m) { m.textContent = txt; m.classList.toggle("aviso", !!txt); } }
@@ -903,11 +922,12 @@ function tickHabla() {
   if (!HABLA.apretado || !h) return;
   // se cerró el tramo (o cambió el debate, o ya no está en un lado): se descarta, no se envía
   if (!s || s.fase !== "abierta" || !s.debate || s.debate.n !== h.debate || !miLado(s)) { soltarHablar({ enviar: false }); return; }
-  // se le acabó el tiempo a su lado, o terminó su punto de información: lo dicho hasta ahí sale
-  // sin tiempo: sale ya con lo que hay (sin esperar el final), antes de que el proyector cierre el tramo
+  // se le acabó el tiempo a su lado, terminó su punto de información o aceptaron un punto contra
+  // su lado: lo dicho hasta ahí sale. Sin tiempo o cediendo, sale ya con lo que hay (sin esperar el
+  // final): antes de que el proyector cierre el tramo, o mientras el otro hace su punto.
   if (!puedoHablar(s)) {
-    const agotado = sinTiempo(s);
-    soltarHablar({ aviso: agotado ? "⏱ Tu lado se quedó sin tiempo: solo puedes escribir." : "", inmediato: agotado });
+    const agotado = sinTiempo(s), cede = cedoPorPunto(s);
+    soltarHablar({ aviso: cede ? `✋ Punto de ${quienPunto(cede)}: escucha.` : agotado ? "⏱ Tu lado se quedó sin tiempo: solo puedes escribir." : "", inmediato: agotado || !!cede });
     return;
   }
   const ahora = Date.now();
@@ -929,7 +949,9 @@ function empezarHablar(e) {
   if (HABLA.apretado) return;
   const s = J.sala;
   if (!puedoHablar(s)) {
-    avisoHabla(s && sinTiempo(s) ? "⏱ Tu lado se quedó sin tiempo: solo puedes escribir." : "Podrás hablar cuando se abra el tramo.");
+    const cede = cedoPorPunto(s);
+    avisoHabla(cede ? `✋ Punto de ${quienPunto(cede)}: escucha. Hablas cuando termine.`
+      : s && sinTiempo(s) ? "⏱ Tu lado se quedó sin tiempo: solo puedes escribir." : "Podrás hablar cuando se abra el tramo.");
     return;
   }
   cortarDictado();                                  // un solo micrófono: el dictado de la caja termina
@@ -944,15 +966,20 @@ function empezarHablar(e) {
   pintarBotonHablar(s);
 }
 
-// Al soltar (o si el teléfono se oculta): espera el resultado final (1,2 s como mucho) y, si dijo
-// al menos dos palabras, lo envía. enviar: false descarta (se cerró el tramo, no dio permiso);
-// inmediato: envía ya lo que hay, sin esperar el final (se acabó el tiempo de su lado).
+// Al soltar (o si el teléfono se oculta): habla: null en el acto (el reloj de su lado deja de correr
+// al soltar, no cuando llega el mensaje); luego espera el resultado final (1,2 s como mucho) y, si
+// dijo al menos dos palabras, lo envía. enviar: false descarta (se cerró el tramo, no dio permiso);
+// inmediato: envía ya lo que hay, sin esperar el final (sin tiempo, o cede la palabra a un punto).
+// Las últimas palabras del proyector (clase.js, ULTIMAS) esperan el mensaje un respiro tras habla:
+// null; por eso, con el banco al borde, tampoco se espera el final.
 async function soltarHablar({ enviar = true, aviso = "", inmediato = false } = {}) {
   if (!HABLA.apretado) return;
   const h = HABLA.toma, rec = h.rec;
   HABLA.apretado = false;
   clearInterval(HABLA.timer); HABLA.timer = null;
+  if (J.codigo && J.uid) setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { habla: null }, { merge: true }).catch(() => {});
   pintarBotonHablar(J.sala);
+  if (enviar && J.sala && alBorde(J.sala)) inmediato = true;
   if (enviar && rec && !inmediato) {
     await new Promise(listo => {
       const plazo = setTimeout(listo, HABLA.ESPERA);
@@ -971,7 +998,6 @@ async function soltarHablar({ enviar = true, aviso = "", inmediato = false } = {
     else if (vigente && !aviso) aviso = "🎤 Muy corto: di al menos dos palabras.";
   }
   if (HABLA.apretado) { if (error) avisoHabla(error); return; }   // ya volvió a apretar: la toma nueva manda, pero el error se ve
-  setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { habla: null }, { merge: true }).catch(() => {});
   if (HABLA.toma === h) HABLA.toma = null;
   avisoHabla(error || aviso);
 }
@@ -1013,15 +1039,17 @@ function montarBotonHablar(contenedor) {
 function pintarBotonHablar(s) {
   const b = $("btnHablar");
   if (!b || !s) return;
-  const puede = puedoHablar(s), agotado = s.fase === "abierta" && sinTiempo(s);
-  const estado = HABLA.apretado ? "apretado" : puede ? (agotado ? "punto" : "listo") : agotado ? "agotado" : "cerrado";
-  if (b.dataset.estado === estado) return;
-  b.dataset.estado = estado;
+  const puede = puedoHablar(s), agotado = s.fase === "abierta" && sinTiempo(s), cede = !HABLA.apretado && s.fase === "abierta" && cedoPorPunto(s);
+  const estado = HABLA.apretado ? "apretado" : puede ? (agotado ? "punto" : "listo") : cede ? "cede" : agotado ? "agotado" : "cerrado";
+  const quien = cede ? quienPunto(cede) : "";
+  if (b.dataset.estado === estado && b.dataset.quien === quien) return;
+  b.dataset.estado = estado; b.dataset.quien = quien;
   b.disabled = !HABLA.apretado && !puede;
   b.classList.toggle("on", HABLA.apretado);
   b.innerHTML = { apretado: "TE ESCUCHO<br><small>suelta para enviar</small>", punto: "TIENES LA PALABRA<br><small>mantén para hablar</small>",
+    cede: `✋ Punto de ${esc(quien)}<br><small>escucha</small>`,
     agotado: "SIN TIEMPO<br><small>solo puedes escribir</small>" }[estado] || "MANTÉN<br>PARA HABLAR";
-  b.setAttribute("aria-label", { apretado: "Te escucho: suelta para enviar", agotado: "Sin tiempo: solo puedes escribir" }[estado] || "Mantén apretado para hablar");
+  b.setAttribute("aria-label", { apretado: "Te escucho: suelta para enviar", cede: `Punto de ${quien}: escucha`, agotado: "Sin tiempo: solo puedes escribir" }[estado] || "Mantén apretado para hablar");
 }
 
 /* ---------- la vista en vivo (viva voz, con el debate abierto) ----------
@@ -1287,7 +1315,7 @@ function parcialPublico(s) {
   const rxClave = obj ? [obj.id, mia || "", hablan.length ? 1 : 0].join("|") : "";
   if (VV.rxClave !== rxClave) {
     VV.rxClave = rxClave;
-    poner($("vvRx"), !obj ? "" : `<div class="vv-rx-q">${hablan.length ? `Reacciona a lo último de <b>${esc(corto(obj.nombre))}</b>: «${esc(obj.texto.slice(0, 60))}${obj.texto.length > 60 ? "…" : ""}»` : "Reacciona a este mensaje"}</div>
+    poner($("vvRx"), !obj ? "" : `<div class="vv-rx-q">${hablan.length ? `Reacciona al último mensaje enviado de <b>${esc(corto(obj.nombre))}</b>: «${esc(obj.texto.slice(0, 60))}${obj.texto.length > 60 ? "…" : ""}»` : `Reacciona a lo que acaba de decir <b>${esc(corto(obj.nombre))}</b>`}</div>
       <div class="vv-rxs">${PUB.REACCIONES.map(r => `<button type="button" class="vv-rxb ${mia === r.id ? "on" : ""}" data-acc="rx" data-m="${esc(obj.id)}" data-r="${r.id}" aria-pressed="${mia === r.id}">
         <span>${r.emoji}</span><small>${esc(r.nombre)}</small><b></b></button>`).join("")}</div>`);
   }
