@@ -19,7 +19,8 @@ const RITMO = {
   MAX_SIN_RESPUESTA: 3, // tras tres intervenciones seguidas sin respuesta, calla hasta que alguien escriba
   NOMBRAR_TRAS: 120000, // a una persona que no ha escrito se la puede nombrar pasados 2 minutos del debate
   ENFRIAR: 150000,      // a quien nombró sin respuesta no lo vuelve a nombrar antes de 2,5 minutos
-  AUSENTE_TRAS: 2       // nombrada dos veces sin responder: se da por ausente
+  AUSENTE_TRAS: 2,      // nombrada dos veces sin responder: se da por ausente
+  RESPIRO_VOZ: 3000     // con voz: silencio tras la última frase dicha antes de entrar
 };
 
 const normRitmo = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
@@ -92,10 +93,15 @@ function leerTramo(msgs, roster, ahora) {
 }
 
 // ¿Entra ahora? abre: cuándo empezó el tramo. forzar: el profesor pulsó 🎙 o le escribieron a ella.
-function debeIntervenir(estado, { ahora, abre, forzar = false }) {
+// Debate a viva voz: hablando = alguien tiene el botón apretado (o hay un punto de información en
+// curso); ultimaVoz = cuándo terminó de hablar el último. Nunca le quita la palabra a nadie, ni
+// pedida: quien la llama espera a que se haga silencio.
+function debeIntervenir(estado, { ahora, abre, forzar = false, hablando = false, ultimaVoz = 0, voz = false }) {
+  if (hablando) return { toca: false, motivo: "hablan" };
   if (forzar) return { toca: true, motivo: "pedido" };
   const desdeMod = ahora - (estado.ultimaMod || abre);
-  if (estado.ultimoAlumno && ahora - estado.ultimoAlumno < RITMO.RESPIRO) return { toca: false, motivo: "conversan" };
+  const ultimo = Math.max(estado.ultimoAlumno || 0, ultimaVoz || 0);
+  if (ultimo && ahora - ultimo < (voz ? RITMO.RESPIRO_VOZ : RITMO.RESPIRO)) return { toca: false, motivo: "conversan" };
   if (desdeMod < RITMO.PAUSA_MIN) return { toca: false, motivo: "recien" };
   if (estado.nuevos >= 3) return { toca: true, motivo: "avanzo" };
   if (estado.nuevos >= 1) return ahora - estado.ultimoAlumno >= RITMO.PAUSA_TRAS ? { toca: true, motivo: "quedo_en_el_aire" } : { toca: false, motivo: "espera" };

@@ -67,3 +67,20 @@ test("esRepetida: la misma pregunta con otro @ cuenta como repetida", () => {
   assert.ok(R.esRepetida("@Andrés Bermúdez, ¿de qué lectura sale eso? Nombra el autor o el dato. Y @Alonso Ruiz Tagle, ¿cómo le responde tu bancada?", previas));
   assert.ok(!R.esRepetida("@Grupo 5, si las cuotas frenan la automatización, ¿quién paga ese costo?", previas));
 });
+
+test("debeIntervenir: mientras alguien habla no entra, ni pedida", () => {
+  const est = { ultimoAlumno: 0, ultimaMod: 0, nuevos: 0, modSeguidas: 0, alumnos: [] };
+  assert.equal(R.debeIntervenir(est, { ahora: 200000, abre: 0, hablando: true }).toca, false);
+  assert.equal(R.debeIntervenir(est, { ahora: 200000, abre: 0, hablando: true, forzar: true }).toca, false);
+  assert.equal(R.debeIntervenir(est, { ahora: 200000, abre: 0, hablando: true }).motivo, "hablan");
+});
+
+test("debeIntervenir: con voz, el respiro se mide desde que terminó de hablar y es corto", () => {
+  const est = { ultimoAlumno: 100000, ultimaMod: 0, nuevos: 3, modSeguidas: 0, alumnos: [] };
+  // sin voz: 8 s de respiro desde el último mensaje
+  assert.equal(R.debeIntervenir(est, { ahora: 104000, abre: 0 }).toca, false);
+  // con voz: 3 s desde el último mensaje o la última voz, lo más reciente
+  assert.equal(R.debeIntervenir(est, { ahora: 104000, abre: 0, voz: true }).toca, true);
+  assert.equal(R.debeIntervenir(est, { ahora: 104000, abre: 0, voz: true, ultimaVoz: 102000 }).toca, false);
+  assert.equal(R.debeIntervenir(est, { ahora: 105000, abre: 0, voz: true, ultimaVoz: 102000 }).toca, true);
+});
