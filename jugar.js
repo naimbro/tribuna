@@ -30,11 +30,16 @@ const PJ = () => (J.sala && J.sala.personajes) || null;
 const nomG = n => rotuloGrupo(n, PJ());
 
 // En la rotación el rol cambia en cada debate: "A" o "B" si mi grupo fue llamado, "P" si voto.
+// Con revelación, durante la preparación el par todavía no se publica (A y B en null): nadie tiene
+// rol, ni siquiera «P», porque cualquiera puede pasar al frente.
 const rolEn = s => {
   if (!s || s.modo !== "rotacion") return J.equipo;
-  if (!s.debate || !J.grupo) return null;
+  if (!s.debate || !J.grupo || enSuspenso(s)) return null;
   return J.grupo === s.debate.A ? "A" : J.grupo === s.debate.B ? "B" : "P";
 };
+// La preparación universal: el par (y con personajes, la moción) se conoce recién al revelar.
+// Las salas de antes no traen `revelado` ni `opciones`: para ellas nunca hay suspenso.
+const enSuspenso = s => !!(s && s.debate && (s.debate.A == null || s.debate.B == null));
 
 
 /* ---------- entrar ---------- */
@@ -250,7 +255,9 @@ function pintarSala() {
   $("miBancada").style.color = colorRol; $("miBancada").style.borderColor = colorRol;
   const d = s.debate;
   $("tramoLbl").textContent = d ? `Debate ${d.n}.` : "Rotación.";
-  $("pauta").textContent = d ? `«${d.pregunta}» — ${nomG(d.A)} a favor, ${nomG(d.B)} en contra.` : "Esperando la primera pregunta.";
+  $("pauta").textContent = !d ? "Esperando la primera pregunta."
+    : enSuspenso(s) ? (d.pregunta ? `«${d.pregunta}» — todos preparan; al terminar el minuto se revela quién pasa al frente.` : "Todos preparan: al terminar el minuto se revela qué duelo sigue.")
+    : `«${d.pregunta}» — ${nomG(d.A)} a favor, ${nomG(d.B)} en contra.`;
   $("marca").innerHTML = "";
   pintarBarraTel();
   const debatiendo = rol === "A" || rol === "B";
@@ -258,10 +265,14 @@ function pintarSala() {
   $("voto").classList.toggle("oculto", rol !== "P" || s.fase !== "abierta");
   pintarPublicoActivo(s, rol);
   document.body.classList.toggle("es-publico", rol === "P" && !s.veredicto);
-  // cambio de debate: mi grupo fue llamado → aviso
-  if (d && J.debateVisto !== d.n) {
+  // cambio de debate: mi grupo fue llamado → aviso. En suspenso todavía no se sabe (no se marca
+  // como visto: el aviso sale al revelar); en la revelación y la entrada vibra pintarEntre.
+  if (d && !enSuspenso(s) && J.debateVisto !== d.n) {
     J.debateVisto = d.n;
-    if (debatiendo) { navigator.vibrate?.([120, 60, 120]); $("notaCaja").textContent = `🎙 Tu grupo debate ${s.equipos[rol].nombre}. Escribe cuando se abra el tramo.`; $("notaCaja").classList.add("ati"); }
+    if (debatiendo) {
+      if (!["revelando", "entrada"].includes(s.fase)) navigator.vibrate?.([120, 60, 120]);
+      $("notaCaja").textContent = `🎙 Tu grupo debate ${s.equipos[rol].nombre}. Escribe cuando se abra el tramo.`; $("notaCaja").classList.add("ati");
+    }
   }
   // brújula: la repetición del cierre; y si el profesor la apaga, quien no tiene grupo elige a mano
   const bj = s.brujula;
@@ -303,6 +314,13 @@ function pintarReloj() {
     el.textContent = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, "0")}`;
     el.classList.remove("urgente");
     if ($("prepReloj")) $("prepReloj").textContent = el.textContent;
+    $("prepReloj")?.classList.toggle("urgente", resta <= 10);
+  } else if (s.fase === "entrada" && s.finEntrada) {
+    // lo que queda para caminar al frente
+    const resta = Math.max(0, Math.ceil((s.finEntrada - Date.now()) / 1000));
+    el.textContent = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, "0")}`;
+    el.classList.remove("urgente");
+    if ($("entReloj")) $("entReloj").textContent = el.textContent;
   } else if (s.fase === "abierta" && s.abreEn) {
     const resta = Math.max(0, s.seg - Math.floor((Date.now() - s.abreEn) / 1000));
     el.textContent = `${String(Math.floor(resta / 60)).padStart(2, "0")}:${String(resta % 60).padStart(2, "0")}`;
@@ -960,10 +978,16 @@ function listoFeedback() {
 function pintarEntre(s) {
   const el = $("entre");
   const rol = rolEn(s), d = s.debate;
-  const fases = ["propuesta", "listo", "resultado", "veredictoPublico", "veredictoJueces", "votando"];
+  const fases = ["propuesta", "listo", "revelando", "entrada", "resultado", "veredictoPublico", "veredictoJueces", "votando"];
   const toca = s.modo === "rotacion" && s.etapa == null && fases.includes(s.fase) && !(s.fase === "votando" && rol === "P");
   el.classList.toggle("oculto", !toca);
-  if (!toca) return;
+  const revela = toca && d && ["revelando", "entrada"].includes(s.fase) && !enSuspenso(s);
+  // el color del escenario solo mientras dura la revelación: al abrirse el debate, el teléfono vuelve a lo de siempre
+  if (!(revela && (rol === "A" || rol === "B"))) { document.body.classList.remove("sube"); document.body.style.removeProperty("--c"); }
+  if (!toca) { el.dataset.clave = ""; return; }
+  if (s.fase === "listo" && d && s.revelado === false) { vistaPreparacion(el, s, d); return; }
+  if (revela) { vistaRevelacion(el, s, d, rol); return; }
+  el.dataset.clave = "";
   const orac = s.oraculoDe && s.oraculoDe[J.uid];
   const pie = (J.grupo ? (() => { const mio = (s.ranking || []).find(f => f.grupo === J.grupo);
       return mio && mio.puesto ? `<div class="es-papel">Tu grupo va <b>#${mio.puesto}</b> con ${mio.puntaje} puntos.</div>` : ""; })() : "")
@@ -1016,6 +1040,112 @@ function pintarEntre(s) {
     return;
   }
   el.innerHTML = `<div class="k">Rotación</div><h1>La moderadora prepara la próxima pregunta…</h1>` + pie;
+}
+
+/* ---------- la preparación universal y la revelación ----------
+   Con revelación, el minuto de preparación es de todos: nadie sabe quién pasa al frente. Sin
+   personajes se ven la moción y las dos posturas (se preparan los dos lados); con personajes, los
+   duelos que faltan, con el mío destacado. Al revelar, a quienes suben al escenario la pantalla se
+   les tiñe con el color de su lado y vibra; los demás son tribuna. Estas vistas no se repintan en
+   cada cambio de la sala (dataset.clave): la animación del título no se repite y el botón del
+   micrófono conserva lo que dijo. */
+function vistaPreparacion(el, s, d) {
+  const duelos = Array.isArray(s.duelos) && s.duelos.length ? s.duelos : null;
+  const voz = opcionActiva(s.opciones, "voz") && !!Reconocedor;
+  const clave = ["prep", d.n, J.grupo, d.pregunta, duelos ? duelos.map(x => x.texto).join("|") : "", voz].join("#");
+  if (el.dataset.clave === clave) { pintarReloj(); return; }
+  el.dataset.clave = clave;
+  const reloj = `<div class="prep-reloj mono" id="prepReloj">${s.finPrep ? "" : "…"}</div>`;
+  const mic = `<button class="btn mic-probar ${voz ? "" : "oculto"}" id="btnProbarMic">${J.micListo ? "✓ Micrófono listo" : "🎤 Probar micrófono"}</button>
+    <div class="mic-nota" id="micNota"></div>`;
+  let cuerpo;
+  if (duelos) {
+    const ps = PJ(), yo = personajeDe(J.grupo, ps);
+    const mio = duelos.find(x => x.A === J.grupo || x.B === J.grupo);
+    const cara = n => { const p = personajeDe(n, ps); return `<b style="color:${p && p.color ? p.color : "var(--txt)"}">${esc(p ? p.corto : nomG(n))}</b>`; };
+    const lado = mio && yo ? (yo.lado === "A" ? mio.favor : mio.contra) : "";
+    const aviso = mio && lado
+      ? `<div class="pr-tuyo" style="--c:${yo.color || "var(--neon)"}"><span>Si sale tu duelo, defiendes esto</span>${esc(lado)}</div>`
+      : !mio && yo ? `<div class="pr-tuyo pr-jugado"><span>Tu duelo ya se jugó</span>Hoy eres tribuna: prepara una pregunta para los que suban.</div>` : "";
+    cuerpo = `<div class="k">Debate ${d.n} · preparación</div>
+      <h1 class="pv-t">${duelos.length === 1 ? "Último duelo" : "¿Qué duelo sigue?"}</h1>
+      ${aviso}
+      <div class="pr-duelos">${duelos.map(x => `<div class="pr-duelo ${x === mio ? "mio" : ""}">
+        <div class="pr-par">${cara(x.A)}<i>vs</i>${cara(x.B)}${x === mio ? `<em>tu duelo</em>` : ""}</div>
+        <div class="pr-q">«${esc(x.texto)}»</div></div>`).join("")}</div>
+      ${reloj}
+      <div class="es-papel">${duelos.length === 1 ? "Queda uno solo: al terminar el minuto, sus dos personajes pasan al frente."
+        : "Nadie sabe qué duelo sigue: al terminar el minuto se revela. Repasa tu dossier: puede ser el tuyo."}</div>`;
+  } else {
+    const pos = d.posturas || {};
+    const postura = k => `<div class="prep-postura" style="--c:${s.equipos[k].color}"><b>${esc(s.equipos[k].nombre)}</b>${esc(pos[k] || s.equipos[k].lema || "")}</div>`;
+    cuerpo = `<div class="k">Debate ${d.n} · preparación</div>
+      <h1 class="pv-t">Prepara los dos lados</h1>
+      ${d.pregunta ? `<div class="es-mocion pv-q">«${esc(d.pregunta)}»</div>` : ""}
+      <div class="pv-lados">${postura("A")}${postura("B")}</div>
+      ${reloj}
+      <div class="es-papel">Nadie sabe quién pasa al frente: al terminar el minuto se revela. Puedes ser tú, de cualquiera de los dos lados.</div>`;
+  }
+  el.innerHTML = `<div class="pv">${cuerpo}${mic}</div>`;
+  prepararProbarMic();
+  pintarReloj();
+}
+
+function vistaRevelacion(el, s, d, rol) {
+  const sube = rol === "A" || rol === "B";
+  const clave = ["rev", s.fase, d.n, J.grupo, d.A, d.B].join("#");
+  if (el.dataset.clave === clave) { pintarReloj(); return; }
+  el.dataset.clave = clave;
+  const color = k => { const p = personajeDe(d[k], PJ()); return p && p.color ? p.color : s.equipos[k].color; };
+  const mocion = d.pregunta ? `<div class="es-mocion pv-q">«${esc(d.pregunta)}»</div>` : "";
+  const entrada = s.fase === "entrada";
+  const reloj = entrada ? `<div class="ent-reloj mono" id="entReloj"></div>` : "";
+  if (sube) {
+    document.body.style.setProperty("--c", color(rol));
+    document.body.classList.add("sube");
+    if (J.subeVisto !== d.n) { J.subeVisto = d.n; navigator.vibrate?.([200, 80, 200, 80, 400]); }
+    const pos = d.posturas && d.posturas[rol];
+    el.innerHTML = `<div class="pv">
+      <div class="k">Debate ${d.n}</div>
+      <h1 class="sube-t">¡SUBEN AL ESCENARIO!</h1>
+      <div class="sube-lado">${esc(nomG(J.grupo))} · tu grupo defiende <b>${esc(s.equipos[rol].nombre)}</b></div>
+      ${mocion}
+      ${pos ? `<div class="prep-postura" style="--c:${color(rol)}"><b>Lo que ustedes sostienen</b>${esc(pos)}</div>` : ""}
+      ${entrada ? `<div class="sube-ya">Pasen al frente con el teléfono: el debate es en voz alta.</div>${reloj}`
+        : `<div class="sube-ya suave">Mira la pantalla: en un momento pasan al frente.</div>`}
+    </div>`;
+  } else {
+    el.innerHTML = `<div class="pv">
+      <div class="k">Debate ${d.n} · ${entrada ? "entran al escenario" : "la revelación"}</div>
+      <h1 class="pv-t">Eres tribuna</h1>
+      <div class="tri-par"><b style="color:${color("A")}">${esc(nomG(d.A))}</b><i>contra</i><b style="color:${color("B")}">${esc(nomG(d.B))}</b></div>
+      ${mocion}${reloj}
+      <div class="es-papel">Mientras debaten: mueve el termómetro, reacciona y manda una pregunta. Al final votas quién argumentó mejor y apuestas a quién eligen los jueces 🔮.</div>
+    </div>`;
+  }
+  pintarReloj();
+}
+
+// Probar el micrófono en la preparación: el permiso se pide ahora y no cuando ya estén hablando al
+// frente. Solo lo abre y lo cierra; el mantener para hablar del debate lo usa después.
+function prepararProbarMic() {
+  const b = $("btnProbarMic");
+  if (!b || b.classList.contains("oculto")) return;
+  b.classList.toggle("ok", !!J.micListo);
+  b.onclick = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) { $("micNota").textContent = "Este navegador no deja usar el micrófono."; return; }
+    b.disabled = true; b.textContent = "🎤 Pidiendo permiso…"; $("micNota").textContent = "";
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({ audio: true });
+      st.getTracks().forEach(t => t.stop());
+      J.micListo = true;
+      b.textContent = "✓ Micrófono listo"; b.classList.add("ok");
+    } catch {
+      b.textContent = "🎤 Probar micrófono";
+      $("micNota").textContent = "Permite el micrófono para este sitio (candado de la barra de direcciones).";
+    }
+    b.disabled = false;
+  };
 }
 
 /* ---------- el ganador, en grande ---------- */

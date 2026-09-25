@@ -163,6 +163,39 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 .prep-postura{max-width:460px;text-align:left;border-left:4px solid var(--c);background:#101820;border-radius:10px;padding:10px 12px;font-size:15px;line-height:1.4}
 .prep-postura b{display:block;color:var(--c);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px}
 .prep-reloj{font-size:44px;font-weight:800;margin:14px 0 0;color:var(--neon)}
+/* la preparación universal: todos preparan; con personajes, los duelos que faltan */
+.pv{margin:auto 0;width:100%;max-width:460px;display:flex;flex-direction:column;align-items:center}
+.pv-t{font-size:30px;font-weight:900;line-height:1.1;letter-spacing:-.01em;margin:2px 0 12px}
+.pv-q{font-size:20px;margin:0 0 14px}
+.pv-lados{display:flex;flex-direction:column;gap:8px;width:100%}
+.pv .prep-postura,.pv .es-papel{width:100%;max-width:none}
+.prep-reloj.urgente{color:var(--B);animation:pulso .8s infinite}
+.pr-tuyo{width:100%;text-align:left;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 13%,var(--panel));border-radius:12px;padding:11px 14px;font-size:15.5px;line-height:1.4;margin:0 0 14px}
+.pr-tuyo span{display:block;color:var(--c);font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px}
+.pr-jugado{--c:var(--dim)}
+.pr-duelos{display:flex;flex-direction:column;gap:10px;width:100%}
+.pr-duelo{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:11px 14px 12px}
+.pr-par{display:flex;align-items:baseline;gap:8px;font-size:19px;font-weight:800}
+.pr-par i{font-style:normal;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim2)}
+.pr-par em{margin-left:auto;font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--neon)}
+.pr-q{font-family:Georgia,serif;font-size:15px;line-height:1.35;margin-top:4px;color:var(--dim)}
+.pr-duelo.mio{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon),0 0 24px rgba(34,229,138,.16)}
+.pr-duelo.mio .pr-q{color:var(--txt)}
+.mic-probar{margin-top:14px}
+.mic-probar.ok{border-color:var(--neon);color:var(--neon);background:#0f2219}
+.mic-nota{font-size:13px;color:var(--amber);margin-top:6px}
+.mic-nota:empty{display:none}
+/* la revelación: a quienes suben al escenario, el teléfono se tiñe con el color de su lado */
+body.sube #entre{background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--c) 55%,#000) 0%,var(--bg) 75%)}
+.sube-t{font-size:34px;font-weight:900;line-height:1.05;color:#fff;text-shadow:0 0 24px var(--c);margin:4px 0 14px;animation:subeGolpe .6s cubic-bezier(.2,1.6,.4,1)}
+@keyframes subeGolpe{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:scale(1)}}
+.sube-lado{font-size:16px;margin-bottom:12px}
+.sube-lado b{color:#fff;text-shadow:0 0 12px var(--c)}
+.sube-ya{margin-top:18px;font-size:19px;font-weight:800;line-height:1.3;color:#fff}
+.sube-ya.suave{font-size:14px;font-weight:500;color:var(--dim)}
+.ent-reloj{font-size:34px;font-weight:800;color:var(--amber);margin-top:6px}
+.tri-par{display:flex;align-items:baseline;justify-content:center;flex-wrap:wrap;gap:4px 10px;font-size:23px;font-weight:800;margin:0 0 12px}
+.tri-par i{font-style:normal;font-size:13px;font-weight:600;color:var(--dim)}
 /* «Grupo N está escribiendo…» */
 .escr{flex:0 0 auto;display:flex;gap:14px;padding:0 12px;font-size:12px;font-weight:600}
 .escr:not(:empty){padding:3px 12px}
@@ -275,9 +308,9 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 
 <script src="brujula.js?v=20260927a"></script>
 <script src="publico.js?v=20260928a"></script>
-<script src="ritmo.js?v=20260928a"></script>
+<script src="ritmo.js?v=20260929a"></script>
 <script src="barra.js?v=20260923a"></script>
-<script src="rotacion.js?v=20260928a"></script>
-<script type="module" src="jugar.js?v=20260928a"></script>
+<script src="rotacion.js?v=20260929a"></script>
+<script type="module" src="jugar.js?v=20260929a"></script>
 </body>
 </html>
