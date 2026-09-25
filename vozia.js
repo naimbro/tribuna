@@ -6,6 +6,10 @@
    ===================================================================== */
 
 const VOZIA = { MAX: 400, IDIOMAS: ["es-cl", "es-us", "es-419", "es-mx", "es-es"] };
+// Un fin de frase: . ? ! (uno o más), las comillas o paréntesis que lo cierran (» ” " ' ) ]) y, pegado,
+// otro punto si lo hay («…advertencia.».»), seguido de un espacio o del final del texto. Un «3.5» no es fin.
+const CIERRES = "»”\"')\\]";
+const FIN_FRASE = new RegExp(`[.?!]+(?:[${CIERRES}]+[.?!]*)*(?=\\s|$)`, "g");
 
 // Sin @, emojis, markdown ni barras; cortado en el último fin de frase que cabe en max.
 function limpiarParaVoz(texto, max = VOZIA.MAX) {
@@ -17,12 +21,12 @@ function limpiarParaVoz(texto, max = VOZIA.MAX) {
     .replace(/([.?!])?\s*\|\s*/g, (_, fin) => (fin ? fin + " " : ". "))
     .replace(/\s+/g, " ").trim();
   if (t.length <= max) return t;
+  // el último fin de frase (FIN_FRASE: «sí.», «sí.»», «¿paga?»», «advertencia.».») que quepa
+  // entero en max; si no hay ninguno, se corta en la última palabra entera
+  let fin = -1;
+  for (const m of t.matchAll(FIN_FRASE)) { const f = m.index + m[0].length; if (f > max) break; fin = f; }
   const corte = t.slice(0, max);
-  if (/[.?!]»?$/.test(corte)) return corte;   // el corte cayó justo en un fin de frase: no hay nada que recortar
-  const marcas = [[". ", 1], ["? ", 1], ["! ", 1], [".» ", 2], ["?» ", 2], ["!» ", 2]];
-  let fin = -1, largo = 1;
-  for (const [m, l] of marcas) { const i = corte.lastIndexOf(m); if (i > fin) { fin = i; largo = l; } }
-  return fin > 0 ? corte.slice(0, fin + largo) : corte.replace(/\s+\S*$/, "") + "…";
+  return fin > 0 ? t.slice(0, fin) : corte.replace(/\s+\S*$/, "") + "…";
 }
 
 // Lo que se dice en voz alta por un mensaje de la conversación ("" = nada).
@@ -40,7 +44,7 @@ function textoHablado(m, equipos) {
     if (!d.resumenA && !d.resumenB) return limpiarParaVoz(m.texto);
     // cada segmento se recorta por su cuenta (no todo el mensaje junto), así un resumen largo no se
     // come el de al lado; y el relator SIEMPRE termina pidiendo el voto, pase lo que pase con el corte.
-    const rematar = s => (/[.?!]$/.test(s) || /[.?!]»$/.test(s) ? s : s + ".");
+    const rematar = s => (new RegExp(`[.?!][${CIERRES}]*$`).test(s) ? s : s + ".");
     const segmentos = [];
     if (d.resumenA) segmentos.push(rematar(limpiarParaVoz(`${equipos.A.nombre}: ${d.resumenA}`, 140)));
     if (d.resumenB) segmentos.push(rematar(limpiarParaVoz(`${equipos.B.nombre}: ${d.resumenB}`, 140)));
@@ -62,11 +66,14 @@ function elegirVoz(voces) {
 
 // Las voces online de Chrome cortan el audio en silencio pasados ~15 s dentro de un mismo
 // utterance. Se parte el texto en oraciones y se agrupan en trozos de a lo más max caracteres,
-// sin partir ninguna palabra (salvo que la palabra sola ya sea más larga que max).
+// sin partir ninguna palabra (salvo que la palabra sola ya sea más larga que max). Juntando los
+// trozos con un espacio vuelve el texto entero (con los espacios normalizados).
 function trozosParaVoz(texto, max = 180) {
-  const t = String(texto || "").trim();
+  const t = String(texto || "").replace(/\s+/g, " ").trim();
   if (!t) return [];
-  const oraciones = t.match(/[^.?!]+[.?!]+(\s+|$)|[^.?!]+$/g) || [t];
+  // Se parte SOLO en los espacios que siguen a un fin de frase: ninguna letra se pierde, aunque la
+  // frase termine en comillas («…advertencia.».») o no termine en punto.
+  const oraciones = t.split(new RegExp(`(?<=[.?!][${CIERRES}.?!]*)\\s+`));
   const trozos = [];
   let actual = "";
   const cerrar = () => { if (actual) { trozos.push(actual); actual = ""; } };

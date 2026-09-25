@@ -48,8 +48,10 @@ function recibirChat(lista, inicial = false) {
       }
     } else if (m.tipo === "mod") sonar("nota", 14);
     // el proyector habla: la moderadora y el relator, si la voz de la IA está encendida (vozia.js)
-    if ((m.tipo === "mod" || m.tipo === "relator") && opcionActiva(S.clase.opciones, "vozIA") && typeof hablarIA === "function")
-      hablarIA(textoHablado(m, EQUIPOS));
+    if ((m.tipo === "mod" || m.tipo === "relator") && opcionActiva(S.clase.opciones, "vozIA") && typeof hablarIA === "function") {
+      if (m.tipo === "relator") { VOZ_ESPERA.length = 0; hablarIA(textoHablado(m, EQUIPOS)); }   // lo que esperaba ya no viene al caso
+      else hablarModeradora(textoHablado(m, EQUIPOS));
+    }
   }
   if (typeof window.alCambiarChat === "function") window.alCambiarChat();
 }
@@ -162,28 +164,47 @@ Háblales como si fueran esas personas, de usted y por su nombre: «@${(personaj
 `;
 }
 
+// La moción entre comillas y con UN fin de frase: si ya termina en . ? ! no se le agrega otro
+// («…advertencia.».» se leía y se oía mal).
+function citaMocion(t) {
+  const s = String(t || "").trim();
+  return /[.?!…]$/.test(s) ? `«${s}»` : `«${s}».`;
+}
+// Cuánto tiempo tienen. Con el reloj de ajedrez (S.banco, lo arma abrirRonda antes de llamar a
+// abrirTramoChat) cada lado tiene la mitad del tramo y el reloj solo corre mientras alguien habla:
+// decir «Tienen 6 minutos» confundía. Sin banco, el tramo entero, como siempre.
+function textoTiempo(seg) {
+  const min = s => { const m = Math.round(s / 30) / 2;       // de a medio minuto
+    return m === 1 ? "1 minuto" : Number.isInteger(m) ? `${m} minutos` : m < 1 ? "medio minuto" : `${Math.floor(m)} minuto${Math.floor(m) === 1 ? "" : "s"} y medio`; };
+  return S.banco ? `Cada lado tiene ${min(seg / 2)} para hablar; el reloj corre mientras alguien mantiene el botón.`
+    : `Tienen ${Math.round(seg / 60)} minutos.`;
+}
+
 function abrirTramoChat() {
   const R = tramoActual();
-  S.mod = { enCurso: false, abre: Date.now(), pregunta: null };
+  // fuentesPendientes: los 🤔 de la tribuna que esperan un silencio (pedirFuenteTribuna)
+  S.mod = { enCurso: false, abre: Date.now(), pregunta: null, fuentesPendientes: [] };
   // Un solo tramo por debate: la posición de entrada y de ahí libre. Lo que estructura la
   // conversación es ella, interviniendo, no un segundo turno con nombre propio. Llama a los
   // grupos, no a una persona: quien quiera responde por su grupo.
   const d = S.debate;
   if (d && PERS) {
-    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: `Duelo ${d.n}: «${d.pregunta}». ${nombreG(d.A)} defiende ${EQUIPOS.A.nombre}; ${nombreG(d.B)}, ${EQUIPOS.B.nombre}. ` +
-      `${grupoDe("A")}, ${grupoDe("B")}: ${tratoDe("A")}, ${tratoDe("B")}, su posición en una frase y en primera persona. Tienen ${Math.round(R.seg / 60)} minutos.` });
+    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: `Duelo ${d.n}: ${citaMocion(d.pregunta)} ${nombreG(d.A)} defiende ${EQUIPOS.A.nombre}; ${nombreG(d.B)}, ${EQUIPOS.B.nombre}. ` +
+      `${grupoDe("A")}, ${grupoDe("B")}: ${tratoDe("A")}, ${tratoDe("B")}, su posición en una frase y en primera persona. ${textoTiempo(R.seg)}` });
     return;
   }
   postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: d
-    ? `Debate ${d.n}: «${d.pregunta}». Grupo ${d.A} defiende ${EQUIPOS.A.nombre}; Grupo ${d.B}, ${EQUIPOS.B.nombre}. ` +
-      `@Grupo ${d.A} y @Grupo ${d.B}: su posición en una frase, cualquiera del grupo, y de ahí seguimos sueltos. Tienen ${Math.round(R.seg / 60)} minutos.`
-    : `«${mocionActual()}». ${ladoNombre("A")} y ${ladoNombre("B")}: su posición en una frase, y de ahí seguimos sueltos. Tienen ${Math.round(R.seg / 60)} minutos.` });
+    ? `Debate ${d.n}: ${citaMocion(d.pregunta)} Grupo ${d.A} defiende ${EQUIPOS.A.nombre}; Grupo ${d.B}, ${EQUIPOS.B.nombre}. ` +
+      `@Grupo ${d.A} y @Grupo ${d.B}: su posición en una frase, cualquiera del grupo, y de ahí seguimos sueltos. ${textoTiempo(R.seg)}`
+    : `${citaMocion(mocionActual())} ${ladoNombre("A")} y ${ladoNombre("B")}: su posición en una frase, y de ahí seguimos sueltos. ${textoTiempo(R.seg)}` });
 }
 
 // Se llama cada pocos segundos y cuando llega un mensaje. Decide si la moderadora interviene.
 function moderadorTalvez(forzar = false) {
   const M = S.mod;
-  if (!M || M.enCurso || S.fase !== "abierta") return;
+  if (!M || S.fase !== "abierta") return;
+  fuentesTalvez();
+  if (M.enCurso) return;
   // la tribuna: a los 3 minutos, si hay preguntas del público y no salió ninguna, entra una
   // (una vez por minuto como mucho: si la moderadora las descarta todas no se insiste en bucle)
   const pedida = forzar;                                   // el profesor (🎙) o alguien con @Moderadora
@@ -229,8 +250,46 @@ function lanzarPreguntaTribuna(p, destino) {
   if (typeof pintarColumna === "function") pintarColumna();
   if (typeof window.publicarEstado === "function") window.publicarEstado();
 }
+// ¿Tiene alguien la palabra en la sala? El botón apretado (window.hablaSala, online.js), un punto de
+// información en curso o las últimas palabras del reloj de ajedrez; y, recién soltado el botón, un
+// respiro corto (la transcripción de quien habló llega un instante después). Sin sala, nunca.
+const RESPIRO_MOD = 1200;
+function salaOcupada(ahora = Date.now()) {
+  let hs = [];
+  try { hs = typeof window.hablaSala === "function" ? window.hablaSala() || [] : []; } catch (e) { hs = []; }
+  if (hs.length || S.cierreBanco || (typeof puntoActivo === "function" && puntoActivo(S.punto))) return true;
+  const ultima = typeof window.ultimaVoz === "function" ? +window.ultimaVoz() || 0 : 0;
+  return ahora - ultima < RESPIRO_MOD;
+}
+// Los 🤔 que cruzaron el umbral esperan en S.mod.fuentesPendientes (online.js) y salen de a uno,
+// solo en silencio: la moderadora nunca le habla encima a quien tiene el botón.
+function encolarFuenteTribuna(msgId) {
+  if (!S.mod) return;
+  (S.mod.fuentesPendientes = S.mod.fuentesPendientes || []).push(msgId);
+  fuentesTalvez();
+}
+function fuentesTalvez() {
+  const M = S.mod;
+  if (!M || S.fase !== "abierta" || !(M.fuentesPendientes || []).length || salaOcupada()) return;
+  pedirFuenteTribuna(M.fuentesPendientes.shift());
+}
+// Red de seguridad para la voz de la IA: lo que diga la moderadora mientras alguien habla (por el
+// camino que sea) se oye en el próximo silencio, no encima. El relator no espera: habla al votar.
+const VOZ_ESPERA = [];
+function hablarModeradora(texto) {
+  if (!texto) return;
+  if (salaOcupada()) VOZ_ESPERA.push(texto); else hablarIA(texto);
+}
+function soltarVozEspera() {
+  if (!VOZ_ESPERA.length) return;
+  if (!opcionActiva(S.clase.opciones, "vozIA")) { VOZ_ESPERA.length = 0; return; }   // la apagaron mientras esperaba
+  if (salaOcupada()) return;
+  for (const t of VOZ_ESPERA.splice(0)) hablarIA(t);
+}
+
 // Un mensaje juntó suficientes 🤔: la moderadora pide la fuente en nombre de la tribuna. Es una
-// plantilla fija a propósito: rápida, y dice de quién viene la pregunta.
+// plantilla fija a propósito: rápida, y dice de quién viene la pregunta. Se llama desde
+// fuentesTalvez (en silencio), nunca directo.
 function pedirFuenteTribuna(msgId) {
   const m = S.chat.find(x => x.id === msgId);
   if (!m || S.fase !== "abierta" || !S.mod) return;
@@ -438,6 +497,8 @@ function prepararCompositor() {
   $("chatTx").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } });
   $("btnModerar").onclick = () => { if (S.fase === "abierta") moderadorTalvez(true); else tick("La moderadora interviene con el tramo abierto."); };
   setInterval(() => moderadorTalvez(false), 6000);
+  // el silencio se nota rápido: los 🤔 pendientes y la voz que esperaba salen apenas sueltan el botón
+  setInterval(() => { fuentesTalvez(); soltarVozEspera(); }, 500);
 }
 
 /* ---------- @menciones en el compositor del profesor ----------

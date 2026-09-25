@@ -101,6 +101,42 @@ test("trozosParaVoz: chunks quedan por debajo de 180 por defecto (Chrome corta u
   assert.ok(trozos.length > 1);
 });
 
+test("trozosParaVoz: no se pierde ninguna frase, aunque termine en comillas o paréntesis", () => {
+  const norma = x => x.replace(/\s+/g, " ").trim();
+  const casos = [
+    "Duelo 1: «Lo de Hugging Face fue un accidente de ingeniería, no una advertencia.». Jensen Huang defiende A FAVOR; Dario Amodei, EN CONTRA. @Huang, @Amodei: señor Huang, señor Amodei, su posición en una frase y en primera persona.",
+    "Pregunta: «¿Quién paga?» Y usted qué dice.",
+    "Él dijo “basta.” Luego (así fue.) y [no!] y 'sí?' Termina sin punto",
+    "Versión 3.5 del modelo.   Dos   espacios!!  ¿Y esto?»  Fin.",
+    "«¿De dónde sale?». «Un autor basta.» " + Array(40).fill("palabra").join(" ") + ".",
+    "Sin puntuación alguna",
+  ];
+  for (const t of casos) for (const max of [180, 40, 20]) {
+    const trozos = V.trozosParaVoz(t, max);
+    assert.equal(trozos.join(" "), norma(t), `max ${max}: ${JSON.stringify(trozos)}`);
+    for (const tr of trozos) assert.ok(tr.length <= max || !/\s/.test(tr), `trozo largo (${tr.length}): "${tr}"`);
+  }
+});
+
+test("trozosParaVoz: parte después de la comilla de cierre, no antes", () => {
+  assert.deepEqual(V.trozosParaVoz("Pregunta: «¿Quién paga?» Y usted qué dice.", 30), ["Pregunta: «¿Quién paga?»", "Y usted qué dice."]);
+  assert.deepEqual(V.trozosParaVoz("Dijo: «no una advertencia.». Jensen defiende.", 30), ["Dijo: «no una advertencia.».", "Jensen defiende."]);
+});
+
+test("limpiarParaVoz: el corte reconoce «.».», «?»» y comillas o paréntesis de cierre", () => {
+  const x = " " + "x".repeat(60);
+  assert.equal(V.limpiarParaVoz("Dijo: «no una advertencia.»." + x, 40), "Dijo: «no una advertencia.».");
+  assert.equal(V.limpiarParaVoz("Pregunta: «¿Quién paga?»" + x, 40), "Pregunta: «¿Quién paga?»");
+  assert.equal(V.limpiarParaVoz("Él dijo “basta.”" + x, 30), "Él dijo “basta.”");
+  assert.equal(V.limpiarParaVoz("Uno (así fue.)" + x, 30), "Uno (así fue.)");
+  assert.equal(V.limpiarParaVoz("Versión 3.5 del modelo" + x, 30), "Versión 3.5 del modelo…");   // 3.5 no es fin de frase
+});
+
+test("textoHablado: un resumen que termina en comilla de cierre no recibe otro punto", () => {
+  const m = { tipo: "relator", datos: { resumenA: "Dijo «basta.»" } };
+  assert.equal(V.textoHablado(m, EQ), "A FAVOR: Dijo «basta.» Público: voten en su teléfono.");
+});
+
 test("elegirVoz: prefiere es-CL, luego es-US, es-419, es-MX, es-ES; dentro de cada una, las de Google", () => {
   const v = (lang, name) => ({ lang, name });
   assert.equal(V.elegirVoz([v("en-US", "A"), v("es-ES", "Monica"), v("es-MX", "Paulina")]).name, "Paulina");

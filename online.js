@@ -583,12 +583,14 @@ function suscribirPublicoActivo(n) {
     const xs = []; snap.forEach(d => xs.push(d.data()));
     S.reacciones = contarReacciones(xs);
     pintarFeed();
-    // 🤔 de la tribuna: si un mensaje cruza el umbral, la moderadora pide la fuente
+    // 🤔 de la tribuna: si un mensaje cruza el umbral, la moderadora pide la fuente, pero en el
+    // próximo silencio: queda en la fila (moderacion.js, encolarFuenteTribuna) y no le habla
+    // encima a quien tiene el botón apretado.
     const reg = S.clase.debates[n - 1];
-    if (!reg || S.fase !== "abierta" || !S.debate || S.debate.n !== n) return;
+    if (!reg || S.fase !== "abierta" || !S.debate || S.debate.n !== n || !S.mod) return;
     for (const id of pedidosDeFuente(S.reacciones, reg.pedidosFuente, elegibles())) {
       (reg.pedidosFuente = reg.pedidosFuente || []).push(id);
-      if (typeof pedirFuenteTribuna === "function") pedirFuenteTribuna(id);
+      if (typeof encolarFuenteTribuna === "function") encolarFuenteTribuna(id);
     }
   }, () => {}));
   desuscribirActivo.push(onSnapshot(del("preguntas"), snap => {
