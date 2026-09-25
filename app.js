@@ -399,22 +399,32 @@ function pintarTermometro() {
   caja.style.display = ver ? "" : "none";
   if (!ver) return;
   const r = resumenTermometro(Object.values(S.termo));
-  const W = 300, H = 112, m = 6, X = s => m + Math.min(1, s / (tramoActual().seg || ROT.SEG_DEBATE)) * (W - 2 * m), Y = v => H / 2 - v / 100 * (H / 2 - m);
-  const curva = [...(reg.curva || [])];
-  const pts = curva.map(p => `${X(p.s).toFixed(1)},${Y(p.m).toFixed(1)}`).join(" ");
-  const ult = curva[curva.length - 1];
   const lado = r.final === null ? null : r.final > 4 ? "A" : r.final < -4 ? "B" : null;
   $("termoPt").innerHTML = r.n ? `${r.n} moviéndolo · ${lado ? `${PERS ? "inclinado a" : "inclinado al"} <b style="color:${EQUIPOS[lado].color}">${esc(nombreG(d[lado]))}</b>` : "parejo"}` : "nadie lo ha movido";
   const pend = (S.preguntasPub || []).length - (reg.tribuna || []).length;
-  $("termo").innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="termo-svg">
-      <rect x="0" y="0" width="${W}" height="${H / 2}" fill="${EQUIPOS.A.color}" opacity=".07"/><rect x="0" y="${H / 2}" width="${W}" height="${H / 2}" fill="${EQUIPOS.B.color}" opacity=".07"/>
+  $("termo").innerHTML = svgTermometro(300, 112) +
+    `<div class="termo-pie">${pend > 0 ? `✋ ${pend} pregunta${pend === 1 ? "" : "s"} de la tribuna en la fila` : "✋ el público puede mandar preguntas desde el teléfono"}</div>`;
+}
+
+// El <svg> de la curva del termómetro del debate en curso, de W×H (en unidades del viewBox).
+// Lo usan la columna derecha (300×112) y el «gusano» al pie del escenario (escenario.js), que lo
+// dibuja al tamaño real de su franja y con los colores de los personajes: o = { letra, cA, cB, clase }.
+function svgTermometro(W, H, o = {}) {
+  const d = S.debate, reg = d && S.clase.debates[d.n - 1];
+  if (!reg) return "";
+  const letra = o.letra || 10, cA = o.cA || EQUIPOS.A.color, cB = o.cB || EQUIPOS.B.color;
+  const m = Math.max(6, letra * 0.6), X = s => m + Math.min(1, s / (tramoActual().seg || ROT.SEG_DEBATE)) * (W - 2 * m), Y = v => H / 2 - v / 100 * (H / 2 - m);
+  const curva = [...(reg.curva || [])];
+  const pts = curva.map(p => `${X(p.s).toFixed(1)},${Y(p.m).toFixed(1)}`).join(" ");
+  const ult = curva[curva.length - 1];
+  return `<svg viewBox="0 0 ${W} ${H}" class="${o.clase || "termo-svg"}">
+      <rect x="0" y="0" width="${W}" height="${H / 2}" fill="${cA}" opacity=".07"/><rect x="0" y="${H / 2}" width="${W}" height="${H / 2}" fill="${cB}" opacity=".07"/>
       <line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#2c3a48" stroke-dasharray="4 4"/>
-      <text x="${m}" y="13" fill="${EQUIPOS.A.color}" font-size="10" font-weight="700">▲ ${esc(nombreG(d.A).toUpperCase())} · A FAVOR</text>
-      <text x="${m}" y="${H - 5}" fill="${EQUIPOS.B.color}" font-size="10" font-weight="700">▼ ${esc(nombreG(d.B).toUpperCase())} · EN CONTRA</text>
-      ${pts ? `<polyline points="${pts}" fill="none" stroke="#e6edf3" stroke-width="2.2" stroke-linejoin="round"/>` : ""}
-      ${ult ? `<circle cx="${X(ult.s).toFixed(1)}" cy="${Y(ult.m).toFixed(1)}" r="4.5" fill="${ult.m > 4 ? EQUIPOS.A.color : ult.m < -4 ? EQUIPOS.B.color : "#e6edf3"}"/>` : ""}
-    </svg>
-    <div class="termo-pie">${pend > 0 ? `✋ ${pend} pregunta${pend === 1 ? "" : "s"} de la tribuna en la fila` : "✋ el público puede mandar preguntas desde el teléfono"}</div>`;
+      <text x="${m}" y="${letra * 1.3}" fill="${cA}" font-size="${letra}" font-weight="700">▲ ${esc(nombreG(d.A).toUpperCase())} · A FAVOR</text>
+      <text x="${m}" y="${H - letra * 0.5}" fill="${cB}" font-size="${letra}" font-weight="700">▼ ${esc(nombreG(d.B).toUpperCase())} · EN CONTRA</text>
+      ${pts ? `<polyline points="${pts}" fill="none" stroke="#e6edf3" stroke-width="${(letra * 0.22).toFixed(1)}" stroke-linejoin="round"/>` : ""}
+      ${ult ? `<circle cx="${X(ult.s).toFixed(1)}" cy="${Y(ult.m).toFixed(1)}" r="${(letra * 0.45).toFixed(1)}" fill="${ult.m > 4 ? cA : ult.m < -4 ? cB : "#e6edf3"}"/>` : ""}
+    </svg>`;
 }
 
 // Columna derecha: ranking de grupos, oráculos y las tarjetas del último panel.
