@@ -38,7 +38,12 @@ function publicarDebate({ pregunta, A, B, favor, contra }) {
 // revela al llegar a cero (revelar), y después viene la entrada al escenario.
 function empezarPreparacion() {
   const d = S.debate;
-  if (opcion("revelacion")) { prepararEnSuspenso(d); return; }
+  // con personajes, el suspenso sirve solo si la moción es uno de los duelos escritos: una moción
+  // editada o improvisada no tiene duelo que mostrar, y la preparación es la de siempre
+  const q = String(d.pregunta).trim().toLowerCase();
+  if (opcion("revelacion") && (!PERS || (datosPreparacion().duelos || []).some(x => String(x.texto).trim().toLowerCase() === q))) {
+    prepararEnSuspenso(d); return;
+  }
   S.fase = "listo"; S.revelado = true;
   S.finPrep = Date.now() + ROT.SEG_PREPARACION * 1000;
   clearInterval(S.reloj);
@@ -96,11 +101,14 @@ async function revelar() {
   const d = S.debate;
   if (!d || S.fase !== "listo") return;
   clearInterval(S.reloj); S.finPrep = null;
+  if (typeof pararMusica === "function") pararMusica();   // el pulso de la preparación (si se reveló antes de tiempo)
   S.fase = "revelando"; S.revelado = true;
   $("btnPrincipal").textContent = "SALTAR ▶";
   publicarEstado();
   tick(`Debate ${d.n}: ${nombreG(d.A)} (${EQUIPOS.A.nombre}) contra ${nombreG(d.B)} (${EQUIPOS.B.nombre}).`);
-  await mostrarRevelacion(d, datosPreparacion());      // escenas.js
+  // una escena que falla no puede congelar la clase: se sigue a la entrada igual
+  try { await mostrarRevelacion(d, datosPreparacion()); }      // escenas.js
+  catch (e) { console.warn("TRIBUNA: falló la escena de revelación", e); }
   if (S.fase === "revelando" && S.debate === d) entrada();
 }
 
@@ -114,7 +122,9 @@ function entrada() {
   $("btnPrincipal").textContent = "▶ EMPEZAR DEBATE";
   publicarEstado();
   musicaEntrada(ROT.SEG_ENTRADA);
-  mostrarEntrada(d, integrantesDebate(), ROT.SEG_ENTRADA).then(() => {   // escenas.js
+  // Promise.resolve().then: también si mostrarEntrada lanza antes de devolver la promesa
+  Promise.resolve().then(() => mostrarEntrada(d, integrantesDebate(), ROT.SEG_ENTRADA))   // escenas.js
+    .catch(e => console.warn("TRIBUNA: falló la escena de entrada", e)).then(() => {
     if (S.fase === "entrada" && S.debate === d) { pararMusica(); cerrarEscena(); abrirRonda(); }
   });
 }
@@ -257,13 +267,25 @@ function terminarClase(sinPreguntar = false) {
   if (sinPreguntar !== true && typeof ceremoniaRanking === "function") ceremoniaRanking();
 }
 
-// El botón principal hace lo que corresponde a cada momento.
+// El botón principal hace lo que corresponde a cada momento. En la preparación, la revelación y
+// la entrada, un doble clic rápido no puede saltarse dos pasos: el segundo, dentro de 400 ms, no cuenta.
+let ultimaAccion = 0;
 function accionPrincipal() {
+  if (["listo", "revelando", "entrada"].includes(S.fase)) {
+    const ahora = Date.now();
+    if (ahora - ultimaAccion < 400) return;
+    ultimaAccion = ahora;
+  }
   if ($("escena") && $("escena").classList.contains("movimiento")) { window.cerrarRepeticion?.(); cerrarEscena(); return; }
   if (S.fase === "propuesta") { if (typeof publicarPropuestaActual === "function") publicarPropuestaActual(); }
   // listo: sin revelación (o restaurado tras cerrar la pestaña) abre el debate; con ella, revela ya
   else if (S.fase === "listo") (S.revelado ? abrirRonda() : revelar());
-  else if (S.fase === "revelando" || S.fase === "entrada") saltarEscena();
+  // si la escena ya no espera nada (terminó o falló), el botón avanza al paso siguiente
+  else if (S.fase === "revelando") { if (ESC.resolver) saltarEscena(); else entrada(); }
+  else if (S.fase === "entrada") {
+    if (ESC.resolver) saltarEscena();
+    else { if (typeof pararMusica === "function") pararMusica(); cerrarEscena(); abrirRonda(); }
+  }
   else if (S.fase === "abierta") cerrarRonda();
   else if (S.fase === "votando") cerrarVotacion();
   else if (S.fase === "veredictoPublico" || S.fase === "veredictoJueces") saltarEscena();

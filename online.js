@@ -72,7 +72,8 @@ function estadoPublico() {
       publico: U.publico ? { A: U.publico.A, B: U.publico.B, n: U.publico.n, ganador: U.publico.ganador } : null,
       jueces: (U.jueces || []).map(j => ({ id: j.id, nombre: j.nombre, emoji: j.emoji, A: j.A, B: j.B, fraseA: j.fraseA || "", fraseB: j.fraseB || "" })),
       termo: U.termo || null, frase: U.frase || null } : null,
-    conteoVotos: { A: S.publico.A || 0, B: S.publico.B || 0, n: S.publico.n || 0, elegibles: S.publico.elegibles || 0 },
+    // elegibles = los que no están en el par: durante el suspenso delataría cuántos suben al frente
+    conteoVotos: { A: S.publico.A || 0, B: S.publico.B || 0, n: S.publico.n || 0, elegibles: enSuspenso ? 0 : S.publico.elegibles || 0 },
     oraculos: orac.slice(0, 10).map(o => ({ uid: o.uid, nombre: o.nombre, grupo: o.grupo || 0, puntos: o.puntos, aciertos: o.aciertos, predicciones: o.predicciones, puesto: o.puesto })),
     oraculoDe: Object.fromEntries(orac.map(o => [o.uid, { puntos: o.puntos, puesto: o.puesto }])),
     fase: S.fase, ronda: S.ronda, totalRondas: TRAMOS.length,
@@ -239,6 +240,8 @@ function activarOnline() {
   else if (S.etapa === "intro") irA("intro");
   else if (S.fase === "propuesta") mostrarPropuesta();     // se recargó con una propuesta pendiente
   else if (S.fase === "votando" && S.debate) mostrarVotacion(S.debate);   // se recargó a mitad de la votación
+  // se recargó en plena preparación con revelación: la escena tapa el par (el reloj no vuelve; REVELAR ▶ revela)
+  else if (S.fase === "listo" && S.revelado === false && S.debate) mostrarPreparacion(S.debate, datosPreparacion());
   // restaurar corre antes que activarOnline: la suscripción a los votos del debate en curso va aquí
   if (S.debate) { suscribirVotos(S.debate.n); suscribirPublicoActivo(S.debate.n); }
   // la curva del termómetro: un punto cada pocos segundos mientras el debate está abierto
