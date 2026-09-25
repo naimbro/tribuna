@@ -10,6 +10,9 @@ const ROT = {
   SEG_DEBATE: 360, SEG_VOTACION: 75, SEG_VEREDICTO_PUBLICO: 6, SEG_JUEZ: 3, SEG_TOTALES: 6, SEG_RESULTADO: 10, SEG_PROPUESTA: 15,
   SEG_PREPARACION: 60,  // antes de abrir el chat, cada grupo ve su postura y acuerda su primera frase
   SEG_ESCRIBIENDO: 6,   // «Grupo N está escribiendo…» dura esto desde la última tecla vista
+  SEG_REVELACION: 8,    // la revelación de quién pasa al frente (se puede saltar)
+  SEG_ENTRADA: 20,      // la entrada al escenario: lo que toma caminar al frente (se puede saltar)
+  P_REVANCHA: 0.25,     // con revelación, probabilidad de que un cupo caiga en un grupo que ya debatió
   GRUPOS_DEFECTO: 6, GRUPOS_MIN: 2, GRUPOS_MAX: 10,
   INDECISO: 8,          // |pos| ≤ 8 es indeciso y no suma votos
   ESCALA: 12,           // voto suave: tanh(|pos| / 12)
@@ -265,6 +268,48 @@ function mejorIntervencion(historial) {
   return (historial || []).reduce((m, h) => (!m || h.total > m.total ? h : m), null);
 }
 
+/* --- El debate en vivo (spec 2026-09-25) -------------------------------
+   Cada conducta nueva tiene un interruptor en S.clase.opciones; lo que falta cuenta como
+   encendido, así las salas creadas antes siguen funcionando. Apagado = la clase de siempre. */
+const OPCIONES_DEFECTO = { revelacion: true, revancha: true, musica: true, voz: true, reloj: true, punto: true, vozIA: true };
+const opcionActiva = (ops, k) => (ops && k in ops ? ops[k] !== false : OPCIONES_DEFECTO[k] !== false);
+
+// Los duelos escritos que faltan, en números de grupo (con personajes). Mismo orden que PREGUNTAS.
+function duelosPendientes(escritas, usadas, ps) {
+  const ya = new Set((usadas || []).map(x => textoPregunta(x).toLowerCase()));
+  return (escritas || []).filter(p => p && typeof p === "object" && p.duelo && textoPregunta(p) && !ya.has(textoPregunta(p).toLowerCase()))
+    .map(p => ({ texto: textoPregunta(p), favor: p.favor || "", contra: p.contra || "", duelo: p.duelo, ...(dueloEnGrupos(p.duelo, ps) || { A: null, B: null }) }));
+}
+
+// Con revelación, el próximo duelo se sortea: nadie sabe cuál sigue. Entran al sorteo los pendientes
+// con gente en los dos lados; `evitar` (el que el profesor acaba de descartar) solo si hay otro. Si
+// ninguno tiene gente, el primero pendiente (la propuesta dirá quién falta). Misma forma que
+// proximaPreguntaEscrita. azar: () => [0, 1), inyectable para las pruebas.
+function sortearDuelo(escritas, usadas, ps, conteo, azar = Math.random, evitar = null) {
+  const pend = duelosPendientes(escritas, usadas, ps);
+  if (!pend.length) return null;
+  const conGente = pend.filter(p => p.A && p.B && (conteo || {})[p.A] > 0 && (conteo || {})[p.B] > 0);
+  let pool = conGente.length ? conGente : [pend[0]];
+  const ev = String(evitar || "").trim().toLowerCase();
+  if (ev && pool.length > 1) pool = pool.filter(p => p.texto.toLowerCase() !== ev);
+  const p = pool[Math.min(pool.length - 1, Math.floor(azar() * pool.length))];
+  return { texto: p.texto, afirma: null, favor: p.favor, contra: p.contra, duelo: p.duelo };
+}
+
+// La revancha: para que ningún grupo se sienta a salvo después de debatir, con probabilidad
+// ROT.P_REVANCHA uno de los dos cupos cae en un grupo que ya debatió (nunca contra sí mismo).
+// Solo con al menos un debate jugado y tres grupos con gente.
+function conRevancha(par, disponibles, debates, azar = Math.random) {
+  const gs = [...new Set(disponibles || [])];
+  if (!par || !(debates || []).length || gs.length < 3) return par;
+  if (azar() >= ROT.P_REVANCHA) return par;
+  const jugaron = gs.filter(g => g !== par.A && g !== par.B && debates.some(d => d.A === g || d.B === g)).sort((a, b) => a - b);
+  if (!jugaron.length) return par;
+  const g = jugaron[Math.min(jugaron.length - 1, Math.floor(azar() * jugaron.length))];
+  return azar() < 0.5 ? { ...par, A: g } : { ...par, B: g };
+}
+
 if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, posturasDebate, gruposEscribiendo, sumarPuntoPregunta, mejorIntervencion, conGrupo,
   numerarPersonajes, personajeDe, rotuloGrupo, rotuloCorto, mencionGrupo, aliasGrupo, conteoPersonajes, personajeLleno, todosLlenos,
-  cupoSugerido, personajeParaAtrasado, dueloEnGrupos, faltanEnDuelo };
+  cupoSugerido, personajeParaAtrasado, dueloEnGrupos, faltanEnDuelo,
+  OPCIONES_DEFECTO, opcionActiva, duelosPendientes, sortearDuelo, conRevancha };

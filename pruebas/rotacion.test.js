@@ -249,3 +249,73 @@ test("gruposEscribiendo: los grupos del debate con alguien tecleando hace poco, 
   assert.deepEqual(R.gruposEscribiendo([], { debate: 2, ahora }), []);
   assert.deepEqual(R.gruposEscribiendo(xs, { debate: null, ahora }), []);
 });
+
+/* ---- El debate en vivo: opciones, sorteo de duelo, revancha ---- */
+const seq = xs => () => (xs.length ? xs.shift() : 0);
+
+test("opcionActiva: sin opciones, todo encendido; false apaga; claves desconocidas, encendidas", () => {
+  assert.equal(R.opcionActiva(null, "voz"), true);
+  assert.equal(R.opcionActiva({}, "revelacion"), true);
+  assert.equal(R.opcionActiva({ voz: false }, "voz"), false);
+  assert.equal(R.opcionActiva({ voz: false }, "musica"), true);
+  assert.deepEqual(Object.keys(R.OPCIONES_DEFECTO).sort(), ["musica", "punto", "reloj", "revancha", "revelacion", "voz", "vozIA"]);
+});
+
+const PS = R.numerarPersonajes([
+  { id: "huang", nombre: "Jensen Huang", corto: "Huang", duelo: 1, lado: "A" },
+  { id: "amodei", nombre: "Dario Amodei", corto: "Amodei", duelo: 1, lado: "B" },
+  { id: "hawley", nombre: "Josh Hawley", corto: "Hawley", duelo: 2, lado: "A" },
+  { id: "altman", nombre: "Sam Altman", corto: "Altman", duelo: 2, lado: "B" },
+  { id: "sanders", nombre: "Bernie Sanders", corto: "Sanders", duelo: 3, lado: "A" },
+  { id: "musk", nombre: "Elon Musk", corto: "Musk", duelo: 3, lado: "B" }
+]);
+const DUELOS = [
+  { texto: "Moción uno", favor: "f1", contra: "c1", duelo: { A: "huang", B: "amodei" } },
+  { texto: "Moción dos", favor: "f2", contra: "c2", duelo: { A: "hawley", B: "altman" } },
+  { texto: "Moción tres", favor: "f3", contra: "c3", duelo: { A: "sanders", B: "musk" } }
+];
+const LLENO = { 1: 4, 2: 4, 3: 4, 4: 4, 5: 4, 6: 4 };
+
+test("duelosPendientes: los que no se han jugado, en números de grupo", () => {
+  const p = R.duelosPendientes(DUELOS, ["Moción dos"], PS);
+  assert.deepEqual(p.map(x => [x.texto, x.A, x.B]), [["Moción uno", 1, 2], ["Moción tres", 5, 6]]);
+  assert.equal(p[0].favor, "f1");
+});
+
+test("sortearDuelo: elige al azar entre los pendientes con gente en los dos lados", () => {
+  assert.equal(R.sortearDuelo(DUELOS, [], PS, LLENO, seq([0])).texto, "Moción uno");
+  assert.equal(R.sortearDuelo(DUELOS, [], PS, LLENO, seq([0.5])).texto, "Moción dos");
+  assert.equal(R.sortearDuelo(DUELOS, [], PS, LLENO, seq([0.99])).texto, "Moción tres");
+  // Musk sin nadie: el duelo 3 no entra al sorteo
+  const sinMusk = { ...LLENO, 6: 0 };
+  for (const x of [0, 0.4, 0.7, 0.99]) assert.notEqual(R.sortearDuelo(DUELOS, [], PS, sinMusk, seq([x])).texto, "Moción tres");
+});
+
+test("sortearDuelo: 'evitar' se salta si hay otro; los jugados no vuelven; sin gente en ninguno, el primero pendiente", () => {
+  assert.equal(R.sortearDuelo(DUELOS, ["Moción uno"], PS, LLENO, seq([0]), "Moción dos").texto, "Moción tres");
+  assert.equal(R.sortearDuelo(DUELOS, ["Moción uno", "Moción tres"], PS, LLENO, seq([0]), "Moción dos").texto, "Moción dos");
+  assert.equal(R.sortearDuelo(DUELOS, ["Moción uno"], PS, {}, seq([0.9])).texto, "Moción dos");
+  assert.equal(R.sortearDuelo(DUELOS, ["Moción uno", "Moción dos", "Moción tres"], PS, LLENO, seq([0])), null);
+});
+
+test("sortearDuelo devuelve la forma de proximaPreguntaEscrita (texto, favor, contra, duelo)", () => {
+  const d = R.sortearDuelo(DUELOS, [], PS, LLENO, seq([0]));
+  assert.deepEqual(d, { texto: "Moción uno", afirma: null, favor: "f1", contra: "c1", duelo: { A: "huang", B: "amodei" } });
+});
+
+test("conRevancha: sin debates previos, con menos de 3 grupos o sin suerte, el par no cambia", () => {
+  const par = { A: 3, B: 4 };
+  assert.deepEqual(R.conRevancha(par, [1, 2, 3, 4], [], seq([0])), par);
+  assert.deepEqual(R.conRevancha(par, [3, 4], [{ A: 3, B: 4 }], seq([0])), par);
+  assert.deepEqual(R.conRevancha(par, [1, 2, 3, 4], [{ A: 1, B: 2 }], seq([R.ROT.P_REVANCHA])), par);
+  assert.equal(R.conRevancha(null, [1, 2], [], seq([0])), null);
+});
+
+test("conRevancha: con suerte, un cupo cae en un grupo que ya debatió", () => {
+  // azar: 0.1 (< P_REVANCHA) → hay revancha; 0 → el primero de los que ya jugaron; 0.7 → reemplaza a B
+  assert.deepEqual(R.conRevancha({ A: 3, B: 4 }, [1, 2, 3, 4], [{ A: 1, B: 2 }], seq([0.1, 0, 0.7])), { A: 3, B: 1 });
+  assert.deepEqual(R.conRevancha({ A: 3, B: 4 }, [1, 2, 3, 4], [{ A: 1, B: 2 }], seq([0.1, 0.99, 0.2])), { A: 2, B: 4 });
+  // nunca deja a un grupo contra sí mismo
+  const r = R.conRevancha({ A: 1, B: 3 }, [1, 2, 3], [{ A: 1, B: 2 }], seq([0.1, 0, 0.2]));
+  assert.notEqual(r.A, r.B);
+});
