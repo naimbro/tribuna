@@ -112,11 +112,14 @@ service cloud.firestore {
       // La conversación: un solo hilo. La leen todos los de la sala. Un alumno de una bancada
       // publica solo como sí mismo, por su bancada y con el tramo abierto; lo demás (moderadora,
       // relator, resultados) lo publica la pantalla del profesor. Nadie edita ni borra salvo él.
+      // El id de un mensaje de alumno es el que arma el teléfono ("a" + base 36, jugar.js
+      // enviarTexto): los teléfonos lo ponen en atributos HTML, así que no puede traer comillas.
       match /mensajes/{id} {
         allow read: if esProfe(codigo) || (conSesion() && esJugador(codigo));
         allow create: if esProfe(codigo)
           // modo clásico (salas antiguas)
           || (conSesion() && esJugador(codigo)
+            && id.matches('^a[0-9a-z]{6,24}$')
             && sala(codigo).data.get('modo', '') != 'rotacion'
             && request.resource.data.tipo == 'alumno'
             && request.resource.data.uid == request.auth.uid
@@ -127,6 +130,7 @@ service cloud.firestore {
             && request.resource.data.texto.size() > 0 && request.resource.data.texto.size() <= 1500)
           // rotación: solo los dos grupos llamados, cada uno por su lado, en el debate en curso
           || (conSesion() && esJugador(codigo)
+            && id.matches('^a[0-9a-z]{6,24}$')
             && sala(codigo).data.get('modo', '') == 'rotacion'
             && request.resource.data.tipo == 'alumno'
             && request.resource.data.uid == request.auth.uid

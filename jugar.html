@@ -197,12 +197,14 @@ body.en-vivo.vv-banco header .reloj{visibility:hidden}
 .vv-hab.quieto .vv-tx.corta{-webkit-mask-image:linear-gradient(to top,transparent,#000 2.2em);mask-image:linear-gradient(to top,transparent,#000 2.2em)}
 .vv-hab.quieto .vv-en{color:var(--dim)}
 .vv-pts{animation:pulso .9s infinite;font-style:normal}
-.vv-escena.dos{justify-content:flex-start;gap:10px}
+.vv-escena.dos{justify-content:flex-start;gap:12px}
 .vv-escena.dos .vv-hab{flex:1 1 0;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);column-gap:8px;align-items:baseline}
 .vv-escena.dos .vv-hab .vv-en{display:none}
 .vv-escena.dos .vv-nom{font-size:18px;margin-top:0}
 .vv-escena.dos .vv-gr{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vv-escena.dos .vv-tx{grid-column:1/-1;align-self:stretch;font-size:18px;margin-top:4px}
+/* cada uno en su mitad: el texto corto queda bajo el nombre; el largo, anclado abajo (lo último) */
+.vv-escena.dos .vv-tx:not(.corta){justify-content:flex-start}
 .vv-escena.dos .vv-tx.corta{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 1.2em);mask-image:linear-gradient(to bottom,transparent,#000 1.2em)}
 .vv-dos{--l:var(--txt);flex:0 0 auto}
 .vv-vacio{text-align:center;font-size:19px;font-weight:700;color:var(--txt)}
@@ -215,6 +217,9 @@ body.en-vivo.vv-banco header .reloj{visibility:hidden}
 .vv-rxb span{font-size:25px;line-height:1.1}
 .vv-rxb small{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .vv-rxb b{position:absolute;top:5px;right:8px;font-size:12px;color:var(--txt)}
+.vv-rxb b:empty{display:none}
+/* el personaje: un punto de su color junto al nombre (el acento de la vista es el color del lado) */
+.vv-pj{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--p);margin-right:6px;vertical-align:1px;box-shadow:0 0 6px var(--p)}
 .vv-rxb.on{border-color:#a78bfa;background:#241d3d;color:var(--txt);box-shadow:0 0 0 1px #a78bfa}
 @media (max-height:700px){
   .vivo{gap:8px;padding-top:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}

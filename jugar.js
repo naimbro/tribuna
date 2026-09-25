@@ -13,7 +13,8 @@ import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, order
 import { firebaseConfig } from "./firebase-config.js?v=20260918a";
 
 const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+// también las comillas: el texto escapado va igual dentro de atributos (data-m="…", data-n="…")
+const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 const HAY_FIREBASE = !!firebaseConfig.apiKey;
 const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
@@ -317,7 +318,8 @@ function pintarSala() {
   if (s.veredicto && !J.ceremoniaVista && J.fbListo) { J.ceremoniaVista = true; ceremonia(s, s.veredicto); }
   pintarChat(); pintarCaja(); pintarReloj();
   // la vista de siempre que eligió el alumno dura lo que dura el debate
-  if (s.fase === "votando" || (d && J.vistaDe !== d.n)) { J.vistaClasica = false; J.vistaDe = d ? d.n : null; }
+  const claveVista = [d ? d.n : "", rol, J.grupo].join("#");
+  if (s.fase === "votando" || J.vistaDe !== claveVista) { J.vistaClasica = false; J.vistaDe = claveVista; }
   pintarVivo(s);
 }
 
@@ -395,7 +397,7 @@ function reaccionesDe(m, s) {
   if (!s.debate || m.debate !== s.debate.n) return "";
   const c = PA.conteos[m.id] || {}, mia = PA.mias[m.id];
   if (rolEn(s) === "P" && s.fase === "abierta")
-    return `<div class="rx">${PUB.REACCIONES.map(r => `<button class="rxb ${mia === r.id ? "on" : ""}" data-m="${m.id}" data-r="${r.id}" title="${r.nombre}">${r.emoji}${c[r.id] ? " " + c[r.id] : ""}</button>`).join("")}</div>`;
+    return `<div class="rx">${PUB.REACCIONES.map(r => `<button class="rxb ${mia === r.id ? "on" : ""}" data-m="${esc(m.id)}" data-r="${r.id}" title="${r.nombre}">${r.emoji}${c[r.id] ? " " + c[r.id] : ""}</button>`).join("")}</div>`;
   const xs = PUB.REACCIONES.filter(r => c[r.id]).map(r => `<span class="rxv">${r.emoji} ${c[r.id]}</span>`);
   return xs.length ? `<div class="rx">${xs.join("")}</div>` : "";
 }
@@ -974,6 +976,10 @@ async function soltarHablar({ enviar = true, aviso = "", inmediato = false } = {
   avisoHabla(error || aviso);
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden && HABLA.apretado) soltarHablar(); });
+// Red de seguridad: si el botón salió del documento o perdió la captura sin avisarle, el dedo que
+// apretó igual suelta al levantarse en cualquier parte. El micrófono nunca queda abierto a ciegas.
+for (const ev of ["pointerup", "pointercancel", "lostpointercapture"])
+  document.addEventListener(ev, e => { if (HABLA.apretado && e.pointerId === HABLA.pointerId) soltarHablar(); }, true);
 // si cierra la pestaña hablando, lo mejor posible: que el proyector no se quede con sus subtítulos
 window.addEventListener("pagehide", () => {
   if (HABLA.toma && J.codigo && J.uid) setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { habla: null }, { merge: true }).catch(() => {});
@@ -1027,15 +1033,20 @@ function pintarBotonHablar(s) {
    (reloj, subtítulos, punto), porque el botón de hablar no se puede rehacer mientras se aprieta:
    perdería la captura del dedo. Quien debate sin reconocimiento de voz (algunos iPhone) se queda
    con la vista de siempre: sin botón, lo suyo es el teclado. */
-const VV = { visible: false, clave: "", llega: {}, hablaVisto: {}, pedido: null, enfria: 0, ladoVisto: null,
-  respondido: null, avisado: null, palabra: null, aviso: null, modClave: "", modLista: [] };
+const VV = { visible: false, clave: "", debate: null, llega: {}, hablaVisto: {}, pedido: null, enfria: 0, ladoVisto: null,
+  respondido: null, avisado: null, palabra: null, aviso: null, modClave: "", modLista: [], rxClave: "", medir: false };
 const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
 const ladoDe = (g, d) => (g === d.A ? "A" : g === d.B ? "B" : null);
-const colorGrupo = (g, s) => { const p = personajeDe(g, PJ()), k = ladoDe(g, s.debate); return (p && p.color) || (k ? s.equipos[k].color : "var(--dim)"); };
+// Los acentos van con el color del lado (el mismo del chip de la cabecera, la conversación y el
+// termómetro); el del personaje, solo como un punto junto a su nombre.
+const colorLado = (k, s) => (k && s.equipos[k] ? s.equipos[k].color : "var(--dim)");
+const puntoPj = g => { const p = personajeDe(g, PJ()); return p && p.color ? `<i class="vv-pj" style="--p:${p.color}"></i>` : ""; };
 // el final de un texto largo (el subtítulo muestra lo último que se dijo)
 const cola = (t, n) => { t = String(t || "").trim(); return t.length > n ? "…" + t.slice(-n).replace(/^\S*\s/, "") : t; };
 // innerHTML solo si cambió: un botón rehecho entre el pointerdown y el pointerup pierde el toque
-const poner = (el, html) => { if (el && el._h !== html) { el._h = html; el.innerHTML = html; } };
+const poner = (el, html) => { if (!el || el._h === html) return false; el._h = html; el.innerHTML = html; return true; };
+const texto = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
+addEventListener("resize", () => { VV.medir = true; });
 
 function tocaVivo(s) {
   if (!s || s.etapa != null || !opcionActiva(s.opciones, "voz") || s.fase !== "abierta" || !s.debate || enSuspenso(s)) return false;
@@ -1058,12 +1069,15 @@ function relojVivo(s) {
 }
 
 function pintarVivo(s) {
+  // lo del punto (pedido, enfriamiento, respuesta, avisos) es de un debate: no pasa al siguiente
+  const n = s && s.debate ? s.debate.n : null;
+  if (VV.debate !== n) { VV.debate = n; Object.assign(VV, { pedido: null, enfria: 0, aviso: null, respondido: null }); }
   const ver = tocaVivo(s) && !J.vistaClasica;
   const volver = $("vvVolver");
   volver.classList.toggle("oculto", !(tocaVivo(s) && J.vistaClasica));
   if (!volver.classList.contains("oculto")) {
     const lado = miLado(s);
-    volver.style.setProperty("--c", lado ? colorGrupo(J.grupo, s) : "#a78bfa");
+    volver.style.setProperty("--c", lado ? colorLado(lado, s) : "#a78bfa");
   }
   $("pVivo").classList.toggle("oculto", !ver);
   document.body.classList.toggle("en-vivo", ver);
@@ -1081,14 +1095,17 @@ function pintarVivo(s) {
 
 function armarVivo(s, rol) {
   const el = $("pVivo"), d = s.debate;
-  // el botón de hablar y lo que voy diciendo sobreviven al armazón nuevo: se sacan antes
+  // Cambió el rol, el debate o el grupo: si estaba hablando, se suelta sin enviar (sacar el botón
+  // del documento le quita la captura del dedo y el micrófono quedaría abierto sin botón a la vista).
+  if (HABLA.apretado) soltarHablar({ enviar: false });
+  // el botón y lo que voy diciendo se sacan antes del innerHTML (si no, se destruyen) y se vuelven a montar
   for (const id of ["btnHablar", "miHabla"]) { const x = $(id); if (x && el.contains(x)) x.remove(); }
   const pie = b => `<div class="vv-pie">${b ? `<button type="button" class="vv-pie-b" data-acc="escribir">⌨ escribir</button>` : ""}<button type="button" class="vv-pie-b" data-acc="conv">ver conversación</button></div>`;
   if (rol === "P") {
     el.className = "vivo publico";
     el.style.setProperty("--c", "#a78bfa");
-    const lado = k => `<div class="vv-ld ${k === "B" ? "der" : ""}" style="--l:${colorGrupo(d[k], s)}">
-        <b>${esc(nomG(d[k]))}</b><small>${esc(s.equipos[k].nombre)}</small><span class="vv-rc mono" id="vvR${k}"></span></div>`;
+    const lado = k => `<div class="vv-ld ${k === "B" ? "der" : ""}" style="--l:${colorLado(k, s)}">
+        <b>${puntoPj(d[k])}${esc(nomG(d[k]))}</b><small>${esc(s.equipos[k].nombre)}</small><span class="vv-rc mono" id="vvR${k}"></span></div>`;
     el.innerHTML = `<div class="vv-duelo">${lado("A")}<i>vs</i>${lado("B")}</div>
       <div class="vv-pp" id="vvPuntoP"></div>
       <div class="vv-escena" id="vvEscena" aria-live="polite"></div>
@@ -1096,9 +1113,9 @@ function armarVivo(s, rol) {
     return;
   }
   el.className = "vivo debate";
-  el.style.setProperty("--c", colorGrupo(J.grupo, s));
+  el.style.setProperty("--c", colorLado(rol, s));
   el.innerHTML = `<div class="vv-cab">
-      <div class="vv-rol"><b>${esc(nomG(J.grupo))}</b><span>${esc(s.equipos[rol].nombre)}</span></div>
+      <div class="vv-rol"><b>${puntoPj(J.grupo)}${esc(nomG(J.grupo))}</b><span>${esc(s.equipos[rol].nombre)}</span></div>
       <div class="vv-reloj mono" id="vvReloj"></div><div class="vv-rnota" id="vvRNota"></div></div>
     <div class="vv-mod oculto" id="vvMod"></div>
     <div class="vv-comp" id="vvComp"></div>
@@ -1139,12 +1156,12 @@ function parcialDebate(s, lado) {
   const ms = banco ? banco[lado] : tramo;
   const agotado = !!banco && banco[lado] <= 0;
   const reloj = $("vvReloj"), nota = $("vvRNota");
-  reloj.textContent = ms == null ? "" : mmss(ms);
+  texto(reloj, ms == null ? "" : mmss(ms));
   reloj.classList.toggle("bajo", ms != null && ms < 20000 && !agotado);
   reloj.classList.toggle("cero", agotado);
   const porPunto = hablaPorPunto(s);
-  nota.textContent = agotado ? (porPunto ? "sin tiempo · hablas por tu punto" : "SIN TIEMPO · solo puedes escribir")
-    : banco ? (corre(lado) ? "tu tiempo · corriendo" : "el tiempo de tu lado") : "queda del tramo";
+  texto(nota, agotado ? (porPunto ? "sin tiempo · hablas por tu punto" : "SIN TIEMPO · solo puedes escribir")
+    : banco ? (corre(lado) ? "tu tiempo · corriendo" : "el tiempo de tu lado") : "queda del tramo");
   nota.classList.toggle("sin", agotado);
   nota.classList.toggle("corre", !agotado && corre(lado));
   el.classList.toggle("agotado", agotado && !porPunto);
@@ -1169,6 +1186,7 @@ function puntoDebate(s, lado, otros, ahora) {
   if (p && p.lado === lado && VV.ladoVisto !== p.t) { VV.ladoVisto = p.t; VV.enfria = Math.max(VV.enfria, ahora); }
   if (VV.pedido && p && p.t === VV.pedido.t) VV.pedido = null;                   // ya lo refleja la sala
   if (VV.pedido && ahora - VV.pedido.en > 6000) {
+    VV.enfria = VV.pedido.enfriaAntes;                   // no entró: no cuenta como pedido
     VV.pedido = null;
     VV.aviso = { txt: "✋ El punto no entró: pídelo de nuevo cuando vuelvan a hablar.", hasta: ahora + 4000 };
   }
@@ -1206,10 +1224,10 @@ function pedirPuntoTel(s) {
   const lado = miLado(s);
   if (!lado || !s.debate || puntoActivo(s.punto) || VV.pedido || !opcionActiva(s.opciones, "punto")) return;
   const t = Date.now();
-  VV.pedido = { t, en: t }; VV.enfria = t;
+  VV.pedido = { t, en: t, enfriaAntes: VV.enfria }; VV.enfria = t;
   navigator.vibrate?.(30);
   setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { punto: { debate: s.debate.n, t } }, { merge: true })
-    .catch(e => { VV.pedido = null; VV.enfria = 0; VV.aviso = { txt: "✋ No se pidió el punto: " + e.code, hasta: Date.now() + 4000 }; });
+    .catch(e => { if (VV.pedido && VV.pedido.t === t) { VV.enfria = VV.pedido.enfriaAntes; VV.pedido = null; } VV.aviso = { txt: "✋ No se pidió el punto: " + e.code, hasta: Date.now() + 4000 }; });
   pintarVivoParcial();
 }
 function responderPuntoTel(s, acepta) {
@@ -1227,7 +1245,7 @@ function parcialPublico(s) {
   const { banco, corre } = relojVivo(s);
   for (const k of ["A", "B"]) {
     const r = $("vvR" + k);
-    r.textContent = banco ? mmss(banco[k]) : "";
+    texto(r, banco ? mmss(banco[k]) : "");
     r.classList.toggle("corre", corre(k));
     r.classList.toggle("bajo", !!banco && banco[k] < 20000);
   }
@@ -1238,7 +1256,9 @@ function parcialPublico(s) {
     : p.estado === "rechazado" ? "✋ Punto rechazado" : p.estado === "vencido" ? "✋ Nadie respondió el punto" : "";
   poner($("vvPuntoP"), pp);
   // quien habla, grande; en silencio, el último mensaje de alumno del debate
-  const hablan = quienesHablan(s).slice(0, 2);
+  // a lo más uno por lado (el que empezó primero): dos del mismo lado no son «los dos lados»
+  const todos = quienesHablan(s).sort((a, b) => (a.habla.t0 || 0) - (b.habla.t0 || 0));
+  const hablan = ["A", "B"].map(k => todos.find(g => ladoDe(g.grupo, d) === k)).filter(Boolean);
   const msgs = J.chat.filter(m => m.tipo === "alumno" && m.debate === d.n);
   const k0 = hablan.length ? ladoDe(hablan[0].grupo, d) : null;
   const obj = [...msgs].reverse().find(m => !k0 || m.equipo === k0);          // al que se reacciona
@@ -1246,28 +1266,35 @@ function parcialPublico(s) {
   if (hablan.length) {
     // los dos lados a la vez (una interrupción): cada uno en su mitad, más compactos
     escena = (hablan.length > 1 ? `<div class="vv-en vv-dos"><i></i>Hablan los dos lados</div>` : "") + hablan.map(g => { const k = ladoDe(g.grupo, d);
-      return `<div class="vv-hab" style="--l:${colorGrupo(g.grupo, s)}"><div class="vv-en"><i></i>Habla ahora</div>
-        <div class="vv-nom">${esc(g.nombre)}</div><div class="vv-gr">${esc(nomG(g.grupo))} · ${esc(s.equipos[k].nombre)}</div>
+      return `<div class="vv-hab" style="--l:${colorLado(k, s)}"><div class="vv-en"><i></i>Habla ahora</div>
+        <div class="vv-nom">${esc(g.nombre)}</div><div class="vv-gr">${puntoPj(g.grupo)}${esc(nomG(g.grupo))} · ${esc(s.equipos[k].nombre)}</div>
         <div class="vv-tx"><span>${g.habla.texto ? esc(cola(g.habla.texto, hablan.length > 1 ? 140 : 280)) : `<i class="vv-pts">…</i>`}</span></div></div>`; }).join("");
   } else if (msgs.length) {
     const m = msgs[msgs.length - 1], g = grupoDeMensaje(m);
-    escena = `<div class="vv-hab quieto" style="--l:${g ? colorGrupo(g, s) : s.equipos[m.equipo]?.color || "var(--dim)"}"><div class="vv-en">${m.voz ? "🎤 " : ""}Lo último que se dijo</div>
-      <div class="vv-nom">${esc(m.nombre)}</div><div class="vv-gr">${esc(g ? nomG(g) : "")}${m.equipo && s.equipos[m.equipo] ? " · " + esc(s.equipos[m.equipo].nombre) : ""}</div>
+    escena = `<div class="vv-hab quieto" style="--l:${colorLado(m.equipo, s)}"><div class="vv-en">${m.voz ? "🎤 " : ""}Lo último que se dijo</div>
+      <div class="vv-nom">${esc(m.nombre)}</div><div class="vv-gr">${g ? puntoPj(g) + esc(nomG(g)) : ""}${m.equipo && s.equipos[m.equipo] ? " · " + esc(s.equipos[m.equipo].nombre) : ""}</div>
       <div class="vv-tx"><span>${esc(m.texto)}</span></div></div>`;
   } else escena = `<div class="vv-vacio">Todavía no habla nadie.<small>Cuando alguien apriete su botón, lo que dice aparece aquí.</small></div>`;
-  poner($("vvEscena"), escena);
-  $("vvEscena").classList.toggle("dos", hablan.length > 1);
-  // si el texto no cabe, se desvanece por donde se corta (arriba en vivo, abajo en silencio)
-  for (const tx of $("vvEscena").querySelectorAll(".vv-tx")) tx.classList.toggle("corta", tx.firstElementChild.offsetHeight > tx.clientHeight + 2);
-  // 🔥🤔🤝 para ese mensaje (mientras alguien habla: lo último que dijo ese lado)
-  let rx = "";
-  if (obj) {
-    const c = PA.conteos[obj.id] || {}, mia = PA.mias[obj.id];
-    rx = `<div class="vv-rx-q">${hablan.length ? `Reacciona a lo último de <b>${esc(corto(obj.nombre))}</b>: «${esc(obj.texto.slice(0, 60))}${obj.texto.length > 60 ? "…" : ""}»` : "Reacciona a este mensaje"}</div>
-      <div class="vv-rxs">${PUB.REACCIONES.map(r => `<button type="button" class="vv-rxb ${mia === r.id ? "on" : ""}" data-acc="rx" data-m="${obj.id}" data-r="${r.id}" aria-pressed="${mia === r.id}">
-        <span>${r.emoji}</span><small>${esc(r.nombre)}</small>${c[r.id] ? `<b>${c[r.id]}</b>` : ""}</button>`).join("")}</div>`;
+  const esc0 = $("vvEscena");
+  if (poner(esc0, escena) || VV.medir) {
+    VV.medir = false;
+    esc0.classList.toggle("dos", hablan.length > 1);
+    // si el texto no cabe, se desvanece por donde se corta (arriba en vivo, abajo en silencio)
+    for (const tx of esc0.querySelectorAll(".vv-tx")) tx.classList.toggle("corta", tx.firstElementChild.offsetHeight > tx.clientHeight + 2);
   }
-  poner($("vvRx"), rx);
+  // 🔥🤔🤝 para ese mensaje (mientras alguien habla: lo último que dijo ese lado)
+  const mia = obj ? PA.mias[obj.id] : null;
+  const rxClave = obj ? [obj.id, mia || "", hablan.length ? 1 : 0].join("|") : "";
+  if (VV.rxClave !== rxClave) {
+    VV.rxClave = rxClave;
+    poner($("vvRx"), !obj ? "" : `<div class="vv-rx-q">${hablan.length ? `Reacciona a lo último de <b>${esc(corto(obj.nombre))}</b>: «${esc(obj.texto.slice(0, 60))}${obj.texto.length > 60 ? "…" : ""}»` : "Reacciona a este mensaje"}</div>
+      <div class="vv-rxs">${PUB.REACCIONES.map(r => `<button type="button" class="vv-rxb ${mia === r.id ? "on" : ""}" data-acc="rx" data-m="${esc(obj.id)}" data-r="${r.id}" aria-pressed="${mia === r.id}">
+        <span>${r.emoji}</span><small>${esc(r.nombre)}</small><b></b></button>`).join("")}</div>`);
+  }
+  if (obj) {
+    const c = PA.conteos[obj.id] || {};
+    for (const b of $("vvRx").querySelectorAll(".vv-rxb")) texto(b.querySelector("b"), c[b.dataset.r] ? String(c[b.dataset.r]) : "");
+  }
 }
 
 function verClasica(escribir) {
@@ -1285,7 +1312,7 @@ $("pVivo").addEventListener("click", e => {
   else if (acc === "acepta" || acc === "rechaza") responderPuntoTel(s, acc === "acepta");
   else if (acc === "rx") reaccionar(b.dataset.m, b.dataset.r);
 });
-$("vvVolver").onclick = () => { $("tx").blur(); J.vistaClasica = false; pintarSala(); };
+$("vvVolver").onclick = () => { cortarDictado(); $("tx").blur(); J.vistaClasica = false; pintarSala(); };
 setInterval(pintarVivoParcial, 300);
 
 /* ---------- votar: quién argumentó mejor y a quién elegirá el jurado ---------- */

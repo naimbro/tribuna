@@ -1,11 +1,13 @@
 // Prueba de firestore.rules contra el emulador de Firestore: el cupo por personaje (semana 308), el
-// orden de llegada (dos que tocan el último lugar a la vez) y que las salas sin personajes sigan como
-// antes. No corre con `node --test pruebas/`: necesita el emulador y dos paquetes que el repo no trae.
+// orden de llegada (dos que tocan el último lugar a la vez), que las salas sin personajes sigan como
+// antes y que un mensaje de alumno solo entre con un id como el que arma el teléfono. No corre con `node --test pruebas/`: necesita el emulador y dos paquetes que el repo no trae.
 //
 //   cd /tmp && mkdir reglas && cd reglas && npm i @firebase/rules-unit-testing@4 firebase@11
 //   cd <repo> && NODE_PATH=/tmp/reglas/node_modules \
 //     firebase emulators:exec --only firestore --project demo-tribuna "node pruebas/reglas-emulador.cjs"
 //
+// Con un emulador que ya está corriendo en 8080, basta NODE_PATH=… node pruebas/reglas-emulador.cjs;
+// REGLAS_PROYECTO elige otro proyecto (demo-…) para no pisar las reglas ni los datos de otra prueba.
 // Resultado del 25-sep-2026: 27 de 27, y en 20 salas con un solo lugar libre entró exactamente uno.
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require("@firebase/rules-unit-testing");
 const { doc, setDoc, getDoc, writeBatch, deleteField, FieldPath } = require("firebase/firestore");
@@ -14,7 +16,7 @@ const path = require("node:path");
 
 (async () => {
 const env = await initializeTestEnvironment({
-  projectId: "demo-tribuna",
+  projectId: process.env.REGLAS_PROYECTO || "demo-tribuna",
   firestore: { rules: fs.readFileSync(path.join(__dirname, "..", "firestore.rules"), "utf8"), host: "127.0.0.1", port: 8080 }
 });
 
@@ -104,6 +106,30 @@ await caso("fuera de la portada, con grupo, ya no", async () => { await actualiz
 await caso("fuera de la portada, sin grupo, puede elegir uno", () => assertSucceeds(setDoc(doc(ctx("b"), "salas", "S001", "jugadores", "b"), { nombre: "B", email: email("b"), grupo: 2 }, { merge: true })));
 await caso("el profesor mueve a cualquiera", () => assertSucceeds(setDoc(doc(profe(), "salas", "S001", "jugadores", "a"), { grupo: 1 }, { merge: true })));
 await caso("un alumno no escribe los cupos de una sala sin personajes", () => assertFails(setDoc(doc(ctx("a"), "salas", "S001", "cupos", "1"), { miembros: { a: true } })));
+
+console.log("Mensajes de alumno: el id es el del teléfono (va dentro de atributos HTML)");
+await sembrar("M001", { personajes: false, etapa: null });
+await env.withSecurityRulesDisabled(async c => {
+  const db = c.firestore();
+  await setDoc(doc(db, "salas", "M001"), { fase: "abierta", debate: { n: 1, A: 1, B: 2 } }, { merge: true });
+  await setDoc(doc(db, "salas", "M001", "jugadores", "a"), { grupo: 1 }, { merge: true });
+});
+// lo mismo que arma jugar.js (enviarTexto)
+const idTel = () => "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const msg = texto => ({ tipo: "alumno", uid: "a", nombre: "A", email: email("a"), grupo: 1, equipo: "A", debate: 1, tramo: 0, ronda: 0, texto, t: Date.now() });
+await caso("un mensaje con el id del teléfono entra", () => assertSucceeds(setDoc(doc(ctx("a"), "salas", "M001", "mensajes", idTel()), msg("Hay que llegar antes."))));
+await caso("un id con comillas (inyección en data-m) no entra", () => assertFails(setDoc(doc(ctx("a"), "salas", "M001", "mensajes", 'a1" onmouseover="alert(1)'), msg("hola"))));
+await caso("un id que no empieza con «a» no entra", () => assertFails(setDoc(doc(ctx("a"), "salas", "M001", "mensajes", "m" + Date.now().toString(36)), msg("hola"))));
+await caso("un id demasiado largo no entra", () => assertFails(setDoc(doc(ctx("a"), "salas", "M001", "mensajes", "a" + "0".repeat(30)), msg("hola"))));
+await caso("el profesor sigue publicando con sus ids (m…)", () => assertSucceeds(setDoc(doc(profe(), "salas", "M001", "mensajes", "m" + Date.now().toString(36) + "xyz"), { tipo: "mod", texto: "Moderadora", t: 1 })));
+await sembrar("M002", { personajes: false, etapa: null });
+await env.withSecurityRulesDisabled(async c => {
+  const db = c.firestore();
+  await setDoc(doc(db, "salas", "M002"), { modo: "clasico", fase: "abierta" }, { merge: true });
+  await setDoc(doc(db, "salas", "M002", "jugadores", "a"), { equipo: "A" }, { merge: true });
+});
+await caso("modo clásico: el id del teléfono entra", () => assertSucceeds(setDoc(doc(ctx("a"), "salas", "M002", "mensajes", idTel()), { ...msg("hola a todos"), equipo: "A" })));
+await caso("modo clásico: un id con comillas no entra", () => assertFails(setDoc(doc(ctx("a"), "salas", "M002", "mensajes", "a'><img src=x>"), { ...msg("hola"), equipo: "A" })));
 
 await env.cleanup();
 console.log(`\n${ok} ok, ${mal} mal`);
