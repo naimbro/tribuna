@@ -98,6 +98,7 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
    de escribir, una píldora ancha (se aprieta con el pulgar sin tapar lo que se escribe). */
 .hablar{width:min(62vw,260px);aspect-ratio:1;border-radius:50%;border:6px solid #fff3;background:radial-gradient(circle,#fff2,#0000),var(--c,var(--neon));color:#fff;font:900 20px system-ui;line-height:1.15;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;transition:transform .12s}
 .hablar small{font-size:.62em;font-weight:700;opacity:.9}
+.hablar *{pointer-events:none}
 .hablar.on{transform:scale(.94);box-shadow:0 0 0 14px #ffffff22,0 0 60px var(--c,var(--neon));animation:hablaPulso 1s infinite}
 @keyframes hablaPulso{50%{box-shadow:0 0 0 20px #ffffff14,0 0 80px var(--c,var(--neon))}}
 .hablar:disabled{filter:grayscale(1);opacity:.4;cursor:default}
