@@ -148,6 +148,7 @@ function estadoControl() {
   return {
     t: Date.now(), ack: ON.ultimaOrden || 0,
     ignorada: ON.ignorada || 0,          // una orden que llegó mientras esta pestaña se recargaba: no se hizo
+    vieja: ON.vieja || 0,                // una orden con la fase de antes: se confirmó, pero no se hizo
     fase: S.fase, etapa: S.etapa || null, ticker: $("ticker").textContent,
     // en la portada y la intro, el botón que manda es el de la escena
     principal: (S.etapa === "portada" ? $("poEmpezar") : S.etapa === "intro" ? $("inSig") : $("btnPrincipal"))?.textContent || "",
@@ -175,7 +176,11 @@ const limpio = o => JSON.parse(JSON.stringify(o));
 // { ligera: true }: sin el respaldo privado (el banco y el punto cambian seguido y no se restauran).
 // El temporizador no se reinicia con cada llamada: con alguien hablando llegan muchas seguidas y la
 // publicación no puede quedar postergada para siempre (el estado se arma al salir, igual es el último).
-let publicando = null, conRespaldo = false;
+// Con solo publicaciones livianas pendientes, el documento de la sala (que leen todos los teléfonos)
+// se escribe como mucho una vez por segundo (el límite sostenido de Firestore por documento); el
+// resumen del control sigue saliendo a los 250 ms, así sus órdenes se confirman rápido.
+let publicando = null, conRespaldo = false, salaPendiente = null;
+const falloSala = e => tick("No se pudo publicar en la sala: " + e.message);
 function publicar(o) {
   if (!ON.codigo || !ON.uid) return;
   if (!(o && o.ligera === true)) conRespaldo = true;
@@ -183,16 +188,24 @@ function publicar(o) {
   publicando = setTimeout(() => {
     publicando = null;
     const respaldo = conRespaldo; conRespaldo = false;
-    // los tres a la vez (el ack del control no espera a los otros dos), cada uno con su error:
-    // si el resumen del control falla, la sala y los teléfonos siguen como siempre
-    const fallo = e => tick("No se pudo publicar en la sala: " + e.message);
     const control = estadoControl();
+    const espera = respaldo ? 0 : (ON.salaEn || 0) + 1000 - Date.now();
+    let sala = null;
+    if (espera <= 0) sala = escribirSala();
+    else if (!salaPendiente) salaPendiente = setTimeout(escribirSala, espera);   // el estado se arma al salir
+    // a la vez (el ack del control no espera a los otros), cada uno con su error: si el resumen del
+    // control falla, la sala y los teléfonos siguen como siempre
     return Promise.all([
-      setDoc(doc(db, "salas", ON.codigo), limpio(estadoPublico())).catch(fallo),
-      respaldo && setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado())).catch(fallo),
+      sala,
+      respaldo && setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado())).catch(falloSala),
       control && escribirControl(control)
     ]);
   }, 250);
+}
+function escribirSala() {
+  clearTimeout(salaPendiente); salaPendiente = null;
+  ON.salaEn = Date.now();
+  return setDoc(doc(db, "salas", ON.codigo), limpio(estadoPublico())).catch(falloSala);
 }
 function escribirControl(control) {
   ON.controlEn = Date.now();
@@ -246,6 +259,9 @@ function activarOnline() {
   envolver("guardarMotor");
 
   // Quiénes están en la sala
+  // Con el debate a viva voz la ficha cambia cada segundo (latido de habla): lo pesado (el feed, la
+  // barra, la portada, el mapa, las asignaciones) se repinta solo si cambió la lista en sí.
+  let firmaLista = null;
   onSnapshot(collectionJugadores(), snap => {
     ON.jugadores = {};
     snap.forEach(d => ON.jugadores[d.id] = d.data());
@@ -253,6 +269,9 @@ function activarOnline() {
     notarHablando(ON.jugadores);
     atenderPuntos();
     puntoPrimera = false;                // los pedidos de la primera foto ya eran viejos: no cuentan
+    const firma = firmaJugadores(ON.jugadores);
+    if (firma === firmaLista) return;
+    firmaLista = firma;
     asignarRezagados();
     asignarAtrasados();
     if (S.publico) S.publico.elegibles = elegibles();
@@ -334,6 +353,10 @@ function activarOnline() {
 }
 
 const collectionJugadores = () => collection(db, "salas", ON.codigo, "jugadores");
+// La lista sin lo que cambia al hablar o escribir (habla, escribe, punto, respondePunto).
+const VIVOS = new Set(["habla", "escribe", "punto", "respondePunto"]);
+const firmaJugadores = js => JSON.stringify(Object.keys(js).sort().map(uid =>
+  [uid, Object.keys(js[uid]).filter(k => !VIVOS.has(k)).sort().map(k => [k, js[uid][k]])]));
 
 /* ---------- las órdenes del control del profesor (control.html) ---------- */
 const ORDENES = {
@@ -372,7 +395,7 @@ const ordenVieja = data => SEGUN_FASE.has(data.cmd) && data.fase !== undefined
 function atenderOrden(data) {
   if (!(data.t > (ON.ultimaOrden || 0))) return;
   ON.ultimaOrden = data.t;
-  if (ordenVieja(data)) { tick("Orden vieja del control: no se hizo."); publicar(); return; }
+  if (ordenVieja(data)) { ON.vieja = data.t; tick("Orden vieja del control: no se hizo."); publicar(); return; }
   try { ORDENES[data.cmd]?.(data.arg); }
   catch (e) { console.warn("TRIBUNA: orden del control", data.cmd, e); tick(`La orden «${data.cmd}» del control falló: ${e.message}`); }
   publicar();                                                    // lleva el ack al control
@@ -406,10 +429,10 @@ setInterval(pintarEscribiendo, 1000);
 
 /* ---------- viva voz: quién habla (subtítulos, reloj de ajedrez) ----------
    Mientras aprieta el botón, el teléfono escribe en su ficha habla: { debate, t0, t, texto } cada
-   ~800 ms, y habla: null al soltar. Como en «escribiendo», cuenta cuándo llegó cada latido a ESTE
+   ~1 s, y habla: null al soltar. Como en «escribiendo», cuenta cuándo llegó cada latido a ESTE
    aparato (visto), no el reloj del teléfono: una ficha sin latido hace más de AJ.LATIDO calla (el
    teléfono se apagó a mitad). La primera foto trae fichas viejas: no cuentan. */
-const HABLA = {};                          // uid → { debate, t, t0, texto, visto }
+const HABLA = {};                          // uid → { debate, t, t0, texto, visto, desde }
 let hablaPrimera = true;
 function notarHablando(jugadores) {
   const ahora = Date.now();
@@ -417,14 +440,17 @@ function notarHablando(jugadores) {
     const h = j.habla;
     if (!h) { if (HABLA[uid]) { delete HABLA[uid]; ON.ultimaVoz = ahora; } continue; }
     const antes = HABLA[uid];
+    // desde: cuándo llegó el primer latido de esta toma (el banco de su lado paga desde ahí)
     if (!antes || antes.t !== h.t || antes.texto !== h.texto)
-      HABLA[uid] = { debate: h.debate, t: h.t, t0: h.t0, texto: String(h.texto || "").slice(-300), visto: hablaPrimera ? 0 : ahora };
+      HABLA[uid] = { debate: h.debate, t: h.t, t0: h.t0, texto: String(h.texto || "").slice(-300), visto: hablaPrimera ? 0 : ahora,
+        desde: antes && antes.t0 === h.t0 ? antes.desde : ahora };
   }
   for (const uid of Object.keys(HABLA)) if (!jugadores[uid]) delete HABLA[uid];
   hablaPrimera = false;
   avisarHabla();
 }
-// [{ uid, nombre, grupo, texto, t0 }]: quienes hablan ahora en el debate en curso (solo los dos lados).
+// [{ uid, nombre, grupo, texto, t0, desde }]: quienes hablan ahora en el debate en curso (solo los dos
+// lados). desde es hora de esta pantalla.
 function hablaSala() {
   const d = S.debate;
   if (!d) return [];
@@ -432,7 +458,7 @@ function hablaSala() {
   return Object.entries(HABLA).filter(([uid, h]) => {
     const j = ON.jugadores[uid];
     return j && h.debate === d.n && ahora - h.visto <= latido && (j.grupo === d.A || j.grupo === d.B);
-  }).map(([uid, h]) => ({ uid, nombre: ON.jugadores[uid].nombre || "", grupo: ON.jugadores[uid].grupo, texto: h.texto, t0: h.t0 }));
+  }).map(([uid, h]) => ({ uid, nombre: ON.jugadores[uid].nombre || "", grupo: ON.jugadores[uid].grupo, texto: h.texto, t0: h.t0, desde: h.desde }));
 }
 window.hablaSala = hablaSala;
 // Cuándo dejó de hablar el último (la moderadora espera un respiro corto desde ahí): al soltar, o
@@ -468,6 +494,7 @@ function atenderPuntos() {
   }
   if (!activo) return;
   const antes = S.punto;
+  const pedibles = !S.cierreBanco;       // durante las últimas palabras no entran puntos nuevos
   // las respuestas al pedido en curso: vale la primera del lado que recibe el punto
   if (S.punto && S.punto.estado === "pedido") {
     for (const [uid, j] of Object.entries(ON.jugadores)) {
@@ -477,11 +504,12 @@ function atenderPuntos() {
       if (S.punto !== antes) break;
     }
   }
-  // los pedidos pendientes, del más antiguo al más nuevo
-  const pendientes = Object.values(PEDIDOS).filter(p => !p.hecho).sort((a, b) => a.t - b.t);
+  // los pedidos pendientes, del que llegó primero a esta pantalla al último (el t es del reloj de
+  // cada teléfono: solo desempata)
+  const pendientes = Object.values(PEDIDOS).filter(p => !p.hecho).sort((a, b) => a.visto - b.visto || a.t - b.t);
   for (const p of pendientes) {
     const j = ON.jugadores[p.uid];
-    if (!j || ahora - p.visto > 5000) { p.hecho = true; continue; }
+    if (!j || !pedibles || ahora - p.visto > 5000) { p.hecho = true; continue; }
     const r = pedirPunto(S.punto, { uid: p.uid, nombre: j.nombre || "", grupo: j.grupo, lado: ladoDe(j), t: p.t },
       { ahora, hablando: hablandoAhora(), ultimo: S.puntoUltimo || {} });
     if (r.punto !== S.punto) { S.punto = r.punto; S.puntoUltimo = r.ultimo; p.hecho = true; }

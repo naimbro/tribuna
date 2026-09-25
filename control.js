@@ -138,7 +138,7 @@ function pintar() {
   pintarInterruptores(c);
   mostrar("btnTerminar", f !== "fin");
   $("pie").innerHTML = `${c.ticker ? `<div>Pantalla: ${esc(c.ticker.replace(/^›\s*/, ""))}</div>` : ""}<div style="margin-top:6px">${esc(auth.currentUser?.email || "")} · <a href="#" id="salir" style="color:var(--dim)">salir</a></div>`;
-  $("salir").onclick = e => { e.preventDefault(); signOut(auth).then(() => location.reload()); };
+  $("salir").onclick = e => { e.preventDefault(); conectadoA = null; signOut(auth).then(() => location.reload()); };
   habilitar(); pintarConexion(); pintarRelojes();
 }
 
@@ -189,11 +189,14 @@ function pintarDebate(c) {
 function pintarRelojes() {
   const c = C.dato;
   if (!c) return;
-  const fin = { listo: c.finPrep, entrada: c.finEntrada, abierta: c.banco ? null : c.finRonda, votando: c.finVoto }[c.fase];
-  const ms = restaDe(fin);
+  // con el reloj de ajedrez, el del tramo es el límite de pared (el mismo LÍMITE del escenario):
+  // chico, porque los que mandan son los dos bancos
+  const fin = { listo: c.finPrep, entrada: c.finEntrada, abierta: c.finRonda, votando: c.finVoto }[c.fase];
+  const ms = restaDe(fin), limite = c.fase === "abierta" && !!c.banco;
   const s = ms === null ? null : Math.ceil(ms / 1000);
   $("reloj").textContent = s === null ? "" : fmt(s);
-  $("reloj").classList.toggle("urgente", s !== null && s <= 20 && ["abierta", "votando"].includes(c.fase));
+  $("reloj").classList.toggle("limite", limite);
+  $("reloj").classList.toggle("urgente", s !== null && s <= 20 && (c.fase === "votando" || (c.fase === "abierta" && !limite)));
   const cuenta = c.fase === "propuesta" && c.propuesta ? restaDe(c.propuesta.cuentaHasta) : null;
   $("prCuenta").textContent = cuenta ? `se publica en ${Math.ceil(cuenta / 1000)} s` : "";
   if (c.fase === "abierta") pintarPunto(c);
@@ -351,6 +354,9 @@ async function conectar(user) {
     // bancoRestante (ajedrez.js) mide desde que ESTE aparato recibió la foto, no desde el reloj del proyector
     C.foto = d.banco ? { ...d.banco, t: C.recibido } : null;
     if (!C.cache && C.noResponde) { C.noResponde = false; nota(""); }
+    // fuera de la propuesta, el borrador se olvida: no se vuelve a publicar un texto viejo ni se
+    // detienen por él las cuentas de las propuestas siguientes
+    if (d.fase !== "propuesta" && (BORR.sucio || BORR.base !== null)) { BORR.sucio = false; BORR.base = null; $("prTexto").value = ""; }
     if (P.enviada && d.ignorada === P.enviada) {
       // la pantalla se recargó con la orden ya escrita: la vio, pero no la hizo
       if (P.t) soltar();
@@ -361,9 +367,10 @@ async function conectar(user) {
       // («+30 s.», «Orden vieja del control: no se hizo.», un error): se copia aquí
       const mismaFase = d.fase === P.fase && (d.etapa ?? null) === P.etapa;
       const tk = String(d.ticker || "").replace(/^›\s*/, ""), antes = String(P.ticker || "").replace(/^›\s*/, "");
-      const conBoton = !!P.boton;
+      const conBoton = !!P.boton, vieja = d.vieja === P.t;
       soltar(); P.enviada = 0;
-      if (mismaFase && conBoton && tk && tk !== antes) nota(tk);
+      if (vieja) nota("La pantalla ya había pasado a otro paso: no se hizo. Mira el botón y vuelve a tocar si corresponde.", true);
+      else if (mismaFase && conBoton && tk && tk !== antes) nota(tk);
     } else if (P.enviada && (d.ack || 0) >= P.enviada) P.enviada = 0;
     pintar();
   }, e => error(e.code === "permission-denied" ? "Esta cuenta no es la del profesor de la sala." : "Se perdió la conexión con la sala: " + e.code));
@@ -371,7 +378,7 @@ async function conectar(user) {
 
 if (!HAY_FIREBASE) error("Este TRIBUNA no tiene un proyecto de Firebase configurado: el control necesita una sala en línea.");
 else onAuthStateChanged(auth, async user => {
-  if (!user) { pedirEntrar("", true, false); return; }
+  if (!user) { conectadoA = null; pedirEntrar("", true, false); return; }
   if (user.isAnonymous || !user.email) { await signOut(auth); return; }
   if (!CODIGO) { pedirEntrar("¿Qué sala diriges? El código está en la barra de la sala, en el proyector.", false, true); return; }
   conectar(user);

@@ -549,22 +549,27 @@ function abrirRonda() {
   $("chatTx").focus();
   // El debate a viva voz (clase.js): el punto de información y lo sumado con +30 s son de este tramo.
   S.punto = null; S.puntoUltimo = {}; S.bancoExtra = 0; S.cierreBanco = null;
-  // El reloj de ajedrez (ajedrez.js): con la voz y el reloj encendidos cada lado tiene su banco, y
-  // el reloj de la cabecera muestra el límite de pared (el tramo más el margen). Si no, como antes.
-  const conBanco = !!S.debate && typeof nuevoBanco === "function" && opcionActiva(S.clase.opciones, "voz") && opcionActiva(S.clase.opciones, "reloj");
+  S.vozUsada = false; S.hablaDesde = { A: null, B: null };
+  // El reloj de ajedrez (ajedrez.js): con la voz y el reloj encendidos, y con sala (sin teléfonos
+  // nadie aprieta el botón), cada lado tiene su banco. Si no, el tramo como antes.
+  const conBanco = !!S.debate && typeof nuevoBanco === "function" && typeof window.jugadoresSala === "function"
+    && opcionActiva(S.clase.opciones, "voz") && opcionActiva(S.clase.opciones, "reloj");
   S.banco = conBanco ? nuevoBanco(tramoActual().seg) : null;
   S.bancoCorre = { A: false, B: false };
   S.bancoT = S.abreEnLocal = Date.now();
   // El reloj se calcula con la hora real, no descontando segundos: Chrome frena los
   // temporizadores de las pestañas ocultas y el reloj se atrasaba (40 s duraron varios minutos).
-  // Con banco, finRonda es el mismo límite de pared que bancoTerminado (desde abreEnLocal).
-  S.finRonda = S.abreEnLocal + (tramoActual().seg + (conBanco ? AJ.MARGEN : 0)) * 1000;
+  // Hasta que alguien habla por voz el tramo dura lo de siempre; el margen del reloj de ajedrez
+  // se agrega con la primera voz (clase.js, limiteTramo).
+  S.finRonda = S.abreEnLocal + tramoActual().seg * 1000;
   S.seg = tramoActual().seg;
   $("reloj").classList.add("corriendo");
   const tic = () => {
     if (S.fase !== "abierta") return;
-    // el banco y el punto (clase.js): si los dos bancos se agotaron, el tramo se cierra ahí
-    if (typeof pasoVivo === "function" && pasoVivo()) return;
+    // el banco y el punto (clase.js): si los dos bancos se agotaron, el tramo se cierra ahí. Un
+    // error ahí no puede dejar el tramo abierto para siempre: el límite de pared sigue abajo.
+    try { if (typeof pasoVivo === "function" && pasoVivo()) return; }
+    catch (e) { console.warn("TRIBUNA: reloj de ajedrez", e); }
     S.seg = Math.max(0, Math.ceil((S.finRonda - Date.now()) / 1000));
     $("reloj").textContent = fmt(S.seg);
     $("reloj").classList.toggle("urgente", S.seg <= 20);

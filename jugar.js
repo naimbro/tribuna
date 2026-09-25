@@ -789,12 +789,12 @@ function cortarDictado(abortar = true) {
    soltar, lo dicho entra solo a la conversación con voz: true (🎤), sin revisar antes, porque
    tiene que sentirse en vivo. Solo transcribe el teléfono que se está apretando: así los teléfonos
    de la sala no se transcriben entre ellos. Mientras aprieta, su ficha lleva
-   habla: { debate, t0, t, texto } (una escritura cada 800 ms como mucho: el límite sostenido de
-   Firestore por documento es una por segundo); con eso el proyector pone los subtítulos y corre el
+   habla: { debate, t0, t, texto } (una escritura por segundo como mucho: el límite sostenido de
+   Firestore por documento; con AJ.LATIDO de 2,5 s caben dos latidos); con eso el proyector pone los subtítulos y corre el
    reloj de ajedrez de su lado. Al soltar, habla: null. Cada apretón es una «toma» con su propio
    reconocedor y su propio texto: si vuelve a apretar mientras la anterior todavía espera el
    resultado final, las dos no se mezclan. */
-const HABLA = { apretado: false, toma: null, pointerId: null, ultimoLatido: 0, timer: null, CADA: 800, MAX: 60000, ESPERA: 1200 };
+const HABLA = { apretado: false, toma: null, pointerId: null, ultimoLatido: 0, timer: null, CADA: 1000, MAX: 60000, ESPERA: 1200 };
 const palabras = t => (String(t || "").match(/\S+/g) || []).length;
 // junta dos trozos reconocidos: después de reiniciar el reconocedor, el primer trozo no trae espacio
 const unir = (a, b) => !a ? b || "" : !b ? a : /\s$/.test(a) || /^\s/.test(b) ? a + b : a + " " + b;

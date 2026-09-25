@@ -325,9 +325,13 @@ function hablandoAhora() {
 }
 // Las últimas palabras: si el tramo se cierra porque los dos bancos llegaron a cero, quien hablaba
 // alcanza a soltar (su teléfono envía lo dicho apenas se agota el banco) y recién ahí se cierra,
-// con un tope de 3 s. RESPIRO: el mensaje puede llegar un instante después que la ficha sin habla.
-// El límite de pared, en cambio, cierra en el acto.
-const ULTIMAS = { TOPE: 3000, RESPIRO: 600 };
+// con un tope. RESPIRO: el mensaje puede llegar un instante después que la ficha sin habla. El
+// límite de pared, en cambio, cierra en el acto. Durante esa espera no entran puntos nuevos.
+const ULTIMAS = { TOPE: 4500, RESPIRO: 600 };
+// El límite de pared del tramo (hora de esta pantalla). Mientras nadie haya hablado por voz, el
+// tramo dura lo de siempre: una clase que escribe no tiene por qué esperar el margen del reloj de
+// ajedrez. Con la primera voz se agrega AJ.MARGEN. Lo sumado con +30 s corre siempre.
+const limiteTramo = () => S.abreEnLocal + (tramoActual().seg + (S.vozUsada ? AJ.MARGEN : 0)) * 1000 + (S.bancoExtra || 0);
 // Devuelve true si cerró el tramo.
 function pasoVivo() {
   const ahora = Date.now();
@@ -337,19 +341,35 @@ function pasoVivo() {
     if (p !== S.punto) { S.punto = p; cambio = true; }
   }
   if (S.banco && S.debate) {
-    const dt = ahora - (S.bancoT || ahora); S.bancoT = ahora;
-    const hablando = hablandoAhora();
-    const r = avanzarBanco(S.banco, hablando, dt);
-    S.banco = r.banco;
+    const d = S.debate, previo = S.bancoT || ahora, dt = Math.max(0, ahora - previo);
+    S.bancoT = ahora;
+    const hs = hablaAhora();
+    const hablando = { A: hs.some(h => h.grupo === d.A), B: hs.some(h => h.grupo === d.B) };
+    // la primera voz del tramo: desde aquí el límite de pared incluye el margen (LÍMITE en el escenario)
+    if (!S.vozUsada && hs.length) { S.vozUsada = true; S.finRonda = limiteTramo(); cambio = true; }
+    // Cada lado paga desde que empezó a hablar (llegada de su primer latido a esta pantalla), no un
+    // paso fijo: con la pestaña oculta Chrome frena el tic a uno por segundo o menos, y un tope por
+    // paso le regalaba tiempo a quien hablaba; al revés, quien empezó hace 100 ms no paga 250.
+    const desde = S.hablaDesde || (S.hablaDesde = { A: null, B: null });
+    const banco = { A: +S.banco.A || 0, B: +S.banco.B || 0 }, agotados = [];
+    for (const k of ["A", "B"]) {
+      if (!hablando[k]) { desde[k] = null; continue; }
+      if (desde[k] === null) desde[k] = Math.max(previo, Math.min(ahora, ...hs.filter(h => h.grupo === d[k]).map(h => h.desde || ahora)));
+      const carga = Math.min(dt, ahora - desde[k]);
+      if (banco[k] <= 0 || carga <= 0) continue;
+      banco[k] = Math.max(0, banco[k] - carga);
+      if (banco[k] === 0) agotados.push(k);
+    }
+    S.banco = banco;
     const antes = S.bancoCorre || {};
-    if (hablando.A !== !!antes.A || hablando.B !== !!antes.B || r.agotados.length) { S.bancoCorre = hablando; cambio = true; }
-    for (const k of r.agotados) tick(`${nombreG(S.debate[k])} se quedó sin tiempo: solo puede escribir.`);
+    if (hablando.A !== !!antes.A || hablando.B !== !!antes.B || agotados.length) { S.bancoCorre = hablando; cambio = true; }
+    for (const k of agotados) tick(`${nombreG(d[k])} se quedó sin tiempo: solo puede escribir.`);
     const seg = tramoActual().seg, extra = S.bancoExtra || 0;
     if (bancoTerminado(S.banco, { abre: S.abreEnLocal, seg, ahora, extra })) {
-      if (ahora - S.abreEnLocal >= (seg + AJ.MARGEN) * 1000 + extra) { cerrarRonda(); return true; }
-      if (!S.cierreBanco) { S.cierreBanco = { desde: ahora, callado: 0 }; tick("Los dos lados se quedaron sin tiempo: las últimas palabras y se cierra."); }
+      if (ahora >= limiteTramo()) { cerrarRonda(); return true; }
+      if (!S.cierreBanco) { S.cierreBanco = { desde: ahora, callado: 0 }; cambio = true; tick("Los dos lados se quedaron sin tiempo: las últimas palabras y se cierra."); }
       const c = S.cierreBanco;
-      c.callado = hablaAhora().length ? 0 : c.callado || ahora;
+      c.callado = hs.length ? 0 : c.callado || ahora;
       if (ahora - c.desde >= ULTIMAS.TOPE || (c.callado && ahora - c.callado >= ULTIMAS.RESPIRO)) { cerrarRonda(); return true; }
     } else S.cierreBanco = null;                            // +30 s devolvió tiempo: sigue el debate
   }
@@ -364,6 +384,11 @@ function fijarOpcion(k, v) {
   S.clase.opciones = { ...OPCIONES_DEFECTO, ...(S.clase.opciones || {}), [k]: !!v };
   if (k === "musica" && !v && typeof pararMusica === "function") pararMusica();
   if (k === "vozIA" && !v && typeof callarIA === "function") callarIA();
+  // apagar la voz o el reloj a mitad de tramo: sin banco desde ya, y el tramo sigue hasta su límite
+  // de pared (o hasta que el profesor lo cierre). Encenderlos a mitad de tramo vale desde el próximo.
+  if ((k === "voz" || k === "reloj") && !v && S.fase === "abierta" && S.banco) {
+    S.banco = null; S.bancoCorre = { A: false, B: false }; S.cierreBanco = null;
+  }
   const nombre = { revelacion: "Revelación", revancha: "Revancha", musica: "Música", voz: "Debate en voz alta",
     reloj: "Reloj de ajedrez", punto: "Punto de información", vozIA: "La IA en voz alta" }[k];
   tick(`${nombre}: ${v ? "encendido" : "apagado"} desde el control.`);

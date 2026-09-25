@@ -362,13 +362,16 @@ la boca; escribir a mano sigue funcionando igual que siempre. Spec en
   iPhone), el botón no aparece y queda el teclado de siempre. Antes del debate, «🎤 Probar micrófono»
   en la preparación pide el permiso con anticipación. Mientras el botón está apretado, el teléfono
   escribe su transcripción provisional en su ficha (`habla: { debate, t0, t, texto }`, un latido cada
-  ~800 ms); el escenario y los teléfonos del público lo muestran como subtítulo en vivo, y una ficha
+  ~1 s); el escenario y los teléfonos del público lo muestran como subtítulo en vivo, y una ficha
   con latido de más de 2,5 s cuenta como callada.
 - **El reloj de ajedrez.** Cada lado tiene un banco igual a la mitad del tramo; corre mientras alguien
   de ese lado tiene el botón apretado (los dos bancos corren a la vez si hablan los dos lados). El
   tramo termina cuando los dos bancos llegan a cero o al pasar el tramo más 150 s de margen (holgado
   porque los turnos hablados de la moderadora no gastan banco pero sí corren contra ese margen), lo
-  que ocurra primero. **+30 s** en el control suma a los dos bancos. Un lado sin tiempo solo puede
+  que ocurra primero. **El margen se gana hablando:** mientras nadie haya usado el botón de hablar en
+  el tramo, el tramo dura lo de siempre (una clase que solo escribe no espera 150 s de más); con la
+  primera voz se agrega el margen, y el LÍMITE del escenario y del control salta a esa hora. Con los
+  dos bancos en cero, quien estaba hablando alcanza a soltar (hasta 4,5 s) antes de que se cierre. **+30 s** en el control suma a los dos bancos. Un lado sin tiempo solo puede
   escribir: el teléfono apaga su botón de hablar y lo dice. Lógica pura en `ajedrez.js`.
 - **El punto de información.** Mientras un lado habla, el otro ve ✋ PUNTO; al tocarlo pide la palabra.
   Quien habla lo acepta o lo rechaza: aceptado, quien pidió el punto tiene la palabra 15 s (corre el
