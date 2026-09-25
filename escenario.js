@@ -24,7 +24,11 @@ const ESCN = {
   rx: {},                // id del mensaje → las reacciones ya vistas (para saber cuándo subir un emoji)
   caras: { A: "", B: "" },
   rotulo: "", rotuloId: null, punto: "", gusano: "", espera: "",
-  vozOk: false,
+  // medidas que se leen del DOM una sola vez (se olvidan al cambiar de tamaño o de debate): leer
+  // el layout cada 300 ms obliga al navegador a recalcularlo
+  ancho: { A: 0, B: 0 }, gusanoTam: null,
+  sucio: true, centroFirma: "",   // ¿hay que volver a mirar si la tarjeta de arriba cabe entera?
+  vozOk: false, desbloqueo: 0,
   errores: 0
 };
 const ESCN_ROTULO_MS = 12000;   // cuánto dura en pantalla el rótulo de la moderadora
@@ -110,7 +114,7 @@ function escnHablan() {
 
 function escnPintarDebate() {
   const d = S.debate, reg = S.clase.debates[d.n - 1] || {}, ahora = Date.now();
-  if (ESCN.deb !== d.n) escnNuevoDebate(d);
+  if (ESCN.deb !== `${d.n}|${d.A}|${d.B}`) escnNuevoDebate(d);
   escnTexto($("escnDeb"), `DEBATE ${d.n}` + (TRAMOS.length > 1 ? ` · ${tramoActual().nombre.toUpperCase()}` : ""));
   escnTexto($("escnMocion"), `«${d.pregunta}»`);
   escnRelojTramo(ahora);
@@ -124,9 +128,10 @@ function escnPintarDebate() {
 
 // Un debate nuevo: se olvidan las tarjetas, las caras y el rótulo del anterior.
 function escnNuevoDebate(d) {
-  ESCN.deb = d.n;
+  ESCN.deb = `${d.n}|${d.A}|${d.B}`;
   ESCN.tarjetas.forEach(el => el.remove()); ESCN.tarjetas.clear();
   ESCN.rx = {}; ESCN.caras = { A: "", B: "" }; ESCN.rotulo = ""; ESCN.rotuloId = null; ESCN.punto = ""; ESCN.gusano = "";
+  escnOlvidarMedidas();
   const v = $("escenarioVista");
   v.style.setProperty("--cA", escnColor("A")); v.style.setProperty("--cB", escnColor("B"));
   for (const k of ["A", "B"]) {
@@ -173,7 +178,8 @@ function escnPodio(k, d, hablan) {
   // las caras caben en una fila (dos si son más de cinco), con holgura para la de quien habla
   const caras = p.querySelector(".escn-caras");
   const porFila = Math.max(1, Math.ceil(gente.length / (gente.length > 5 ? 2 : 1)));
-  const ancho = caras.clientWidth || innerWidth * 0.24, hueco = innerWidth * 0.009;
+  if (!ESCN.ancho[k]) ESCN.ancho[k] = caras.clientWidth;
+  const ancho = ESCN.ancho[k] || innerWidth * 0.24, hueco = innerWidth * 0.009;
   const tam = Math.max(34, Math.round(Math.min(90, innerHeight * (gente.length > 5 ? 0.058 : 0.078), (ancho - hueco * (porFila - 1)) / (porFila + 0.4))));
   const clave = tam + "|" + gente.map(j => `${j.uid}:${j.nombre}:${j.foto}`).join(",");
   if (ESCN.caras[k] !== clave) {
@@ -202,6 +208,13 @@ function escnCrono(k, p, habla) {
   const s = Math.max(0, Math.ceil(S.banco[k] / 1000));
   const corre = S.bancoCorre ? !!S.bancoCorre[k] : habla;
   escnTexto(cr.firstElementChild, fmt(s));
+  // con un punto aceptado, quien lo pidió habla aunque su lado no tenga tiempo: no dice «SIN TIEMPO»
+  const p0 = S.punto, punto = p0 && p0.estado === "aceptado" && p0.lado === k;
+  if (punto) {
+    escnTexto(cr.lastElementChild, `✋ PUNTO · ${Math.max(0, Math.ceil(((p0.fin || 0) - Date.now()) / 1000))} s`);
+    escnClase(cr, "escn-crono corre punto");
+    return;
+  }
   escnTexto(cr.lastElementChild, s <= 0 ? "SIN TIEMPO · solo escribe" : corre ? "● HABLANDO" : "tiempo para hablar");
   escnClase(cr, "escn-crono" + (s <= 0 ? " agotado" : (corre ? " corre" : "") + (s <= 20 ? " urgente" : "")));
 }
@@ -226,8 +239,12 @@ function escnParticipacion(k, p) {
 function escnMensajes(d, reg, hablan) {
   const xs = S.chat.filter(m => m.debate === d.n && m.id !== ESCN.rotuloId && (m.tipo === "alumno" || m.tipo === "mod" || m.tipo === "noticia"));
   let ultimo = null;
-  if (!hablan.length) for (let i = xs.length - 1; i >= 0; i--) if (xs[i].tipo === "alumno" && (xs[i].equipo === "A" || xs[i].equipo === "B")) { ultimo = xs[i]; break; }
+  // el último mensaje va a la franja de abajo solo si nadie habla y no hay rótulo: el rótulo tapa
+  // esa franja, y el mensaje desaparecería hasta 12 s
+  if (!hablan.length && !ESCN.rotuloId) for (let i = xs.length - 1; i >= 0; i--) if (xs[i].tipo === "alumno" && (xs[i].equipo === "A" || xs[i].equipo === "B")) { ultimo = xs[i]; break; }
   const centro = xs.filter(m => m !== ultimo).slice(-ESCN_MENSAJES);
+  const firma = centro.map(m => m.id).join(",");
+  if (firma !== ESCN.centroFirma) { ESCN.centroFirma = firma; ESCN.sucio = true; }
   const vivos = new Set(centro.map(m => m.id));
   if (ultimo) vivos.add(ultimo.id);
   for (const [id, el] of ESCN.tarjetas) if (!vivos.has(id)) { el.remove(); ESCN.tarjetas.delete(id); }
@@ -238,7 +255,10 @@ function escnMensajes(d, reg, hablan) {
     if (cont.children[i] !== el) cont.insertBefore(el, cont.children[i] || null);
   });
   while (cont.children.length > centro.length) cont.lastElementChild.remove();
-  // la tarjeta de más arriba que no cabe entera no se muestra a medias
+  // la tarjeta de más arriba que no cabe entera no se muestra a medias (solo si algo cambió: el
+  // contenido o el tamaño de la caja, que avisa el ResizeObserver)
+  if (!ESCN.sucio) return;
+  ESCN.sucio = !window.ResizeObserver;
   const tope = cont.getBoundingClientRect().top - 2;
   for (const el of cont.children) el.classList.toggle("fuera", el.getBoundingClientRect().top < tope);
 }
@@ -256,6 +276,7 @@ function escnTarjeta(m, reg) {
   }
   if (el.dataset.base !== base) {
     el.dataset.base = base;
+    ESCN.sucio = true;
     const lado = m.tipo === "alumno" ? m.equipo : "";
     el.classList.remove("A", "B", "mod", "noticia", "trib");
     el.classList.add(m.tipo === "alumno" ? lado || "A" : m.tipo);
@@ -287,6 +308,7 @@ function escnReacciones(m, el) {
   ESCN.rx[m.id] = firma;
   if (ESCN.rx[m.id + "|pintado"] === firma) return;
   ESCN.rx[m.id + "|pintado"] = firma;
+  ESCN.sucio = true;
   el.querySelector(".escn-rx").innerHTML = PUB.REACCIONES.filter(r => c[r.id]).map(r => `<span>${r.emoji} <b>${c[r.id]}</b></span>`).join("");
 }
 
@@ -393,7 +415,6 @@ function escnPunto(d, ahora) {
       terminado: ["✋ PUNTO DE INFORMACIÓN", "TERMINADO"]
     }[p.estado] || ["✋ PUNTO DE INFORMACIÓN", escHtml(p.estado)];
     el.innerHTML = `<div class="escn-pt-k">${t[0]}</div><div class="escn-pt-t">${t[1]}</div><div class="escn-pt-s"></div>`;
-    el.style.setProperty("--c", escnColor(p.lado === "B" ? "B" : "A"));
     el.className = "escn-punto on " + p.estado;
   }
   escnTexto(el.lastElementChild, p.estado === "pedido" ? `${para} acepta o rechaza · ${s} s`
@@ -409,14 +430,15 @@ function escnGusano(d, reg) {
   const ver = !!(S.termo || curva.length) && typeof svgTermometro === "function";
   el.classList.toggle("oculto", !ver);
   if (!ver) return;
-  const caja = $("escnGusanoSvg"), W = caja.clientWidth, H = caja.clientHeight;
-  if (!W || !H) return;
-  const u = curva[curva.length - 1];
-  const firma = [W, H, d.n, curva.length, u && u.s, u && u.m].join("|");
+  const caja = $("escnGusanoSvg");
+  if (!ESCN.gusanoTam && caja.clientWidth && caja.clientHeight) ESCN.gusanoTam = { W: caja.clientWidth, H: caja.clientHeight };
+  if (!ESCN.gusanoTam) return;
+  const { W, H } = ESCN.gusanoTam, u = curva[curva.length - 1];
+  const n = S.termo ? Object.keys(S.termo).length : 0;
+  const firma = [W, H, d.n, curva.length, u && u.s, u && u.m, n].join("|");
   if (ESCN.gusano === firma) return;
   ESCN.gusano = firma;
   caja.innerHTML = svgTermometro(W, H, { letra: Math.round(Math.max(12, Math.min(20, H * 0.17))), cA: escnColor("A"), cB: escnColor("B"), clase: "" });
-  const n = S.termo ? Object.keys(S.termo).length : 0;
   $("escnGusanoK").innerHTML = `🌡 LA SALA${n ? ` · ${n} moviéndolo` : ""}`;
 }
 
@@ -462,7 +484,9 @@ function escnFaltaAudio() {
   return !activada || !ESCN.vozOk || !!(ac && ac.state === "suspended");
 }
 function escnAvisoAudio() {
-  const falta = escnEnModo() && escnFaltaAudio();
+  // recién desbloqueado, el AudioContext tarda un instante en pasar a «running»: sin esta pausa
+  // el aviso se apaga y vuelve a aparecer un momento
+  const falta = escnEnModo() && Date.now() - ESCN.desbloqueo > 1000 && escnFaltaAudio();
   let a = $("escnAudio");
   if (document.body.classList.contains("escn-audio") !== falta) document.body.classList.toggle("escn-audio", falta);
   if (!falta) { a?.remove(); return; }
@@ -475,6 +499,7 @@ function escnAvisoAudio() {
 // Con el primer gesto: el AudioContext (app.js) y una frase vacía para la voz (speechSynthesis
 // también exige un gesto antes de hablar por primera vez).
 function escnDesbloquear() {
+  ESCN.desbloqueo = Date.now();
   if (typeof audioCtx === "function") audioCtx();
   if (!ESCN.vozOk) {
     ESCN.vozOk = true;
@@ -486,11 +511,37 @@ function escnDesbloquear() {
 document.addEventListener("pointerdown", escnDesbloquear, true);
 document.addEventListener("keydown", escnDesbloquear, true);
 
+/* ---------------------------- medidas ---------------------------- */
+function escnOlvidarMedidas() {
+  ESCN.ancho = { A: 0, B: 0 }; ESCN.gusanoTam = null;
+  ESCN.caras = { A: "", B: "" }; ESCN.gusano = ""; ESCN.sucio = true;
+}
+// Cuando cambia el tamaño de una caja (se abre la franja de subtítulos, aparece el punto, el
+// proyector cambia de resolución) se vuelve a medir solo esa. Las caras solo cuentan si cambió el
+// ancho: su alto cambia con cada repintado de las propias caras.
+function escnObservarTamanos() {
+  escnArmar();
+  if (!window.ResizeObserver || !$("escnMsgs")) return;
+  const ro = new ResizeObserver(entradas => {
+    for (const e of entradas) {
+      const t = e.target, w = Math.round(e.contentRect.width);
+      if (t.id === "escnMsgs") ESCN.sucio = true;
+      else if (t.id === "escnGusanoSvg") { ESCN.gusanoTam = null; ESCN.gusano = ""; }
+      else {
+        const k = t.parentNode.dataset.k;
+        if (k && w && w !== ESCN.ancho[k]) { ESCN.ancho[k] = w; ESCN.caras[k] = ""; }
+      }
+    }
+  });
+  ro.observe($("escnMsgs")); ro.observe($("escnGusanoSvg"));
+  for (const k of ["A", "B"]) ro.observe($("escnPodio" + k).querySelector(".escn-caras"));
+}
+
 /* ---------------------------- arranque ---------------------------- */
 // Esc sale del modo, salvo que una escena, un modal, el mapa o la intro estén abiertos (esos
 // usan Esc para cerrarse ellos).
 document.addEventListener("keydown", e => {
-  if (e.key !== "Escape" || !escnEnModo()) return;
+  if (e.key !== "Escape" || !escnEnModo() || e.target.closest?.("input,textarea,select")) return;
   if ($("escena") || document.querySelector(".modal") || $("mapaGrande") || $("intro")) return;
   modoEscenario(false);
 });
@@ -500,9 +551,13 @@ document.addEventListener("keydown", e => {
   if (on === null) { try { on = localStorage.getItem("tribuna_escenario") === "1"; } catch (e) { on = false; } }
   const b = $("btnEscenario");
   if (b) b.onclick = () => modoEscenario(true);
-  // la conversación cambió: repintar ya, sin esperar el próximo tic
+  // La conversación cambió: repintar ya, sin esperar el próximo tic. recibirChat (moderacion.js)
+  // llama a window.alCambiarChat; se encadena con quien lo haya puesto antes (hoy nadie). Si otro
+  // script lo reemplaza más tarde sin encadenar, no se pierde nada: el tic de 300 ms lo recoge.
   const antes = window.alCambiarChat;
   window.alCambiarChat = function () { if (typeof antes === "function") antes(); pintarEscenario(); };
-  window.addEventListener("resize", () => { ESCN.caras = { A: "", B: "" }; ESCN.gusano = ""; pintarEscenario(); });
-  if (on) modoEscenario(true, false);
+  window.addEventListener("resize", () => { escnOlvidarMedidas(); pintarEscenario(); });
+  escnObservarTamanos();
+  // ?escenario=0 también se recuerda: la próxima vez abre la pantalla normal
+  if (on || pedido === "0") modoEscenario(on, false);
 })();

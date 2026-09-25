@@ -16,9 +16,12 @@ const COLOR_ROL = () => ({ A: EQUIPOS.A.color, B: EQUIPOS.B.color, P: "#a78bfa" 
 
 function avatarHtml(j, tam = 64) {
   const c = COLOR_ROL()[j.equipo] || "#4d5f70";
+  // las iniciales van escapadas y, para la foto que no carga, en un atributo: nada del nombre
+  // entra al código del onerror
+  const ini = escHtml(iniciales(j.nombre));
   const cara = j.foto
-    ? `<img src="${escHtml(j.foto)}" referrerpolicy="no-referrer" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${iniciales(j.nombre)}'}))">`
-    : `<span>${iniciales(j.nombre)}</span>`;
+    ? `<img src="${escHtml(j.foto)}" referrerpolicy="no-referrer" alt="" data-ini="${ini}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:this.dataset.ini}))">`
+    : `<span>${ini}</span>`;
   return `<div class="av" style="--c:${c};--t:${tam}px">${cara}</div>`;
 }
 

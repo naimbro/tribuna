@@ -319,6 +319,97 @@ Un atrasado cayó en Hawley, y los tres duelos corrieron en orden con sus mocion
 brújula dio exactamente los mismos grupos, rótulos, propuesta y apertura de la moderadora que el
 código anterior.
 
+## El debate en vivo (desde el 29-sep-2026)
+
+Hasta ahora se jugaba escribiendo. Desde la clase 8 de MGT300 (semana 308, martes 29-sep-2026) se
+juega **principalmente a viva voz**: los dos lados pasan al frente y hablan con el teléfono cerca de
+la boca; escribir a mano sigue funcionando igual que siempre. Spec en
+`docs/superpowers/specs/2026-09-25-debate-en-vivo-design.md`.
+
+- **El ciclo.** Antes: propuesta (en el proyector) → publicar → preparación 60 s (solo ven su lado
+  los dos llamados) → debate. Ahora: **propuesta (solo en el control del profesor)** → publicar →
+  **preparación** de 60 s, todos preparan los dos lados sin saber si les toca → **revelación** (~8 s,
+  redoble y golpe por nombre) → **entrada** (20 s tipo boxeo, se puede saltar) → debate. `S.fase` suma
+  `revelando` y `entrada` entre `listo` y `abierta`; restaurar la pestaña ahí vuelve a la preparación
+  ya revelada y pausada (`prepararEnSuspenso`, `revelar`, `entrada` en `clase.js`).
+- **Personajes vs. grupos/brújula.** Con personajes (semana 308) cada duelo tiene su lado fijo, así
+  que la propuesta **sortea qué duelo sigue** entre los pendientes con gente en los dos lados
+  (`sortearDuelo` en `rotacion.js`, en el orden de `PREGUNTAS`; el profesor puede pedir otro); el
+  último duelo no tiene suspenso, va directo a la entrada. Sin personajes, la revelación dice grupo y
+  lado a la vez («A FAVOR… Grupo 3», pausa, «EN CONTRA… Grupo 1») y, con probabilidad de 25 %
+  (`ROT.P_REVANCHA`), uno de los dos cupos cae en un grupo que ya debatió (`conRevancha`, con al
+  menos un debate jugado y tres grupos con gente, nunca un grupo contra sí mismo).
+- **El control.** `control.html?sala=CODIGO`, entra con Google (el mismo profesor); se abre
+  escaneando el QR del botón **📱 CONTROL** de la barra de la sala. Muestra la fase y su reloj, **un
+  botón grande con la acción siguiente** (PUBLICAR, ABRIR YA, SALTAR ENTRADA, PEDIR VOTACIÓN…, la
+  misma de `accionPrincipal`), la propuesta en privado antes de publicarla, **+30 s**, 🎙 moderadora
+  ya, ⚡ shock, 🏁 terminar clase, los siete interruptores y un resumen (quién habla, los dos relojes,
+  votos). Se hablan por dos documentos privados: el proyector publica `privado/control` (fase, rótulo
+  del botón, propuesta, relojes) y el control escribe órdenes en `privado/orden` (`{ cmd, arg, t }`);
+  cada orden se atiende una sola vez por `t` y el `ack` siguiente es lo que destraba el botón — si
+  tarda, el control avisa «la pantalla no responde». No hace falta ninguna regla de Firestore nueva.
+- **El escenario.** `index.html` sigue siendo la pantalla del profesor y el motor sigue corriendo
+  ahí; **⛶ ESCENARIO** (o `?escenario=1`, o la orden del control) esconde sala de control, botones y
+  ticker y pone la vista de escenario (`escenario.js`, `modoEscenario`): dos podios (A FAVOR a la
+  izquierda, EN CONTRA a la derecha) con caras, reloj de ajedrez y barra de cada lado, el subtítulo en
+  vivo bajo quien habla, los últimos mensajes al centro, la moderadora como rótulo inferior, el
+  gusano al pie y las reacciones subiendo flotando. Como Chrome exige un clic antes de reproducir
+  audio, si el `AudioContext` no arrancó aparece el banner «🔊 Toca la pantalla para activar el
+  sonido»; un toque lo desbloquea y el banner se retira solo.
+- **Mantener para hablar.** En el teléfono de quien debate, un botón enorme: se aprieta, se habla, se
+  suelta; al soltar el texto se envía solo, marcado `voz: true` (se ve con 🎤 en la conversación).
+  Usa `SpeechRecognition` del navegador, igual que el dictado de hoy; sin reconocimiento de voz (algún
+  iPhone), el botón no aparece y queda el teclado de siempre. Antes del debate, «🎤 Probar micrófono»
+  en la preparación pide el permiso con anticipación. Mientras el botón está apretado, el teléfono
+  escribe su transcripción provisional en su ficha (`habla: { debate, t0, t, texto }`, un latido cada
+  ~800 ms); el escenario y los teléfonos del público lo muestran como subtítulo en vivo, y una ficha
+  con latido de más de 2,5 s cuenta como callada.
+- **El reloj de ajedrez.** Cada lado tiene un banco igual a la mitad del tramo; corre mientras alguien
+  de ese lado tiene el botón apretado (los dos bancos corren a la vez si hablan los dos lados). El
+  tramo termina cuando los dos bancos llegan a cero o al pasar el tramo más 150 s de margen (holgado
+  porque los turnos hablados de la moderadora no gastan banco pero sí corren contra ese margen), lo
+  que ocurra primero. **+30 s** en el control suma a los dos bancos. Un lado sin tiempo solo puede
+  escribir: el teléfono apaga su botón de hablar y lo dice. Lógica pura en `ajedrez.js`.
+- **El punto de información.** Mientras un lado habla, el otro ve ✋ PUNTO; al tocarlo pide la palabra.
+  Quien habla lo acepta o lo rechaza: aceptado, quien pidió el punto tiene la palabra 15 s (corre el
+  banco de su lado); rechazado, o sin respuesta en 10 s, se cierra y se anuncia. Un punto a la vez;
+  cada lado puede volver a pedir 30 s después de su último pedido. Máquina de estados pura en
+  `punto.js`.
+- **La IA con voz.** En el escenario, la moderadora y el relator se leen en voz alta con
+  `speechSynthesis` del navegador (sin @, emojis ni markdown; se prefiere es-CL, luego es-US, es-419,
+  es-MX, es-ES, y dentro de cada una las voces «Google»; el relator se corta a ~400 caracteres). El
+  relator siempre pide el voto al público al terminar. La moderadora **nunca interrumpe a quien
+  habla**: mientras alguien tiene el botón apretado no entra, ni pedida (`ritmo.js`), y con la voz
+  encendida el respiro entre intervenciones baja a 3 s, medido desde que terminó de hablar el último.
+- **El gusano y la duda de la tribuna.** La curva del termómetro corre como una franja al pie del
+  escenario, A FAVOR arriba y EN CONTRA abajo, como en los debates de televisión; un mensaje que junta
+  suficientes 🤔 se estampa con «LA TRIBUNA DUDA».
+- **Los siete interruptores**, en `S.clase.opciones`, editables desde el control y por defecto todos
+  encendidos (lo que falta en `opciones` cuenta como encendido, así una sala vieja sigue funcionando):
+
+  | Interruptor | Apagado |
+  |---|---|
+  | `revelacion` | La preparación es como antes: solo los dos grupos, sin revelación ni entrada. |
+  | `revancha` | Nunca repite un grupo antes de tiempo (sin efecto con personajes). |
+  | `musica` | Sin pulso, redoble ni música de entrada. |
+  | `voz` | Sin botón de hablar, subtítulos, reloj de ajedrez ni punto; el tramo dura como antes. |
+  | `reloj` | Con voz, sin bancos: el tramo dura como antes. |
+  | `punto` | Sin ✋ PUNTO. |
+  | `vozIA` | La moderadora y el relator no se leen en voz alta. |
+
+- **Cómo se prueba.** Lógica pura con `node --test pruebas/`: `rotacion.test.js` (interruptores,
+  sorteo del duelo, revancha), `ajedrez.test.js` (bancos, simultaneidad, latido vencido, agotado,
+  +30 s), `punto.test.js` (pedido, aceptado, rechazado, vencido, enfriamiento de 30 s), `ritmo.test.js`
+  (no entra mientras alguien habla, respiro corto con voz) y `vozia.test.js` (limpieza del texto,
+  elección de voz). De punta a punta, un ensayo completo de la semana 308 contra los emuladores con
+  Playwright (24 teléfonos, cupo 4, un control y el escenario; el arnés se documenta en la memoria del
+  usuario), con `SpeechRecognition` reemplazado por uno simulado que entrega frases con resultados
+  provisionales.
+- **Límites conocidos.** El reconocimiento de voz no se probó en un teléfono real antes de la clase
+  (solo en el ensayo con emuladores y voz simulada); Android puede repetir el texto final de una
+  frase; Safari en iOS tiene sus propias rarezas de reconocimiento; y las lecturas de Firestore crecen
+  con los latidos de «quién está hablando», así que una sala muy larga lee más que antes.
+
 ## Pantalla del profesor
 
 Dos paneles, como el panel de debate de `mapuche_panel`: a la izquierda **el hilo** —una
