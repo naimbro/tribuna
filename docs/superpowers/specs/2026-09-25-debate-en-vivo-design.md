@@ -46,7 +46,8 @@ Nuevo: **propuesta (solo en el control)** → publicar → **preparación** (60 
 
 Fases de `S.fase`: `propuesta` → `listo` (preparación) → `revelando` → `entrada` → `abierta` →
 `votando` → … Las fases nuevas entran en las listas de `terminarClase`, `accionPrincipal` y la
-restauración de la pestaña. Restaurar durante `revelando` o `entrada` salta directo a `abierta`.
+restauración de la pestaña. Restaurar durante `revelando` o `entrada` vuelve a la preparación ya
+revelada y pausada: ▶ REANUDAR abre el debate.
 
 ### Sin personajes (grupos o brújula)
 
@@ -177,7 +178,8 @@ Página nueva `control.html` + `control.js`. Entra con Google (el mismo profesor
 ### Subtítulos en vivo
 
 Mientras el botón está apretado, el teléfono escribe en su propia ficha
-`habla: { debate, t0, t, texto }` cada ~400 ms (el texto provisional hasta 300 caracteres; `t` sirve de
+`habla: { debate, t0, t, texto }` cada ~800 ms (el límite sostenido de escritura por documento de
+Firestore es de una por segundo) (el texto provisional hasta 300 caracteres; `t` sirve de
 latido). Al soltar escribe `habla: null`. Es el mismo camino que «Grupo N está escribiendo…»
 (`escribe`), sin reglas nuevas. Una ficha con `habla.t` de hace más de 2,5 s cuenta como callada (el
 teléfono se apagó a mitad).
@@ -207,8 +209,8 @@ muestran también (ver D).
 - Mientras un lado habla, cada integrante del otro lado ve **✋ PUNTO** en su teléfono. Al tocarlo,
   escribe `punto: { debate, t }` en su ficha.
 - El escenario toma el pedido más antiguo y publica `punto: { de, nombre, grupo, para, estado, t, fin }`.
-  El teléfono de quien está hablando (o, si nadie habla, los de su grupo) muestra «Hawley pide un
-  punto: **Aceptar / Rechazar**». Responde escribiendo `respondePunto: { t, acepta }` en su ficha.
+  Los teléfonos del grupo que recibe el punto muestran «Hawley pide un punto: **Aceptar /
+  Rechazar**»; vale la primera respuesta. Responde escribiendo `respondePunto: { t, acepta }` en su ficha.
 - **Aceptado:** quien lo pidió tiene la palabra 15 s (su botón de hablar se enciende aunque no le
   toque; corre el banco de su lado); el escenario lo anuncia. **Rechazado** o sin respuesta en 10 s: se
   anuncia «rechazado» y se cierra.
