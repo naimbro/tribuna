@@ -48,9 +48,9 @@ function mostrarPortada(url, codigo, alEmpezar) {
       </div>
       <div class="po-sala">
         <div class="po-cfg">
-          <label>Tema general <input id="poTema" value="${escHtml(S.clase.tema || SESION.tema)}"></label>
+          <label class="po-tema-l">Tema general <textarea id="poTema" rows="1" maxlength="200" spellcheck="false">${escHtml(S.clase.tema || SESION.tema)}</textarea></label>
           ${PERS ? `<label>Cupo por personaje <input id="poCupo" type="number" min="1" max="30" value="${S.clase.cupo || SESION.cupo || 4}" style="width:64px"></label>
-            <button class="btn pri" id="poInscripcion"></button><span id="poInsEstado" class="po-ins"></span>`
+            <button class="btn sec" id="poInscripcion"></button><span id="poInsEstado" class="po-ins"></span>`
           : `<label>Grupos <select id="poGrupos">${Array.from({ length: ROT.GRUPOS_MAX - ROT.GRUPOS_MIN + 1 }, (_, i) => i + ROT.GRUPOS_MIN)
             .map(g => `<option ${g === S.clase.grupos ? "selected" : ""}>${g}</option>`).join("")}</select></label>`}
           ${typeof BRUJULA !== "undefined" ? `<label class="po-sw"><input type="checkbox" id="poBrujula" ${S.clase.brujula && S.clase.brujula.activa ? "checked" : ""}> Usar brújula</label>` : ""}
@@ -81,7 +81,9 @@ function mostrarPortada(url, codigo, alEmpezar) {
     window.publicarEstado?.();
     actualizarPortada(window.jugadoresSala?.() || {});
   };
-  $("poTema").onchange = e => { S.clase.tema = e.target.value.trim().slice(0, 200) || SESION.tema; window.publicarEstado?.(); };
+  $("poTema").onchange = e => { S.clase.tema = e.target.value.replace(/\s+/g, " ").trim().slice(0, 200) || SESION.tema; window.publicarEstado?.(); };
+  // es un área de texto para que el tema largo se lea entero, pero es una sola línea: Enter la guarda
+  $("poTema").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); e.target.blur(); } };
   if (PERS) {
     $("poInscripcion").onclick = () => {
       if (S.clase.inscripcion === "abierta") window.cerrarInscripcion?.();

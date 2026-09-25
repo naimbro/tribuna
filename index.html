@@ -237,7 +237,10 @@ main .col{position:relative}
 #mapaGrande .mg-pie{text-align:center}
 .aviso{color:var(--amber);font-size:13px}
 .po-cfg{display:flex;gap:18px;margin:6px 0 12px;color:var(--dim);font-size:13px;flex-wrap:wrap}
-.po-cfg input{background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:600 18px system-ui;width:min(560px,50vw);display:block;margin-top:4px}
+.po-cfg input,.po-cfg textarea{background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:600 18px system-ui;width:min(560px,50vw);display:block;margin-top:4px}
+/* el tema general: ocupa lo que haya y, si es largo, baja a otra línea en vez de cortarse */
+.po-cfg .po-tema-l{flex:1 1 380px;min-width:0;max-width:760px}
+.po-cfg #poTema{width:100%;box-sizing:border-box;resize:none;line-height:1.3;field-sizing:content;min-height:calc(1.3em + 16px);max-height:calc(3.9em + 16px);overflow:auto}
 .po-cfg select{background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:600 18px system-ui;display:block;margin-top:4px}
 .po-grupos{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;width:100%}
 .po-g{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;min-height:110px}
@@ -246,6 +249,10 @@ main .col{position:relative}
 .po-gc{width:100%;font-size:11.5px;color:var(--dim);margin-top:-4px}
 .po-cfg #poCupo{width:64px;display:block}
 .po-cfg #poInscripcion{align-self:flex-end}
+/* la inscripción: un botón secundario, pero activo (el primario es EMPEZAR) */
+.btn.sec{background:rgba(0,224,122,.08);border:1px solid var(--neon);color:var(--neon);font-weight:700}
+.btn.sec:hover:not(:disabled){background:rgba(0,224,122,.18);border-color:var(--neon);color:#7dffc0}
+.po-cfg #poInscripcion.btn{font-size:13px;padding:10px 16px}
 .po-ins{align-self:flex-end;padding-bottom:9px;color:var(--amber)}
 .in-duelos{display:flex;flex-direction:column;gap:14px;text-align:left;max-width:980px;margin:0 auto}
 .in-duelos>div{display:grid;grid-template-columns:1fr auto 1fr;gap:6px 18px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 20px}
@@ -430,6 +437,8 @@ body.escenario #escenarioVista{display:flex}
 .escn-lado{color:var(--c);letter-spacing:.32em;font-weight:800;font-size:calc(var(--u)*1.05)}
 .escn-nombre{color:var(--c);font-weight:900;font-size:calc(var(--u)*2.9);line-height:1.12;max-width:100%;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .escn-nombre.largo{font-size:calc(var(--u)*2.35)}
+/* el color del personaje, solo como un punto junto a su nombre: el podio va en el del lado */
+.escn-nombre.pj::before{content:"";display:inline-block;width:.32em;height:.32em;border-radius:50%;background:var(--cp);box-shadow:0 0 .35em color-mix(in srgb,var(--cp) 70%,transparent);margin-right:.3em;vertical-align:.17em}
 .escn-cargo{color:var(--dim);font-size:calc(var(--u)*1.1);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .escn-cargo:empty{display:none}
 .escn-podio > *{flex-shrink:0}
@@ -752,7 +761,8 @@ body.escn-audio #escenarioVista{top:40px}
 .btn:hover:not(:disabled){border-color:var(--dim);background:#1b2530}
 .btn:disabled{opacity:.32;cursor:not-allowed}
 .btn.pri{background:linear-gradient(180deg,#00e07a,#00b862);color:#04140c;border:none;font-weight:700}
-.btn.pri:hover:not(:disabled){filter:brightness(1.12)}
+/* sin el fondo repetido, el :hover de .btn (más específico) lo dejaba gris con letra oscura */
+.btn.pri:hover:not(:disabled){background:linear-gradient(180deg,#00e07a,#00b862);filter:brightness(1.12)}
 .btn.sm{padding:5px 10px;font-size:11px}
 .hint{font-size:11px;color:var(--dim2);margin-left:auto}
 
@@ -970,26 +980,26 @@ table.rank td.num{font-family:var(--mono);text-align:right}
     document.write('<script src="contenido/semana' + ok + '.js?v=20260928a"><\/script>');
   })();
 </script>
-<script src="rotacion.js?v=20260929a"></script>
-<script src="ajedrez.js?v=20260929a"></script>
-<script src="punto.js?v=20260929a"></script>
-<script src="vozia.js?v=20260929a"></script>
+<script src="rotacion.js?v=20260929b"></script>
+<script src="ajedrez.js?v=20260929b"></script>
+<script src="punto.js?v=20260929b"></script>
+<script src="vozia.js?v=20260929b"></script>
 <script src="publico.js?v=20260928a"></script>
 <script src="brujula.js?v=20260927a"></script>
-<script src="ritmo.js?v=20260929a"></script>
+<script src="ritmo.js?v=20260929b"></script>
 <script src="barra.js?v=20260923a"></script>
-<script src="moderacion.js?v=20260928a"></script>
-<script src="app.js?v=20260929a"></script>
-<script src="musica.js?v=20260929a"></script>
-<script src="jueces.js?v=20260928a"></script>
-<script src="clase.js?v=20260929a"></script>
-<script src="escenas.js?v=20260929a"></script>
+<script src="moderacion.js?v=20260929b"></script>
+<script src="app.js?v=20260929b"></script>
+<script src="musica.js?v=20260929b"></script>
+<script src="jueces.js?v=20260929b"></script>
+<script src="clase.js?v=20260929b"></script>
+<script src="escenas.js?v=20260929b"></script>
 <script src="mapavivo.js?v=20260923a"></script>
 <script src="barravista.js?v=20260928a"></script>
-<script src="escenario.js?v=20260929a"></script>
+<script src="escenario.js?v=20260929b"></script>
 <!-- QR del código de sala (MOSTRAR CÓDIGO); sin red no carga y el modal muestra solo la URL -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <!-- capa online (Firestore): si no hay conexión o config, el juego sigue en modo local -->
-<script type="module" src="online.js?v=20260929a"></script>
+<script type="module" src="online.js?v=20260929b"></script>
 </body>
 </html>

@@ -42,6 +42,9 @@ const C = { dato: null, recibido: 0, foto: null, cache: true, noResponde: false,
 // enviada sobrevive al «no responde»: si la pantalla vuelve y dice que la ignoró, se avisa igual.
 const P = { t: 0, boton: null, texto: "", timer: null, fase: null, etapa: null, ticker: "", enviada: 0 };
 const BORR = { base: null, sucio: false };                                                    // la pregunta que escribe el profesor
+// el botón principal pidiendo el segundo toque: en qué fase se tocó (null = no está pidiendo)
+const CONFIRMA = { abierta: "¿Cerrar el debate? Toca otra vez", votando: "¿Cerrar la votación? Toca otra vez" };
+const CONF = { fase: null, timer: null };
 
 const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 // Cuánto falta para `fin` (hora del proyector): se mide contra el `t` de la misma foto más lo que
@@ -122,8 +125,10 @@ function pintar() {
   else if (conDebate) $("deb").innerHTML = `<q>${esc(d.pregunta)}</q><div class="par">
     <span class="tag" style="--c:var(--A)">A FAVOR · ${esc(nombreDe(d.A))}</span><span class="tag" style="--c:var(--B)">EN CONTRA · ${esc(nombreDe(d.B))}</span></div>`;
 
-  // el botón principal: el mismo rótulo que en la pantalla (en la portada y la intro, el de la escena)
-  if (P.boton !== $("cp")) $("cp").textContent = c.principal || "…";
+  // el botón principal: el mismo rótulo que en la pantalla (en la portada y la intro, el de la escena),
+  // salvo mientras pide la confirmación; si la fase cambió entretanto, la pregunta ya no corre
+  if (CONF.fase && (CONF.fase !== f || antes)) sinConfirmar();
+  if (P.boton !== $("cp")) $("cp").textContent = CONF.fase ? CONFIRMA[CONF.fase] : c.principal || "…";
 
   mostrar("sProp", !antes && f === "propuesta");
   if (!antes && f === "propuesta") pintarPropuesta(c);
@@ -251,13 +256,31 @@ function publicarDesdeAqui(boton) {
   BORR.sucio = false;
   mandar("publicar", { pregunta, A, B }, boton);
 }
+// Cerrar el debate o la votación no tiene vuelta atrás y el botón es enorme: el primer toque
+// pregunta (CONFIRMA, 4 s) y solo el segundo manda la orden.
+function sinConfirmar() {
+  clearTimeout(CONF.timer);
+  CONF.fase = null; CONF.timer = null;
+  $("cp").classList.remove("confirma");
+}
 $("cp").onclick = () => {
   const c = C.dato;
   if (!c) return;
-  if (c.etapa === "portada" || c.etapa === "intro") mandar("etapa", null, $("cp"));
+  const antes = c.etapa === "portada" || c.etapa === "intro";
+  if (antes) mandar("etapa", null, $("cp"));
   // en la propuesta el botón publica lo que se ve AQUÍ (la pregunta pudo editarse en el celular)
   else if (c.fase === "propuesta") publicarDesdeAqui($("cp"));
-  else mandar("principal", null, $("cp"));
+  else if (CONFIRMA[c.fase] && CONF.fase !== c.fase) {
+    sinConfirmar();
+    CONF.fase = c.fase;
+    $("cp").textContent = CONFIRMA[c.fase];
+    $("cp").classList.add("confirma");
+    CONF.timer = setTimeout(() => { sinConfirmar(); pintar(); }, 4000);
+  } else {
+    sinConfirmar();
+    $("cp").textContent = c.principal || "…";     // tras el ack vuelve este rótulo, no la pregunta
+    mandar("principal", null, $("cp"));
+  }
 };
 $("prPublicar").onclick = () => publicarDesdeAqui($("prPublicar"));
 $("prOtra").onclick = () => { BORR.sucio = false; mandar("otra", null, $("prOtra")); };

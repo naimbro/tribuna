@@ -42,6 +42,9 @@ p{margin:0 0 10px;color:var(--dim)}
 .cp{width:100%;min-height:72px;border:0;border-radius:16px;background:var(--neon);color:#062a17;font:800 22px/1.15 system-ui,-apple-system,sans-serif;letter-spacing:.02em;box-shadow:0 0 26px #22e58a4d;cursor:pointer;padding:10px 14px}
 .cp:active{transform:scale(.985)}
 .cp:disabled{opacity:.45;box-shadow:none}
+/* primer toque de «cerrar el debate / la votación»: pide el segundo */
+.cp.confirma{background:var(--amber);color:#2a1a04;box-shadow:0 0 0 3px #ffb02055,0 0 26px #ffb0204d;animation:cpConfirma .9s ease-in-out infinite alternate}
+@keyframes cpConfirma{to{box-shadow:0 0 0 6px #ffb02033,0 0 34px #ffb02066}}
 .nota{border-radius:12px;padding:11px 13px;font-weight:700;font-size:15px;background:#2a1a08;color:var(--amber);border:1px solid #4a3310}
 .nota.mal{background:#2a0f16;color:var(--B);border-color:#5a2230}
 .pie{font-size:13px;color:var(--dim2);text-align:center}
@@ -171,8 +174,8 @@ select{min-height:48px;appearance:none;background-image:linear-gradient(45deg,tr
     <div class="pie" id="pie"></div>
   </section>
 </main>
-<script src="rotacion.js?v=20260929a"></script>
-<script src="ajedrez.js?v=20260929a"></script>
-<script type="module" src="control.js?v=20260929a"></script>
+<script src="rotacion.js?v=20260929b"></script>
+<script src="ajedrez.js?v=20260929b"></script>
+<script type="module" src="control.js?v=20260929b"></script>
 </body>
 </html>

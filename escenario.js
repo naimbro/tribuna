@@ -38,7 +38,12 @@ const escnEnModo = () => document.body.classList.contains("escenario");
 // Cambia el texto solo si es otro (asignar el mismo texto igual rehace el nodo).
 function escnTexto(el, t) { if (el && el.textContent !== t) el.textContent = t; }
 function escnClase(el, c) { if (el && el.className !== c) el.className = c; }
-const escnColor = k => (S.debate && typeof escColorDe === "function" ? escColorDe(S.debate[k], k) : EQUIPOS[k].color);
+// El debate en vivo va en el color del LADO (A FAVOR / EN CONTRA), el mismo de los teléfonos, el
+// control, el chat y los resultados. El del personaje queda solo en el punto junto a su nombre
+// (las escenas de revelación y entrada, que son sobre los personajes, siguen con el suyo).
+const escnColor = k => (EQUIPOS[k] && EQUIPOS[k].color) || `var(--${k})`;
+const escnColorPersonaje = k => (S.debate && typeof PERS !== "undefined" && PERS && typeof personajeDe === "function"
+  ? (personajeDe(S.debate[k], PERS) || {}).color || "" : "");
 const escnPrimerNombre = n => String(n || "?").trim().split(/\s+/)[0];
 
 /* ---------------------------- el modo ---------------------------- */
@@ -137,9 +142,11 @@ function escnNuevoDebate(d) {
   for (const k of ["A", "B"]) {
     const p = $("escnPodio" + k);
     p.style.setProperty("--c", escnColor(k));
-    const nombre = nombreG(d[k]);
-    escnTexto(p.querySelector(".escn-nombre"), nombre);
-    p.querySelector(".escn-nombre").classList.toggle("largo", nombre.length > 10);
+    const nombre = nombreG(d[k]), el = p.querySelector(".escn-nombre"), cp = escnColorPersonaje(k);
+    escnTexto(el, nombre);
+    el.classList.toggle("largo", nombre.length > 10);
+    el.classList.toggle("pj", !!cp);
+    el.style.setProperty("--cp", cp || "transparent");
     escnTexto(p.querySelector(".escn-cargo"), typeof escSubtitulo === "function" ? escSubtitulo(d[k]) : "");
     p.querySelector(".escn-caras").innerHTML = "";
   }
@@ -467,7 +474,7 @@ function escnPintarEspera() {
       ${rk.length ? `<div class="escn-rk"><div class="escn-rk-k">RANKING DE ${PERS ? "PERSONAJES" : "GRUPOS"}</div>${rk.map(f => {
         const c = (personajeDe(f.grupo, PERS) || {}).color || "var(--neon)";
         return `<div class="escn-rk-f" style="--c:${c}"><span class="mono">#${f.puesto}</span><b>${escHtml(nombreGrupo(f.grupo))}</b><i class="mono">${f.puntaje === null ? "—" : f.puntaje.toFixed(1)}</i></div>`;
-      }).join("")}</div>` : `<div class="escn-es-pie">Miren su teléfono: ahí verán qué les toca.</div>`}`;
+      }).join("")}</div>` : `<div class="escn-es-pie">Repasen su dossier: en un momento sale la próxima pregunta.</div>`}`;
   }
   if (ESCN.espera !== clave) { ESCN.espera = clave; el.innerHTML = html; }
   if (S.fase === "listo" && S.finPrep) escnTexto($("escnPrepReloj"), fmt(Math.max(0, Math.ceil((S.finPrep - Date.now()) / 1000))));
