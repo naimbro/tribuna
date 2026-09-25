@@ -47,6 +47,9 @@ function recibirChat(lista, inicial = false) {
         if (/@moderadora\b/i.test(norm(m.texto))) { S.mod.pregunta = m; moderadorTalvez(true); }
       }
     } else if (m.tipo === "mod") sonar("nota", 14);
+    // el proyector habla: la moderadora y el relator, si la voz de la IA está encendida (vozia.js)
+    if ((m.tipo === "mod" || m.tipo === "relator") && opcionActiva(S.clase.opciones, "vozIA") && typeof hablarIA === "function")
+      hablarIA(textoHablado(m, EQUIPOS));
   }
   if (typeof window.alCambiarChat === "function") window.alCambiarChat();
 }
@@ -123,10 +126,13 @@ function participantes() {
 }
 
 // La conversación como texto para los prompts. Sin los mensajes de resultado (son del juego).
+// Los alumnos con m.voz (Task 14: mantener para hablar) llevan la marca 🎤: es una transcripción
+// automática, no lo que escribieron, y así lo saben moderadora y jueces (promptModerador, promptJuez).
 function transcripcionChat(filtro = () => true, max = 40) {
   return S.chat.filter(m => ["alumno", "mod", "relator"].includes(m.tipo) && filtro(m)).slice(-max).map(m =>
     m.tipo === "mod" ? `[🎙 ${MOD_NOMBRE}] ${m.texto}`
     : m.tipo === "relator" ? `[⚖ ${REL_NOMBRE}] ${m.texto}`
+    : m.voz ? `[${EQUIPOS[m.equipo]?.nombre || m.equipo} · ${m.nombre} · 🎤] ${m.texto}`
     : `[${EQUIPOS[m.equipo]?.nombre || m.equipo} · ${m.nombre}] ${m.texto}`).join("\n");
 }
 
@@ -202,7 +208,7 @@ function lanzarPreguntaTribuna(p, destino) {
   if (!reg || !p) return;
   (reg.tribuna = reg.tribuna || []).push({ uid: p.uid, nombre: p.nombre || "", grupo: p.grupo || 0, texto: String(p.texto).slice(0, PUB.PREGUNTA_MAX) });
   S.clase.oraculos = sumarPuntoPregunta(S.clase.oraculos, p);
-  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: textoTribuna(p, destino, PERS), datos: { tribuna: "pregunta", uid: p.uid } });
+  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: textoTribuna(p, destino, PERS), datos: { tribuna: "pregunta", uid: p.uid, nombre: p.nombre || "" } });
   if (typeof pintarColumna === "function") pintarColumna();
   if (typeof window.publicarEstado === "function") window.publicarEstado();
 }
@@ -222,6 +228,7 @@ function promptModerador(est) {
   const ahora = Date.now(), abre = S.mod ? S.mod.abre : ahora;
   const minutos = Math.max(0, Math.round((ahora - abre) / 60000));
   const puedeNombrar = nombrables(est, { ahora, abre }).map(p => p.nombre);
+  const conVoz = delDebateEnCurso().some(m => m.voz);   // Task 14: alguien mantuvo para hablar en este debate
   const fila = p => `${p.nombre} (${p.n} mensaje${p.n === 1 ? "" : "s"}${p.ausente ? "; PARECE NO ESTAR: no la nombres" : p.sinResponder ? `; la llamaste ${p.sinResponder} vez sin respuesta` : ""}${p.verificado ? "; ya le preguntaste de dónde saca algo" : ""})`;
   const lista = k => est.alumnos.filter(p => p.equipo === k).map(fila).join(", ") || "(nadie aún)";
   const d = S.debate;
@@ -247,6 +254,8 @@ Responde a esa persona (nómbrala con @${S.mod.pregunta.nombre}), en una o dos f
 tiempo, la pregunta del debate o lo que pediste antes. Si dice que no sabe o no tiene la respuesta, no se la vuelvas a
 pedir: pásale la pregunta a su grupo o sigue con otra cosa. Si te pide argumentos, datos, lecturas o que le digas quién
 tiene la razón, NO se los des: devuélvele la pregunta para que la responda su grupo.
+
+` : ""}${conVoz ? `LOS MENSAJES MARCADOS 🎤 son transcripciones automáticas de lo que se dijo en voz alta: no comentes muletillas, puntuación ni nombres propios mal transcritos.
 
 ` : ""}CÓMO MODERAS
 Sigue el ritmo de la conversación, como una buena moderadora humana: responde a lo que se acaba de decir, no a una lista de tareas. Si los grupos se están respondiendo bien entre ellos, no interrumpas: elige "esperar".
