@@ -28,6 +28,7 @@ const ON = { codigo: null, uid: null, email: null, creada: null, jugadores: {}, 
 const CODIGO_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const nuevoCodigo = () => Array.from({ length: 4 }, () => CODIGO_CHARS[Math.floor(Math.random() * CODIGO_CHARS.length)]).join("");
 const urlJugar = () => `${location.origin}${location.pathname.replace(/[^/]*$/, "")}jugar.html?sala=${ON.codigo}`;
+const urlControl = () => `${location.origin}${location.pathname.replace(/[^/]*$/, "")}control.html?sala=${ON.codigo}`;
 
 /* ---------- lo que ve el alumno: estado público de la sala ---------- */
 function estadoPublico() {
@@ -141,7 +142,9 @@ function estadoControl() {
   const p = S.clase.propuesta;
   return {
     t: Date.now(), ack: ON.ultimaOrden || 0,
-    fase: S.fase, etapa: S.etapa || null, principal: $("btnPrincipal").textContent, ticker: $("ticker").textContent,
+    fase: S.fase, etapa: S.etapa || null, ticker: $("ticker").textContent,
+    // en la portada y la intro, el botón que manda es el de la escena
+    principal: (S.etapa === "portada" ? $("poEmpezar") : S.etapa === "intro" ? $("inSig") : $("btnPrincipal"))?.textContent || "",
     debate: S.debate ? { n: S.debate.n, pregunta: S.debate.pregunta, A: S.debate.A, B: S.debate.B } : null,
     propuesta: p ? { estado: p.estado, pregunta: p.pregunta || "", porQue: p.porQue || "", A: p.A, B: p.B, aviso: p.aviso || "",
       favor: p.favor || "", contra: p.contra || "", cuentaHasta: S.cuentaHasta || null } : null,
@@ -300,7 +303,7 @@ const collectionJugadores = () => collection(db, "salas", ON.codigo, "jugadores"
 
 /* ---------- las órdenes del control del profesor (control.html) ---------- */
 const ORDENES = {
-  principal: () => accionPrincipal(),
+  principal: () => accionPrincipal({ control: true }),
   publicar: a => publicarPropuestaActual(a && a.pregunta ? a : null),
   otra: () => pedirOtraPropuesta(),
   lados: () => cambiarLadosPropuesta(),
@@ -311,6 +314,14 @@ const ORDENES = {
   shock: a => { $("selEvento").value = a; lanzarEvento(); },
   opcion: a => fijarOpcion(a.k, a.v),
   escenario: a => window.modoEscenario?.(!!a),
+  // en la portada y la intro, el control pulsa el botón de la escena (EMPEZAR ▶, SIGUIENTE ›): así
+  // corre lo mismo que en el proyector (cerrar la inscripción, exigir los grupos de la brújula)
+  etapa: () => {
+    if (S.etapa === "portada") {
+      $("poEmpezar")?.click();
+      if (S.etapa === "portada" && $("poFormarAviso")?.textContent) tick($("poFormarAviso").textContent);
+    } else if (S.etapa === "intro") $("inSig")?.click();
+  },
   terminar: () => { terminarClase(true); S.veredictoRevelado = true; }
 };
 function atenderOrden(data) {
@@ -445,8 +456,23 @@ function pintarBarraOnline() {
     <span class="mono" style="color:var(--txt)">${urlJugar()}</span>
     ${ON.feedback ? `<span title="Feedback recibido; se lee en MIS PARTIDAS">💬 ${ON.feedback} feedback</span>` : ""}
     <a class="btn" href="admin.html" target="_blank" style="margin-left:auto;text-decoration:none;color:inherit">📋 MIS PARTIDAS</a>
+    <button class="btn" id="btnControl" title="Dirigir la clase desde tu celular">📱 CONTROL</button>
     <button class="btn" id="btnPortada" title="Volver a la portada con el QR y quién entró">⛶ PORTADA</button>`;
   $("btnPortada").onclick = () => irA("portada");
+  $("btnControl").onclick = abrirQrControl;
+}
+
+// El control del profesor (control.html) se abre en el celular escaneando este QR, con la misma cuenta.
+function abrirQrControl() {
+  const url = urlControl();
+  let qr = "";
+  if (typeof qrcode === "function") { const q = qrcode(0, "M"); q.addData(url); q.make(); qr = q.createSvgTag({ cellSize: 6, margin: 2 }); }
+  abrirModal(`<h2>📱 EL CONTROL, EN TU CELULAR</h2>
+    <p>Escanéalo y entra con la misma cuenta (<b style="color:var(--txt)">${esc(ON.email || "")}</b>). Desde el celular ves la
+    próxima pregunta antes que nadie, avanzas cada paso, das +30 s, llamas a la moderadora y prendes o apagas lo nuevo.</p>
+    <div style="background:#fff;padding:10px;border-radius:12px;width:max-content;margin:14px auto;line-height:0">${qr}</div>
+    <p class="mono" style="text-align:center;word-break:break-all;color:var(--txt)">${esc(url)}</p>
+    <div style="text-align:right"><button class="btn" onclick="cerrarModal()">Cerrar</button></div>`);
 }
 
 /* ---------- brújula: mapa, grupos y rezagados ---------- */

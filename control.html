@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b141a">
+<title>TRIBUNA — control</title>
+<style>
+/* la paleta de jugar.html: el control es otro teléfono de la misma sala */
+:root{--bg:#0b141a;--panel:#0f161d;--line:#1d2732;--txt:#e6edf3;--dim:#8b98a5;--dim2:#5b6773;--A:#38bdf8;--B:#fb7185;--neon:#22e58a;--amber:#f5b301;--mod:#b4a6ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{min-height:100dvh;overflow-x:hidden}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.oculto{display:none!important}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));background:#0c1319;border-bottom:1px solid var(--line)}
+header b{color:var(--neon);letter-spacing:.16em;font-size:13px}
+header .sala{margin-left:auto;font-size:16px;font-weight:700;letter-spacing:.14em}
+.con{width:11px;height:11px;border-radius:50%;background:var(--dim2);flex:0 0 auto}
+.con.ok{background:var(--neon);box-shadow:0 0 8px var(--neon)}
+.con.espera{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.con.mal{background:var(--B);box-shadow:0 0 8px var(--B)}
+main{display:flex;flex-direction:column;gap:12px;max-width:520px;margin:0 auto;padding:14px 12px calc(30px + env(safe-area-inset-bottom))}
+#vPanel{display:flex;flex-direction:column;gap:12px}
+.k{font-size:11px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;margin-bottom:8px}
+.cc{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+p{margin:0 0 10px;color:var(--dim)}
+/* arriba: la fase en palabras y su reloj */
+.fase{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;min-height:58px}
+.fase .k{margin-bottom:2px}
+.fase-t{font-size:27px;font-weight:800;line-height:1.1}
+.reloj{font-size:38px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.reloj.urgente{color:var(--B)}
+.deb{font-size:14.5px;color:var(--dim);border-left:3px solid var(--line);padding:2px 0 2px 10px}
+.deb q{color:var(--txt);quotes:"«" "»"}
+.par{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{display:inline-block;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:99px;border:1px solid var(--c);color:var(--c);white-space:nowrap}
+/* el botón principal: la misma acción que el de la pantalla */
+.cp{width:100%;min-height:72px;border:0;border-radius:16px;background:var(--neon);color:#062a17;font:800 22px/1.15 system-ui,-apple-system,sans-serif;letter-spacing:.02em;box-shadow:0 0 26px #22e58a4d;cursor:pointer;padding:10px 14px}
+.cp:active{transform:scale(.985)}
+.cp:disabled{opacity:.45;box-shadow:none}
+.nota{border-radius:12px;padding:11px 13px;font-weight:700;font-size:15px;background:#2a1a08;color:var(--amber);border:1px solid #4a3310}
+.nota.mal{background:#2a0f16;color:var(--B);border-color:#5a2230}
+.pie{font-size:13px;color:var(--dim2);text-align:center}
+.pie .mono{color:var(--dim)}
+/* botones secundarios: 48 px, fáciles con el pulgar */
+.b{min-height:48px;border:1px solid var(--line);background:#141d26;color:var(--txt);border-radius:12px;font:600 16px system-ui,-apple-system,sans-serif;padding:0 12px;cursor:pointer}
+.b.pri{background:var(--neon);color:#062a17;border-color:transparent;font-weight:800}
+.b.peligro{background:#1a0e12;border-color:#5a2230;color:var(--B)}
+.b:disabled,select:disabled,.sw input:disabled{opacity:.45}
+.ancho{width:100%}
+.ca{display:flex;gap:8px}
+.ca>*{flex:1 1 0;min-width:0}
+/* la propuesta */
+textarea,select,input[type=text]{width:100%;background:#080d12;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:11px;font:16px/1.35 system-ui,-apple-system,sans-serif}
+textarea{resize:vertical;min-height:84px}
+select{min-height:48px;appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+.aviso{color:var(--amber);font-size:14.5px;font-weight:600;margin-bottom:10px}
+.porque{color:var(--dim);font-size:14px;margin:8px 0 2px}
+.lado{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center;margin-top:10px}
+.lado span{font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--c)}
+.cuenta{text-align:center;font-weight:700;color:var(--neon);min-height:22px;margin-top:10px}
+#sProp .ca{margin-top:12px}
+/* el debate */
+.bancos{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.banco{border-left:4px solid var(--c);background:#0b1218;border-radius:10px;padding:9px 11px;min-width:0}
+.banco .n{font-size:12.5px;font-weight:700;color:var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.banco .t{font-size:30px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+.banco.corre .t{color:var(--c)}
+.banco.cero .t{color:var(--dim2)}
+.habla{font-size:15px;margin-bottom:12px}
+.habla b{color:var(--neon)}
+.shock{display:flex;gap:8px;margin-top:10px}
+.shock select{flex:1 1 auto;min-width:0}
+.shock .b{flex:0 0 auto}
+/* la votación */
+.votos{font-size:22px;font-weight:800}
+.votos small{font-size:15px;color:var(--dim);font-weight:600}
+.barra{height:12px;border-radius:99px;background:#101820;border:1px solid #1e2a36;overflow:hidden;margin-top:10px}
+.barra i{display:block;height:100%;background:var(--neon);border-radius:99px;transition:width .5s}
+/* los interruptores */
+.sw{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;border-top:1px solid var(--line);cursor:pointer}
+.sw:first-of-type{border-top:0}
+.sw span{font-size:16px}
+.sw small{display:block;color:var(--dim2);font-size:12.5px}
+.sw input{appearance:none;-webkit-appearance:none;margin:0;width:58px;height:34px;border-radius:99px;background:#26313c;position:relative;flex:0 0 auto;cursor:pointer;transition:background .15s}
+.sw input::after{content:"";position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;background:#cfd8e0;transition:transform .15s}
+.sw input:checked{background:var(--neon)}
+.sw input:checked::after{transform:translateX(24px);background:#062a17}
+</style>
+</head>
+<body>
+<header>
+  <b>TRIBUNA · CONTROL</b>
+  <span class="sala mono" id="sala"></span>
+  <i class="con" id="con" title="conexión"></i>
+</header>
+<main id="c">
+  <!-- entrar -->
+  <section class="cc oculto" id="vEntrar">
+    <div class="k">El control del profesor</div>
+    <p id="entrarTxt">Entra con la misma cuenta de Google con que abriste la sala en el proyector.</p>
+    <div class="ca oculto" id="vCodigo" style="margin-bottom:10px">
+      <input type="text" id="inCodigo" maxlength="4" placeholder="CÓDIGO DE LA SALA" autocapitalize="characters" autocomplete="off" class="mono">
+      <button class="b" id="btnCodigo" style="flex:0 0 auto">Ir</button>
+    </div>
+    <button class="b pri ancho" id="btnGoogle">🔑 Entrar con Google</button>
+  </section>
+  <div class="nota mal oculto" id="error"></div>
+  <div class="nota oculto" id="espera"></div>
+
+  <!-- el control -->
+  <section class="oculto" id="vPanel">
+    <div class="fase">
+      <div><div class="k" id="faseK"></div><div class="fase-t" id="faseT"></div></div>
+      <div class="reloj mono" id="reloj"></div>
+    </div>
+    <div class="deb oculto" id="deb"></div>
+    <button class="cp" id="cp"></button>
+    <div class="nota oculto" id="nota"></div>
+
+    <section class="cc oculto" id="sProp">
+      <div class="k">Lo ves solo tú · la sala todavía no</div>
+      <div class="aviso oculto" id="prEstado"></div>
+      <div class="aviso oculto" id="prAviso"></div>
+      <textarea id="prTexto" rows="3" maxlength="300" placeholder="Escribe la pregunta del debate"></textarea>
+      <div class="porque oculto" id="prPorQue"></div>
+      <label class="lado" style="--c:var(--A)"><span>A FAVOR</span><select id="prA"></select></label>
+      <label class="lado" style="--c:var(--B)"><span>EN CONTRA</span><select id="prB"></select></label>
+      <div class="ca">
+        <button class="b" id="prLados">⇄ Lados</button>
+        <button class="b" id="prOtra">Pedir otra</button>
+        <button class="b pri" id="prPublicar">Publicar</button>
+      </div>
+      <div class="cuenta" id="prCuenta"></div>
+    </section>
+
+    <section class="cc oculto" id="sDebate">
+      <div class="k">En vivo</div>
+      <div class="bancos oculto" id="bancos"></div>
+      <div class="habla" id="habla"></div>
+      <div class="ca">
+        <button class="b" id="btnMas30">+30 s</button>
+        <button class="b" id="btnModera">🎙 Moderadora</button>
+      </div>
+      <div class="shock">
+        <select id="selShock"><option value="">⚡ Shock: elige una noticia…</option></select>
+        <button class="b" id="btnShock" disabled>Lanzar</button>
+      </div>
+    </section>
+
+    <section class="cc oculto" id="sVoto">
+      <div class="k">Votación</div>
+      <div class="votos" id="votos"></div>
+      <div class="barra"><i id="votosBarra" style="width:0"></i></div>
+    </section>
+
+    <section class="cc" id="sOps">
+      <div class="k">Interruptores</div>
+      <div id="ops"></div>
+    </section>
+
+    <button class="b peligro ancho" id="btnTerminar">🏁 Terminar clase</button>
+    <div class="pie" id="pie"></div>
+  </section>
+</main>
+<script src="rotacion.js?v=20260929a"></script>
+<script src="ajedrez.js?v=20260929a"></script>
+<script type="module" src="control.js?v=20260929a"></script>
+</body>
+</html>

@@ -269,9 +269,11 @@ function terminarClase(sinPreguntar = false) {
 
 // El botón principal hace lo que corresponde a cada momento. En la preparación, la revelación y
 // la entrada, un doble clic rápido no puede saltarse dos pasos: el segundo, dentro de 400 ms, no cuenta.
+// Desde el control del celular ({ control: true }) no hace falta: el control no deja tocar de nuevo
+// hasta que la pantalla confirma la orden anterior, y ese segundo toque ya es a propósito.
 let ultimaAccion = 0;
-function accionPrincipal() {
-  if (["listo", "revelando", "entrada"].includes(S.fase)) {
+function accionPrincipal(o) {
+  if (!(o && o.control === true) && ["listo", "revelando", "entrada"].includes(S.fase)) {
     const ahora = Date.now();
     if (ahora - ultimaAccion < 400) return;
     ultimaAccion = ahora;
@@ -317,7 +319,9 @@ function fijarOpcion(k, v) {
   S.clase.opciones = { ...OPCIONES_DEFECTO, ...(S.clase.opciones || {}), [k]: !!v };
   if (k === "musica" && !v && typeof pararMusica === "function") pararMusica();
   if (k === "vozIA" && !v && typeof callarIA === "function") callarIA();
-  tick(`${k}: ${v ? "encendido" : "apagado"}.`);
+  const nombre = { revelacion: "Revelación", revancha: "Revancha", musica: "Música", voz: "Debate en voz alta",
+    reloj: "Reloj de ajedrez", punto: "Punto de información", vozIA: "La IA en voz alta" }[k];
+  tick(`${nombre}: ${v ? "encendido" : "apagado"} desde el control.`);
   publicarEstado();
 }
 
