@@ -139,9 +139,11 @@ function estadoPrivado() {
 // este reloj: el control las lee contra `t`, no contra su propio reloj. ack = la última orden
 // atendida, para que el control sepa que su botón llegó.
 function estadoControl() {
+  if (!S.clase) return null;
   const p = S.clase.propuesta;
   return {
     t: Date.now(), ack: ON.ultimaOrden || 0,
+    ignorada: ON.ignorada || 0,          // una orden que llegó mientras esta pestaña se recargaba: no se hizo
     fase: S.fase, etapa: S.etapa || null, ticker: $("ticker").textContent,
     // en la portada y la intro, el botón que manda es el de la escena
     principal: (S.etapa === "portada" ? $("poEmpezar") : S.etapa === "intro" ? $("inSig") : $("btnPrincipal"))?.textContent || "",
@@ -168,16 +170,31 @@ let publicando = null;
 function publicar() {
   if (!ON.codigo || !ON.uid) return;
   clearTimeout(publicando);
-  publicando = setTimeout(async () => {
-    try {
-      await setDoc(doc(db, "salas", ON.codigo), limpio(estadoPublico()));
-      await setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado()));
-    } catch (e) { tick("No se pudo publicar en la sala: " + e.message); }
-    // aparte: si el resumen del control falla, la sala y los teléfonos siguen como siempre
-    try { await setDoc(doc(db, "salas", ON.codigo, "privado", "control"), limpio(estadoControl())); }
-    catch (e) { console.warn("TRIBUNA: no se pudo publicar el resumen del control", e); }
+  publicando = setTimeout(() => {
+    // los tres a la vez (el ack del control no espera a los otros dos), cada uno con su error:
+    // si el resumen del control falla, la sala y los teléfonos siguen como siempre
+    const fallo = e => tick("No se pudo publicar en la sala: " + e.message);
+    const control = estadoControl();
+    return Promise.all([
+      setDoc(doc(db, "salas", ON.codigo), limpio(estadoPublico())).catch(fallo),
+      setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado())).catch(fallo),
+      control && escribirControl(control)
+    ]);
   }, 250);
 }
+function escribirControl(control) {
+  ON.controlEn = Date.now();
+  return setDoc(doc(db, "salas", ON.codigo, "privado", "control"), limpio(control))
+    .catch(e => console.warn("TRIBUNA: no se pudo publicar el resumen del control", e));
+}
+// Latido para el control: si la pantalla lleva 10 s sin publicar (una propuesta quieta, la
+// portada), reescribe solo el resumen del control. El control pone su punto en gris cuando pasan
+// 20 s sin noticias: así se distingue «no pasa nada» de «el proyector se cerró o se colgó».
+setInterval(() => {
+  if (!ON.codigo || !ON.uid || Date.now() - (ON.controlEn || 0) < 10000) return;
+  const control = estadoControl();
+  if (control) escribirControl(control);
+}, 5000);
 
 /* ---------- envolver el motor: cada cambio de estado se publica ---------- */
 function envolver(nombre, despues) {
@@ -254,7 +271,9 @@ function activarOnline() {
     const t = data.terminar || 0;
     if (ordenVista === null) {                                     // la que ya estaba al abrir no cuenta
       ordenVista = t;
-      if (data.cmd) ON.ultimaOrden = data.t || 0;
+      // si el control la mandó mientras esta pestaña se recargaba, no se hizo: se le avisa
+      // (ignorada) para que el profesor vuelva a tocar, en vez de creer que ya pasó
+      if (data.cmd) { ON.ultimaOrden = data.t || 0; ON.ignorada = data.t || 0; }
       publicar();
       return;
     }
@@ -307,12 +326,15 @@ const ORDENES = {
   publicar: a => publicarPropuestaActual(a && a.pregunta ? a : null),
   otra: () => pedirOtraPropuesta(),
   lados: () => cambiarLadosPropuesta(),
-  grupos: a => elegirGruposPropuesta(+a.A, +a.B),
+  grupos: a => { if (a) elegirGruposPropuesta(+a.A, +a.B); },
   detener: () => detenerCuentaPropuesta(),
   mas30: () => sumarTiempo(30000),
   moderadora: () => { if (S.fase === "abierta") moderadorTalvez(true); else tick("La moderadora interviene con el tramo abierto."); },
-  shock: a => { $("selEvento").value = a; lanzarEvento(); },
-  opcion: a => fijarOpcion(a.k, a.v),
+  shock: a => {
+    if (S.fase !== "abierta") { tick("La noticia se lanza con el tramo abierto."); return; }
+    $("selEvento").value = a; lanzarEvento();
+  },
+  opcion: a => { if (a) fijarOpcion(a.k, a.v); },
   escenario: a => window.modoEscenario?.(!!a),
   // en la portada y la intro, el control pulsa el botón de la escena (EMPEZAR ▶, SIGUIENTE ›): así
   // corre lo mismo que en el proyector (cerrar la inscripción, exigir los grupos de la brújula)
@@ -322,11 +344,20 @@ const ORDENES = {
       if (S.etapa === "portada" && $("poFormarAviso")?.textContent) tick($("poFormarAviso").textContent);
     } else if (S.etapa === "intro") $("inSig")?.click();
   },
-  terminar: () => { terminarClase(true); S.veredictoRevelado = true; }
+  // desde el control el profesor está mirando el proyector: termina con el podio, como el botón de
+  // la pantalla (ceremoniaRanking revela el campeón). El { terminar } del panel sigue sin ceremonia.
+  terminar: () => { terminarClase(true); if (typeof ceremoniaRanking === "function") ceremoniaRanking(); }
 };
+// Las órdenes que dependen del momento: el control las manda con la fase y la etapa que veía. Si
+// la pantalla ya pasó a otra (la cuenta publicó sola, la entrada terminó), no se hacen: un toque
+// pensado para «▶ EMPEZAR DEBATE» no puede cerrar el debate recién abierto.
+const SEGUN_FASE = new Set(["principal", "etapa", "publicar", "mas30", "moderadora", "shock"]);
+const ordenVieja = data => SEGUN_FASE.has(data.cmd) && data.fase !== undefined
+  && (data.fase !== S.fase || (data.etapa ?? null) !== (S.etapa ?? null));
 function atenderOrden(data) {
   if (!(data.t > (ON.ultimaOrden || 0))) return;
   ON.ultimaOrden = data.t;
+  if (ordenVieja(data)) { tick("Orden vieja del control: no se hizo."); publicar(); return; }
   try { ORDENES[data.cmd]?.(data.arg); }
   catch (e) { console.warn("TRIBUNA: orden del control", data.cmd, e); tick(`La orden «${data.cmd}» del control falló: ${e.message}`); }
   publicar();                                                    // lleva el ack al control
@@ -468,7 +499,7 @@ function abrirQrControl() {
   let qr = "";
   if (typeof qrcode === "function") { const q = qrcode(0, "M"); q.addData(url); q.make(); qr = q.createSvgTag({ cellSize: 6, margin: 2 }); }
   abrirModal(`<h2>📱 EL CONTROL, EN TU CELULAR</h2>
-    <p>Escanéalo y entra con la misma cuenta (<b style="color:var(--txt)">${esc(ON.email || "")}</b>). Desde el celular ves la
+    <p>Escanéalo y entra con la misma cuenta de Google con que abriste esta sala. Desde el celular ves la
     próxima pregunta antes que nadie, avanzas cada paso, das +30 s, llamas a la moderadora y prendes o apagas lo nuevo.</p>
     <div style="background:#fff;padding:10px;border-radius:12px;width:max-content;margin:14px auto;line-height:0">${qr}</div>
     <p class="mono" style="text-align:center;word-break:break-all;color:var(--txt)">${esc(url)}</p>

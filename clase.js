@@ -297,8 +297,7 @@ function accionPrincipal(o) {
 
 $("btnPrincipal").onclick = accionPrincipal;
 $("btnTerminar").onclick = () => terminarClase();
-// moderacion.js le puso su propio +1 MIN al preparar el compositor (app.js lo llama antes de que
-// cargue este archivo): con el reloj de ajedrez, el minuto va a los dos bancos, no al tramo
+// +1 MIN: con el reloj de ajedrez, el minuto va a los dos bancos, no al tramo
 $("btnMasMin").onclick = () => sumarTiempo(60000);
 
 // «+30 s» del control y +1 MIN de la pantalla: con el reloj de ajedrez (Task 15) a los dos bancos;
@@ -315,7 +314,7 @@ function sumarTiempo(ms) {
 // Los interruptores del debate en vivo, desde el control. Apagar la música o la voz de la IA
 // también corta lo que está sonando en ese momento.
 function fijarOpcion(k, v) {
-  if (!(k in OPCIONES_DEFECTO)) return;
+  if (!Object.hasOwn(OPCIONES_DEFECTO, k)) return;            // «toString» no es un interruptor
   S.clase.opciones = { ...OPCIONES_DEFECTO, ...(S.clase.opciones || {}), [k]: !!v };
   if (k === "musica" && !v && typeof pararMusica === "function") pararMusica();
   if (k === "vozIA" && !v && typeof callarIA === "function") callarIA();
@@ -551,7 +550,9 @@ function cambiarLadosPropuesta() {
 // aviso se recalcula: un duelo con un lado vacío no se publica.
 function elegirGruposPropuesta(A, B) {
   const p = S.clase.propuesta;
-  if (!p || S.fase !== "propuesta" || !A || !B) return;
+  const valido = g => Number.isInteger(g) && g >= 1 && g <= S.clase.grupos;
+  if (!p || S.fase !== "propuesta" || !valido(A) || !valido(B)) return;
+  if (A === B) { tick("Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA."); return; }
   p.A = A; p.B = B;
   p.aviso = avisoDuelo(A, B);
   const texto = $("prTexto")?.value;                 // lo que el profesor estaba escribiendo en la pantalla

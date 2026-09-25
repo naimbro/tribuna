@@ -38,7 +38,9 @@ const INTERRUPTORES = [
 ];
 
 const C = { dato: null, recibido: 0, foto: null, cache: true, noResponde: false, error: "" };   // lo que publica la pantalla
-const P = { t: 0, boton: null, texto: "", timer: null };                                     // la orden en camino
+// la orden en camino: t, el botón que espera, y la fase, la etapa y el ticker que se veían al tocar.
+// enviada sobrevive al «no responde»: si la pantalla vuelve y dice que la ignoró, se avisa igual.
+const P = { t: 0, boton: null, texto: "", timer: null, fase: null, etapa: null, ticker: "", enviada: 0 };
 const BORR = { base: null, sucio: false };                                                    // la pregunta que escribe el profesor
 
 const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -56,18 +58,28 @@ function nota(texto, mal = false) {
 function espera(texto) { $("espera").textContent = texto; mostrar("espera", !!texto); }
 function error(texto) { $("error").textContent = texto; mostrar("error", !!texto); C.error = texto; pintarConexion(); }
 
+// El proyector reescribe el resumen al menos cada ~10 s (online.js): 20 s sin noticias por este
+// aparato = se cerró, se colgó o perdió la red. El punto queda gris (no rojo: puede volver solo).
+const MUDO_TRAS = 20000;
+const mudo = () => !!C.dato && Date.now() - C.recibido > MUDO_TRAS;
 function pintarConexion() {
   const el = $("con");
-  el.className = "con " + (C.error || C.noResponde ? "mal" : P.t || C.cache ? "espera" : C.dato ? "ok" : "");
-  el.title = C.error || (C.noResponde ? "la pantalla no responde" : P.t ? "esperando a la pantalla" : C.cache ? "sin conexión" : "conectado");
+  el.className = "con " + (C.error || C.noResponde ? "mal" : P.t || C.cache ? "espera" : mudo() ? "muda" : C.dato ? "ok" : "");
+  el.title = C.error || (C.noResponde ? "la pantalla no responde" : P.t ? "esperando a la pantalla" : C.cache ? "sin conexión"
+    : mudo() ? `la pantalla no da señales hace ${Math.round((Date.now() - C.recibido) / 1000)} s: ¿sigue abierta?` : "conectado");
 }
+setInterval(pintarConexion, 1000);
 
 /* ---------- mandar una orden y esperar el ack ---------- */
 async function mandar(cmd, arg = null, boton = null) {
   if (P.t || !C.dato) return;
+  // lo que se ve viene del caché: la fase puede ser vieja, y la orden quedaría en cola para después
+  if (C.cache) { nota("Sin conexión: la orden no se envió. Vuelve a tocar cuando vuelva la señal.", true); pintarInterruptores(C.dato); return; }
   // t mayor que el último ack: si otro aparato con el reloj adelantado mandó antes, esta igual cuenta
   const t = Math.max(Date.now(), (C.dato.ack || 0) + 1);
-  P.t = t; P.boton = boton; P.texto = boton && boton.tagName === "BUTTON" ? boton.textContent : "";
+  // la fase y la etapa que se veían al tocar: si la pantalla ya pasó a otra, no la hace (online.js)
+  const fase = C.dato.fase, etapa = C.dato.etapa ?? null;
+  Object.assign(P, { t, boton, texto: boton && boton.tagName === "BUTTON" ? boton.textContent : "", fase, etapa, ticker: C.dato.ticker || "", enviada: t });
   if (P.texto) boton.textContent = "…";
   nota(""); habilitar(); pintarConexion();
   clearTimeout(P.timer);
@@ -77,7 +89,7 @@ async function mandar(cmd, arg = null, boton = null) {
     nota("La pantalla no responde: ¿está abierta?", true);
     pintar();
   }, 5000);
-  try { await setDoc(doc(db, "salas", CODIGO, "privado", "orden"), { cmd, arg: arg ?? null, t }); }
+  try { await setDoc(doc(db, "salas", CODIGO, "privado", "orden"), { cmd, arg: arg ?? null, t, fase, etapa }); }
   catch (e) { if (P.t === t) { soltar(); nota("No se pudo enviar la orden: " + (e.code || e.message), true); pintar(); } }
 }
 function soltar() {
@@ -151,6 +163,9 @@ function pintarPropuesta(c) {
   // una pregunta nueva de la pantalla reemplaza el borrador, salvo que el profesor esté escribiendo la suya
   const base = p ? p.pregunta || "" : "";
   if (base !== BORR.base) { BORR.base = base; if (!BORR.sucio) $("prTexto").value = base; }
+  // la cuenta de «se publica en 15 s» no puede publicar por detrás lo que el profesor escribe aquí:
+  // si el «detener» del foco se perdió (o la cuenta arrancó después), se vuelve a mandar
+  if (p && p.cuentaHasta && (BORR.sucio || document.activeElement === $("prTexto")) && !P.t) mandar("detener");
   $("prPorQue").textContent = (p && p.porQue) || ""; mostrar("prPorQue", !!(p && p.porQue));
   const gs = (c.grupos || []).map(g => [String(g.n), `${g.nombre} (${g.gente})`]);
   for (const k of ["A", "B"]) {
@@ -229,7 +244,10 @@ $("prPublicar").onclick = () => publicarDesdeAqui($("prPublicar"));
 $("prOtra").onclick = () => { BORR.sucio = false; mandar("otra", null, $("prOtra")); };
 $("prLados").onclick = () => mandar("lados", null, $("prLados"));
 for (const k of ["A", "B"]) $("pr" + k).onchange = () => mandar("grupos", { A: +$("prA").value, B: +$("prB").value }, $("pr" + k));
-$("prTexto").oninput = () => { BORR.sucio = true; };
+$("prTexto").oninput = () => {
+  BORR.sucio = true;
+  if (C.dato && C.dato.propuesta && C.dato.propuesta.cuentaHasta && !P.t) mandar("detener");
+};
 // escribir la propia detiene la cuenta de «se publica en 15 s», como tocar la propuesta en la pantalla
 $("prTexto").onfocus = () => { if (C.dato && C.dato.propuesta && C.dato.propuesta.cuentaHasta) mandar("detener"); };
 $("btnMas30").onclick = () => mandar("mas30", null, $("btnMas30"));
@@ -246,14 +264,22 @@ $("btnTerminar").onclick = () => {
   mandar("terminar", null, $("btnTerminar"));
 };
 
-// El celular del profesor no se apaga en plena clase (si el navegador lo permite).
-let candado = null;
+// El celular del profesor no se apaga en plena clase (si el navegador lo permite). Se pide al
+// volver a la pestaña y en cada toque mientras no se tenga: si el primer intento falla (sin
+// gesto, batería baja), el próximo toque lo reintenta.
+let candado = null, pidiendoCandado = false;
 async function pantallaEncendida() {
-  try { if (!candado && navigator.wakeLock && document.visibilityState === "visible") candado = await navigator.wakeLock.request("screen"); candado?.addEventListener("release", () => { candado = null; }); }
-  catch (e) { /* sin permiso: no pasa nada */ }
+  if (candado || pidiendoCandado || !navigator.wakeLock || document.visibilityState !== "visible") return;
+  pidiendoCandado = true;
+  try {
+    const c = await navigator.wakeLock.request("screen");
+    candado = c;
+    c.addEventListener("release", () => { if (candado === c) candado = null; }, { once: true });
+  } catch (e) { /* sin permiso: no pasa nada, se reintenta con el próximo toque */ }
+  finally { pidiendoCandado = false; }
 }
 document.addEventListener("visibilitychange", pantallaEncendida);
-document.addEventListener("pointerdown", pantallaEncendida, { once: true });
+document.addEventListener("pointerdown", pantallaEncendida);
 
 /* ---------- entrar ---------- */
 function pedirEntrar(texto, conGoogle = true, conCodigo = false) {
@@ -269,11 +295,25 @@ $("btnCodigo").onclick = () => {
 };
 $("inCodigo").onkeydown = e => { if (e.key === "Enter") $("btnCodigo").click(); };
 
+// onAuthStateChanged puede avisar dos veces por la misma cuenta (al refrescar el token): una sola
+// suscripción por cuenta.
+let conectadoA = null;
 async function conectar(user) {
+  if (conectadoA === user.uid) return;
+  conectadoA = user.uid;
   $("sala").textContent = CODIGO;
   let pub;
-  try { pub = await getDoc(doc(db, "salas", CODIGO)); }
-  catch (e) { error("No se pudo leer la sala: " + e.code); return; }
+  // la red del aula falla al entrar: se reintenta solo, cada vez más espaciado (hasta 10 s)
+  for (let i = 1; !pub; i++) {
+    try { pub = await getDoc(doc(db, "salas", CODIGO)); }
+    catch (e) {
+      if (e.code === "permission-denied") { error("No se pudo leer la sala: " + e.code); return; }
+      error(`No se pudo leer la sala (${e.code}): reintentando…`);
+      await new Promise(r => setTimeout(r, Math.min(10000, 1500 * i)));
+      if (conectadoA !== user.uid) return;
+    }
+  }
+  if (C.error) error("");
   if (!pub.exists()) { error(`La sala ${CODIGO} no existe.`); pedirEntrar("Revisa el código: está en la barra de la sala, en el proyector.", false, true); return; }
   if (pub.data().profeUid !== user.uid) {
     error(`Esta cuenta (${user.email}) no es la del profesor de la sala.`);
@@ -294,8 +334,21 @@ async function conectar(user) {
     C.dato = d; C.recibido = Date.now();
     // bancoRestante (ajedrez.js) mide desde que ESTE aparato recibió la foto, no desde el reloj del proyector
     C.foto = d.banco ? { ...d.banco, t: C.recibido } : null;
-    if (P.t && (d.ack || 0) >= P.t) soltar();
     if (!C.cache && C.noResponde) { C.noResponde = false; nota(""); }
+    if (P.enviada && d.ignorada === P.enviada) {
+      // la pantalla se recargó con la orden ya escrita: la vio, pero no la hizo
+      if (P.t) soltar();
+      P.enviada = 0;
+      nota("La pantalla se recargó: vuelve a tocar.", true);
+    } else if (P.t && (d.ack || 0) >= P.t) {
+      // la pantalla la atendió. Si la fase no cambió, lo que dijo el ticker es la respuesta
+      // («+30 s.», «Orden vieja del control: no se hizo.», un error): se copia aquí
+      const mismaFase = d.fase === P.fase && (d.etapa ?? null) === P.etapa;
+      const tk = String(d.ticker || "").replace(/^›\s*/, ""), antes = String(P.ticker || "").replace(/^›\s*/, "");
+      const conBoton = !!P.boton;
+      soltar(); P.enviada = 0;
+      if (mismaFase && conBoton && tk && tk !== antes) nota(tk);
+    } else if (P.enviada && (d.ack || 0) >= P.enviada) P.enviada = 0;
     pintar();
   }, e => error(e.code === "permission-denied" ? "Esta cuenta no es la del profesor de la sala." : "Se perdió la conexión con la sala: " + e.code));
 }

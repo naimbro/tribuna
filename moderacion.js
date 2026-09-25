@@ -420,7 +420,6 @@ function prepararCompositor() {
   prepararMenciones($("chatTx"), $("chatSugiere"));
   $("chatTx").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } });
   $("btnModerar").onclick = () => { if (S.fase === "abierta") moderadorTalvez(true); else tick("La moderadora interviene con el tramo abierto."); };
-  $("btnMasMin").onclick = () => { if (S.fase === "abierta") { S.finRonda += 60000; tick("+1 minuto."); } };
   setInterval(() => moderadorTalvez(false), 6000);
 }
 
