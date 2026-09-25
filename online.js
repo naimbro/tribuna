@@ -133,6 +133,31 @@ function estadoPrivado() {
   };
 }
 
+// Lo que ve el control del profesor en su celular (control.html): salas/{codigo}/privado/control.
+// Es privado porque trae la propuesta antes de publicarla. Las horas (fin*, cuentaHasta) son de
+// este reloj: el control las lee contra `t`, no contra su propio reloj. ack = la última orden
+// atendida, para que el control sepa que su botón llegó.
+function estadoControl() {
+  const p = S.clase.propuesta;
+  return {
+    t: Date.now(), ack: ON.ultimaOrden || 0,
+    fase: S.fase, etapa: S.etapa || null, principal: $("btnPrincipal").textContent, ticker: $("ticker").textContent,
+    debate: S.debate ? { n: S.debate.n, pregunta: S.debate.pregunta, A: S.debate.A, B: S.debate.B } : null,
+    propuesta: p ? { estado: p.estado, pregunta: p.pregunta || "", porQue: p.porQue || "", A: p.A, B: p.B, aviso: p.aviso || "",
+      favor: p.favor || "", contra: p.contra || "", cuentaHasta: S.cuentaHasta || null } : null,
+    grupos: Array.from({ length: S.clase.grupos }, (_, i) => i + 1).map(n => ({ n, nombre: nombreGrupo(n),
+      gente: Object.values(ON.jugadores).filter(j => j.grupo === n).length })),
+    opciones: { ...OPCIONES_DEFECTO, ...(S.clase.opciones || {}) },
+    escenario: document.body.classList.contains("escenario"),
+    banco: S.banco ? { A: S.banco.A, B: S.banco.B, corre: S.bancoCorre || { A: false, B: false }, t: Date.now() } : null,
+    finRonda: S.fase === "abierta" ? S.finRonda || null : null, finPrep: S.finPrep || null,
+    finEntrada: S.fase === "entrada" ? S.finEntrada || null : null, finVoto: S.fase === "votando" ? S.finVoto || null : null,
+    votos: { n: (S.publico.A || 0) + (S.publico.B || 0), elegibles: S.publico.elegibles || 0 },
+    hablando: typeof window.hablaSala === "function" ? window.hablaSala().map(h => h.nombre) : [],
+    eventos: (typeof EVENTOS !== "undefined" ? EVENTOS : []).map(e => ({ id: e.id, titular: e.titular }))
+  };
+}
+
 // Firestore no acepta `undefined` ni objetos con prototipo raro: se pasa por JSON.
 const limpio = o => JSON.parse(JSON.stringify(o));
 
@@ -145,6 +170,9 @@ function publicar() {
       await setDoc(doc(db, "salas", ON.codigo), limpio(estadoPublico()));
       await setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado()));
     } catch (e) { tick("No se pudo publicar en la sala: " + e.message); }
+    // aparte: si el resumen del control falla, la sala y los teléfonos siguen como siempre
+    try { await setDoc(doc(db, "salas", ON.codigo, "privado", "control"), limpio(estadoControl())); }
+    catch (e) { console.warn("TRIBUNA: no se pudo publicar el resumen del control", e); }
   }, 250);
 }
 
@@ -215,10 +243,19 @@ function activarOnline() {
   }, () => {});
   // 🏁 Terminar partida desde el panel (admin.html): si esta pantalla sigue abierta, termina ella,
   // porque su próxima publicación pisaría el cierre que escribió el panel.
+  // El control del celular (control.html) escribe en el mismo documento { cmd, arg, t }: cada
+  // orden se atiende una sola vez por t, y la publicación siguiente lleva el ack.
   let ordenVista = null;
   onSnapshot(doc(db, "salas", ON.codigo, "privado", "orden"), snap => {
-    const t = snap.exists() ? snap.data().terminar || 0 : 0;
-    if (ordenVista === null) { ordenVista = t; return; }          // la que ya estaba al abrir no cuenta
+    const data = snap.exists() ? snap.data() : {};
+    const t = data.terminar || 0;
+    if (ordenVista === null) {                                     // la que ya estaba al abrir no cuenta
+      ordenVista = t;
+      if (data.cmd) ON.ultimaOrden = data.t || 0;
+      publicar();
+      return;
+    }
+    if (data.cmd) { atenderOrden(data); return; }
     if (t <= ordenVista) return;
     ordenVista = t;
     if (S.fase === "fin") { S.veredictoRevelado = true; publicar(); return; }
@@ -260,6 +297,29 @@ function activarOnline() {
 }
 
 const collectionJugadores = () => collection(db, "salas", ON.codigo, "jugadores");
+
+/* ---------- las órdenes del control del profesor (control.html) ---------- */
+const ORDENES = {
+  principal: () => accionPrincipal(),
+  publicar: a => publicarPropuestaActual(a && a.pregunta ? a : null),
+  otra: () => pedirOtraPropuesta(),
+  lados: () => cambiarLadosPropuesta(),
+  grupos: a => elegirGruposPropuesta(+a.A, +a.B),
+  detener: () => detenerCuentaPropuesta(),
+  mas30: () => sumarTiempo(30000),
+  moderadora: () => { if (S.fase === "abierta") moderadorTalvez(true); else tick("La moderadora interviene con el tramo abierto."); },
+  shock: a => { $("selEvento").value = a; lanzarEvento(); },
+  opcion: a => fijarOpcion(a.k, a.v),
+  escenario: a => window.modoEscenario?.(!!a),
+  terminar: () => { terminarClase(true); S.veredictoRevelado = true; }
+};
+function atenderOrden(data) {
+  if (!(data.t > (ON.ultimaOrden || 0))) return;
+  ON.ultimaOrden = data.t;
+  try { ORDENES[data.cmd]?.(data.arg); }
+  catch (e) { console.warn("TRIBUNA: orden del control", data.cmd, e); tick(`La orden «${data.cmd}» del control falló: ${e.message}`); }
+  publicar();                                                    // lleva el ack al control
+}
 
 /* ---------- «Grupo N está escribiendo…» ----------
    El teléfono marca en su ficha de jugador escribe: { debate, t } mientras teclea (t = 0 al

@@ -253,7 +253,7 @@ function terminarClase(sinPreguntar = false) {
   }
   // la cuenta de «se publica en 15 s» seguía corriendo y abría un debate nuevo sobre la clase
   // terminada: el podio nunca llegaba (clase del 24-sep-2026, sala 2GUU)
-  clearInterval(cuentaPropuesta);
+  detenerCuentaPropuesta();
   S.clase.propuesta = null;
   S.fase = "fin";
   if (typeof saltarEscena === "function") saltarEscena();     // corta la espera de cualquier escena en curso
@@ -295,6 +295,31 @@ function accionPrincipal() {
 
 $("btnPrincipal").onclick = accionPrincipal;
 $("btnTerminar").onclick = () => terminarClase();
+// moderacion.js le puso su propio +1 MIN al preparar el compositor (app.js lo llama antes de que
+// cargue este archivo): con el reloj de ajedrez, el minuto va a los dos bancos, no al tramo
+$("btnMasMin").onclick = () => sumarTiempo(60000);
+
+// «+30 s» del control y +1 MIN de la pantalla: con el reloj de ajedrez (Task 15) a los dos bancos;
+// sin él, al tramo. S.bancoExtra acumula lo sumado para que el límite de pared del tramo también
+// se corra (ajedrez.js, bancoTerminado).
+function sumarTiempo(ms) {
+  if (S.fase !== "abierta") { tick("El tiempo se suma con el tramo abierto."); return; }
+  if (S.banco) { S.banco = sumarBanco(S.banco, ms); S.bancoExtra = (S.bancoExtra || 0) + ms; }
+  else S.finRonda += ms;
+  tick(ms === 60000 ? "+1 minuto." : `+${Math.round(ms / 1000)} s.`);
+  publicarEstado();
+}
+
+// Los interruptores del debate en vivo, desde el control. Apagar la música o la voz de la IA
+// también corta lo que está sonando en ese momento.
+function fijarOpcion(k, v) {
+  if (!(k in OPCIONES_DEFECTO)) return;
+  S.clase.opciones = { ...OPCIONES_DEFECTO, ...(S.clase.opciones || {}), [k]: !!v };
+  if (k === "musica" && !v && typeof pararMusica === "function") pararMusica();
+  if (k === "vozIA" && !v && typeof callarIA === "function") callarIA();
+  tick(`${k}: ${v ? "encendido" : "apagado"}.`);
+  publicarEstado();
+}
 
 // 🧭 REPETIR BRÚJULA: solo si la partida formó los grupos con la brújula, y entre debates
 function actualizarBotonRepetir() {
@@ -306,7 +331,7 @@ $("btnMapa").onclick = () => abrirMapaGrande();
 setInterval(() => { $("btnMapa").style.display = S.clase.brujula && S.clase.brujula.activa && typeof BRUJULA !== "undefined" ? "" : "none"; }, 2000);
 $("btnRepetir").onclick = () => {
   if (!["propuesta", "fin"].includes(S.fase)) { tick("Termina el debate en curso antes de repetir la brújula."); return; }
-  if (S.fase === "propuesta") clearInterval(cuentaPropuesta);           // que no se publique la pregunta por detrás
+  if (S.fase === "propuesta") detenerCuentaPropuesta();                 // que no se publique la pregunta por detrás
   window.repetirBrujula?.();
   mostrarMovimiento();
 };
@@ -438,7 +463,7 @@ async function prepararPropuesta() {
 let cuentaPropuesta = null;
 
 function mostrarPropuesta() {
-  clearInterval(cuentaPropuesta);
+  clearInterval(cuentaPropuesta); S.cuentaHasta = null;
   const p = S.clase.propuesta;
   // una propuesta armada antes de que hubiera grupos (la sala la prepara al abrirse, en la
   // portada) llega sin par: con los grupos ya formados se rehace. Si no, el primer debate caía en
@@ -475,22 +500,61 @@ function mostrarPropuesta() {
       <button class="btn" id="prOtra">Pedir otra</button>
       <span class="pr-cuenta" id="prCuenta"></span>
     </div>`;
-  const detener = () => { clearInterval(cuentaPropuesta); $("prCuenta").textContent = ""; };
-  el.onpointerdown = detener; el.onfocusin = detener;
-  $("prPublicar").onclick = publicarPropuestaActual;
-  $("prCambiar").onclick = () => { const a = $("prA").value; $("prA").value = $("prB").value; $("prB").value = a; };
+  el.onpointerdown = detenerCuentaPropuesta; el.onfocusin = detenerCuentaPropuesta;
+  $("prPublicar").onclick = () => publicarPropuestaActual();
+  $("prCambiar").onclick = cambiarLadosPropuesta;
+  // el control del celular ve los grupos elegidos en la pantalla
+  $("prA").onchange = $("prB").onchange = () => elegirGruposPropuesta(+$("prA").value, +$("prB").value);
   $("prOtra").onclick = pedirOtraPropuesta;
   const listo = p.estado === "lista" && !faltan && !p.aviso;
   $("btnPrincipal").textContent = "PUBLICAR PREGUNTA";
   if (listo) {
     let resta = ROT.SEG_PROPUESTA;
     $("prCuenta").textContent = `se publica en ${resta} s`;
+    S.cuentaHasta = Date.now() + ROT.SEG_PROPUESTA * 1000;      // el control muestra la misma cuenta
     cuentaPropuesta = setInterval(() => {
       resta--;
-      if (resta <= 0) { clearInterval(cuentaPropuesta); publicarPropuestaActual(); return; }
+      if (resta <= 0) { clearInterval(cuentaPropuesta); S.cuentaHasta = null; publicarPropuestaActual(); return; }
       if ($("prCuenta")) $("prCuenta").textContent = `se publica en ${resta} s`;
     }, 1000);
   }
+  publicarEstado();
+}
+
+// El profesor tocó la propuesta (en la pantalla o en el control): la cuenta no la publica por detrás.
+function detenerCuentaPropuesta() {
+  clearInterval(cuentaPropuesta);
+  if ($("prCuenta")) $("prCuenta").textContent = "";
+  if (S.cuentaHasta) { S.cuentaHasta = null; publicarEstado(); }
+}
+
+// Los grupos que ve la pantalla en los selectores (el profesor pudo cambiarlos sin publicar)
+const parEnPantalla = p => ({ A: +($("prA")?.value || p.A) || p.A, B: +($("prB")?.value || p.B) || p.B });
+
+// ⇄ lados: A FAVOR pasa a EN CONTRA y viceversa. El aviso de «sin nadie inscrito» no cambia
+// (es el mismo par), así que basta con dar vuelta los selectores sin rehacer la tarjeta.
+function cambiarLadosPropuesta() {
+  const p = S.clase.propuesta;
+  if (!p || S.fase !== "propuesta") return;
+  const { A, B } = parEnPantalla(p);
+  p.A = B; p.B = A;
+  if ($("prA") && $("prB")) { $("prA").value = p.A; $("prB").value = p.B; }
+  detenerCuentaPropuesta();
+  publicarEstado();
+}
+
+// El profesor elige el par (desde el control o los selectores de la pantalla). Con personajes, el
+// aviso se recalcula: un duelo con un lado vacío no se publica.
+function elegirGruposPropuesta(A, B) {
+  const p = S.clase.propuesta;
+  if (!p || S.fase !== "propuesta" || !A || !B) return;
+  p.A = A; p.B = B;
+  p.aviso = avisoDuelo(A, B);
+  const texto = $("prTexto")?.value;                 // lo que el profesor estaba escribiendo en la pantalla
+  mostrarPropuesta();
+  if (texto !== undefined && $("prTexto")) $("prTexto").value = texto;
+  detenerCuentaPropuesta();
+  publicarEstado();
 }
 
 // «Pedir otra» (en la pantalla o desde el control). Un duelo descartado tiene que poder jugarse
@@ -504,11 +568,13 @@ function pedirOtraPropuesta() {
   S.clase.propuesta = null; prepararPropuesta();
 }
 
-function publicarPropuestaActual() {
-  clearInterval(cuentaPropuesta);
+// datos = { pregunta, A, B } cuando la orden viene del control (lo que el profesor escribió en el
+// celular); sin datos, lo que muestra la pantalla.
+function publicarPropuestaActual(datos = null) {
+  clearInterval(cuentaPropuesta); S.cuentaHasta = null;
   if (S.fase !== "propuesta") return;                        // p. ej., la clase ya terminó
-  const pregunta = ($("prTexto")?.value || S.clase.propuesta?.pregunta || "").trim();
-  const A = +($("prA")?.value || S.clase.propuesta?.A), B = +($("prB")?.value || S.clase.propuesta?.B);
+  const pregunta = String(datos ? datos.pregunta || "" : $("prTexto")?.value || S.clase.propuesta?.pregunta || "").trim();
+  const A = +(datos ? datos.A : $("prA")?.value || S.clase.propuesta?.A), B = +(datos ? datos.B : $("prB")?.value || S.clase.propuesta?.B);
   const error = t => { tick(t); if ($("prError")) $("prError").textContent = t; };
   if (!pregunta) { error("Escribe una pregunta o pide otra a la moderadora."); return; }
   if (!A || !B || A === B) { error("Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA."); return; }
