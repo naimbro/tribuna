@@ -35,6 +35,9 @@ function estadoPublico() {
   const U = S.clase.ultimo;
   const orac = rankingOraculos(S.clase.oraculos || {});
   const R = tramoActual();
+  // con revelación, durante la preparación nadie sabe quién pasa al frente: el par no se publica
+  // (y con personajes, tampoco la moción: la sala ve los duelos que faltan)
+  const enSuspenso = S.fase === "listo" && S.revelado === false;
   return {
     profeUid: ON.uid, profeEmail: ON.email, actualizado: Date.now(), creada: ON.creada || null,
     curso: SESION.curso || "", semana: SESION.semana, tema: SESION.tema, mocion: SESION.mocion,
@@ -42,13 +45,20 @@ function estadoPublico() {
     equipos: { A: { nombre: EQUIPOS.A.nombre, bandera: EQUIPOS.A.bandera, color: EQUIPOS.A.color, lema: EQUIPOS.A.lema || "" },
                B: { nombre: EQUIPOS.B.nombre, bandera: EQUIPOS.B.bandera, color: EQUIPOS.B.color, lema: EQUIPOS.B.lema || "" } },
     modo: "rotacion", grupos: S.clase.grupos, temaGeneral: S.clase.tema || SESION.tema,
-    debate: S.debate ? { n: S.debate.n, pregunta: S.debate.pregunta, A: S.debate.A, B: S.debate.B, posturas: S.debate.posturas || null } : null,
+    debate: S.debate ? (enSuspenso
+      ? { n: S.debate.n, pregunta: PERS ? null : S.debate.pregunta, A: null, B: null, posturas: PERS ? null : S.debate.posturas || null }
+      : { n: S.debate.n, pregunta: S.debate.pregunta, A: S.debate.A, B: S.debate.B, posturas: S.debate.posturas || null }) : null,
+    revelado: S.revelado !== false,
+    finEntrada: S.fase === "entrada" ? S.finEntrada || null : null,   // la entrada al escenario
+    duelos: PERS && enSuspenso ? datosPreparacion().duelos : null,
+    opciones: { ...OPCIONES_DEFECTO, ...(S.clase.opciones || {}) },
     tramo: S.tramo, finVoto: S.fase === "votando" ? S.finVoto || null : null,
     finPrep: S.fase === "listo" ? S.finPrep || null : null,       // el minuto de preparación
     ranking: (S.clase.ranking || []).map(f => ({ grupo: f.grupo, debates: f.debates, puesto: f.puesto, distincion: f.distincion,
       jurado: f.jurado === null ? null : +f.jurado.toFixed(1), publico: f.publico === null ? null : +f.publico.toFixed(1),
       puntaje: f.puntaje === null ? null : +f.puntaje.toFixed(1) })),
-    debates: S.clase.debates.map(d => ({ n: d.n, pregunta: d.pregunta, A: d.A, B: d.B,
+    // el debate en curso tampoco va en la lista mientras está en suspenso
+    debates: S.clase.debates.filter((d, i) => !(enSuspenso && i === S.clase.debates.length - 1)).map(d => ({ n: d.n, pregunta: d.pregunta, A: d.A, B: d.B,
       ganador: d.res ? d.res.ganador : null,
       puntajeA: d.res ? r1(d.res.A.puntaje) : null, puntajeB: d.res ? r1(d.res.B.puntaje) : null,
       totalA: d.panel ? r1(d.panel.A.total) : null, totalB: d.panel ? r1(d.panel.B.total) : null,
@@ -117,6 +127,7 @@ function estadoPrivado() {
     ronda: S.ronda, fase: S.fase, etapa: S.etapa || null, seq: S.seq, votoInicial: S.votoInicial, iniPos: S.iniPos,
     historial: S.historial, turnos: S.turnos, shocks: S.shocks, abreEn: S.abreEn || null,
     clase: S.clase, debate: S.debate, tramo: S.tramo, finVoto: S.finVoto || null, veredictoRevelado: !!S.veredictoRevelado,
+    revelado: S.revelado !== false,
     audiencia: Object.fromEntries(AUDIENCIA.map(p => [p.id, { pos: p.pos, memoria: p.memoria || [], ultimo: p.ultimo || "" }]))
   };
 }
@@ -507,6 +518,7 @@ async function crearSala() {
   S.clase.gruposInfo = [];
   // con personajes: un grupo por personaje, el cupo que propone la semana y la inscripción sin abrir
   if (PERS) Object.assign(S.clase, { grupos: PERS.length, cupo: SESION.cupo || 4, inscripcion: null });
+  S.clase.opciones = { ...OPCIONES_DEFECTO };     // los interruptores del debate en vivo (rotacion.js)
   S.fase = "propuesta";
   await setDoc(doc(db, "salas", ON.codigo), limpio({ ...estadoPublico(), creada: Date.now() }));
   await setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado()));
@@ -540,10 +552,12 @@ async function restaurar(codigo) {
     S.debate = priv.debate || null; S.tramo = priv.tramo || 0;
     // un debate a medias descartado al terminar la clase ya no está en la lista: no se retoma
     if (S.debate && S.debate.n > S.clase.debates.length) S.debate = null;
-    // un tramo abierto vuelve pausado (se reanuda con el botón); una votación, sin reloj
-    S.fase = priv.fase === "abierta" ? "listo"
+    // un tramo abierto vuelve pausado (se reanuda con el botón); una votación, sin reloj. La
+    // revelación o la entrada vuelven a la preparación ya revelada: ▶ REANUDAR abre el debate.
+    S.fase = ["abierta", "revelando", "entrada"].includes(priv.fase) ? "listo"
       : ["cerrando", "veredictoPublico", "veredictoJueces"].includes(priv.fase) ? "votando"
       : priv.fase || "propuesta";
+    S.revelado = ["revelando", "entrada"].includes(priv.fase) ? true : priv.revelado !== false;
     S.ronda = priv.ronda; S.seq = priv.seq || 0; S.shocks = priv.shocks || [];
     S.veredictoRevelado = !!priv.veredictoRevelado;       // si no, al reabrir se «des-revelaría» el campeón
     S.historial = priv.historial; S.turnos = priv.turnos || []; S.votoInicial = priv.votoInicial || S.votoInicial; S.iniPos = priv.iniPos || S.iniPos;
@@ -551,6 +565,7 @@ async function restaurar(codigo) {
     pintarRonda(); pintarMarcador(); pintarFeed();
     $("btnPrincipal").textContent = { propuesta: "PUBLICAR PREGUNTA", listo: "▶ REANUDAR TRAMO", votando: "CERRAR VOTACIÓN",
       resultado: "SEGUIR ▶", fin: "🏆 VER CAMPEÓN" }[S.fase] || "PUBLICAR PREGUNTA";
+    if (S.fase === "listo" && !S.revelado) $("btnPrincipal").textContent = "REVELAR ▶";   // se cerró en plena preparación
     if (S.fase === "resultado") S.fase = "propuesta";
     tick(`Sala ${codigo} restaurada: ${S.clase.debates.length} debate${S.clase.debates.length === 1 ? "" : "s"}, ${S.historial.length} intervenciones.`);
     // partidas guardadas con la versión anterior (un texto por bancada, votos en cada entrada)

@@ -580,3 +580,29 @@ async function mostrarVeredictoJueces(d, jueces, panel) {
   if (g) confeti([EQUIPOS[g].color, "#ffffff", "#ffb020"], 3000);
   await esperar(ROT.SEG_TOTALES * 1000);
 }
+
+/* ------------------------ 6. PREPARACIÓN, REVELACIÓN Y ENTRADA (provisional; la Task 8 las reemplaza) ------------------------ */
+// Versiones mínimas para que el ciclo nuevo de clase.js funcione mientras llegan las escenas de verdad.
+function mostrarPreparacion(d, { tema, duelos } = {}) {
+  const el = escena("preparacion");
+  const cuerpo = duelos
+    ? `<div class="es-q">${escHtml(tema || "")}</div>` + duelos.map(x => `<div class="es-pie">${escHtml(nombreG(x.A))} vs ${escHtml(nombreG(x.B))} · «${escHtml(x.texto)}»</div>`).join("")
+    : `<div class="es-q">«${escHtml(d.pregunta)}»</div>` + ["A", "B"].map(k => `<div class="es-pie" style="color:${EQUIPOS[k].color}">${k === "A" ? "A FAVOR" : "EN CONTRA"} · ${escHtml((d.posturas || {})[k] || "")}</div>`).join("");
+  el.innerHTML = `<div class="es-k">DEBATE ${d.n} · PREPARACIÓN</div>${cuerpo}<div class="es-ganador on mono" id="ppNum"></div>`;
+  botonEscena("REVELAR YA ▶");
+}
+function actualizarPreparacion(resta) { if ($("ppNum")) $("ppNum").textContent = resta; }
+async function mostrarRevelacion(d) {
+  const el = escena("revelacion");
+  el.innerHTML = `<div class="es-k">¿QUIÉN PASA AL FRENTE?</div>
+    <div class="es-q" style="color:${EQUIPOS.A.color}">A FAVOR… ${escHtml(nombreGrupo(d.A))}</div>
+    <div class="es-q" style="color:${EQUIPOS.B.color}">EN CONTRA… ${escHtml(nombreGrupo(d.B))}</div>`;
+  await esperar(3000);
+}
+async function mostrarEntrada(d, integrantes, segundos) {
+  const el = escena("entrada");
+  botonEscena("▶ EMPEZAR DEBATE");
+  el.innerHTML = ["A", "B"].map(k => `<div class="es-q" style="color:${EQUIPOS[k].color}">${escHtml(nombreG(d[k]))}</div>
+    <div class="es-pie">${(integrantes[k] || []).map(j => escHtml(j.nombre)).join(" · ")}</div>`).join("");
+  await esperar(segundos * 1000);
+}

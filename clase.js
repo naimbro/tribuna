@@ -6,6 +6,8 @@
    ===================================================================== */
 
 const publicarEstado = () => { if (typeof window.publicarEstado === "function") window.publicarEstado(); };
+// Los interruptores del debate en vivo (rotacion.js): apagado = la conducta de antes.
+const opcion = k => opcionActiva(S.clase.opciones, k);
 
 function gruposDisponibles() {
   if (typeof window.gruposConectados === "function") return window.gruposConectados();
@@ -32,9 +34,12 @@ function publicarDebate({ pregunta, A, B, favor, contra }) {
 // Un minuto antes de abrir el chat: cada grupo ve en el teléfono qué lado defiende y qué sostiene,
 // y acuerda su primera frase. En la clase del 24-sep-2026 cada debate perdía dos minutos antes
 // del primer mensaje con contenido. Al llegar a cero el chat se abre solo; ▶ ABRIR YA lo adelanta.
+// Con la revelación encendida prepara toda la sala, sin saber quién pasa al frente: el par se
+// revela al llegar a cero (revelar), y después viene la entrada al escenario.
 function empezarPreparacion() {
   const d = S.debate;
-  S.fase = "listo";
+  if (opcion("revelacion")) { prepararEnSuspenso(d); return; }
+  S.fase = "listo"; S.revelado = true;
   S.finPrep = Date.now() + ROT.SEG_PREPARACION * 1000;
   clearInterval(S.reloj);
   let el = $("preparacion");
@@ -56,6 +61,68 @@ function empezarPreparacion() {
   $("btnPrincipal").textContent = "▶ ABRIR YA";
   tick(PERS ? `Debate ${d.n}: un minuto para que ${nombreG(d.A)} y ${nombreG(d.B)} preparen su primera frase.`
     : `Debate ${d.n}: un minuto para que los grupos ${d.A} y ${d.B} preparen su primera frase.`);
+}
+
+function prepararEnSuspenso(d) {
+  S.fase = "listo"; S.revelado = false;
+  S.finPrep = Date.now() + ROT.SEG_PREPARACION * 1000;
+  clearInterval(S.reloj);
+  $("preparacion")?.remove();
+  mostrarPreparacion(d, datosPreparacion());          // escenas.js
+  pulsoPreparacion(S.finPrep);                          // musica.js
+  const tic = () => {
+    if (S.fase !== "listo" || !S.finPrep) return;
+    const resta = Math.max(0, Math.ceil((S.finPrep - Date.now()) / 1000));
+    $("reloj").textContent = fmt(resta);
+    actualizarPreparacion(resta, ROT.SEG_PREPARACION);  // escenas.js
+    if (resta <= 0) revelar();
+  };
+  S.reloj = setInterval(tic, 250); tic();
+  $("btnPrincipal").textContent = "REVELAR YA ▶";
+  tick(`Debate ${d.n}: todos preparan. Al terminar el minuto se revela quién pasa al frente.`);
+}
+
+// Lo que ve la sala mientras prepara: el tema y, con personajes, los duelos que faltan (el que
+// está en curso incluido: publicarDebate ya lo agregó a la lista, por eso se excluye el último).
+function datosPreparacion() {
+  const escritas = typeof PREGUNTAS !== "undefined" ? PREGUNTAS : [];
+  const duelos = PERS ? duelosPendientes(escritas, S.clase.debates.slice(0, -1).map(x => x.pregunta), PERS) : null;
+  return { tema: S.clase.tema || SESION.tema, duelos, ultimo: !!duelos && duelos.length === 1 };
+}
+
+// Fin del minuto: se revela quién pasa al frente. Cada paso comprueba que siga siendo el mismo
+// debate (el profesor pudo terminar la clase o saltar la escena).
+async function revelar() {
+  const d = S.debate;
+  if (!d || S.fase !== "listo") return;
+  clearInterval(S.reloj); S.finPrep = null;
+  S.fase = "revelando"; S.revelado = true;
+  $("btnPrincipal").textContent = "SALTAR ▶";
+  publicarEstado();
+  tick(`Debate ${d.n}: ${nombreG(d.A)} (${EQUIPOS.A.nombre}) contra ${nombreG(d.B)} (${EQUIPOS.B.nombre}).`);
+  await mostrarRevelacion(d, datosPreparacion());      // escenas.js
+  if (S.fase === "revelando" && S.debate === d) entrada();
+}
+
+// La entrada al escenario: el tiempo que toman los dos grupos en caminar al frente, con música.
+// Al terminar (o con ▶ EMPEZAR DEBATE) se abre el debate.
+function entrada() {
+  const d = S.debate;
+  if (!d || S.fase !== "revelando") return;
+  S.fase = "entrada";
+  S.finEntrada = Date.now() + ROT.SEG_ENTRADA * 1000;
+  $("btnPrincipal").textContent = "▶ EMPEZAR DEBATE";
+  publicarEstado();
+  musicaEntrada(ROT.SEG_ENTRADA);
+  mostrarEntrada(d, integrantesDebate(), ROT.SEG_ENTRADA).then(() => {   // escenas.js
+    if (S.fase === "entrada" && S.debate === d) { pararMusica(); cerrarEscena(); abrirRonda(); }
+  });
+}
+// Quiénes suben al escenario: { A: [{ nombre, foto }], B: [...] } desde la lista de la sala.
+function integrantesDebate() {
+  const js = typeof window.jugadoresSala === "function" ? Object.values(window.jugadoresSala()) : [];
+  const de = g => js.filter(j => j.grupo === g).map(j => ({ nombre: j.nombre || "", foto: j.foto || "" }));
+  return S.debate ? { A: de(S.debate.A), B: de(S.debate.B) } : { A: [], B: [] };
 }
 
 // Lo que escribió cada lado en el debate (para los jueces simulados sin motor).
@@ -164,10 +231,11 @@ function mostrarResultado() {
 
 // sinPreguntar: la orden viene del panel (admin.html), que ya pidió confirmación
 function terminarClase(sinPreguntar = false) {
-  if (["abierta", "listo", "votando", "veredictoPublico", "veredictoJueces"].includes(S.fase)) {
+  if (["abierta", "listo", "revelando", "entrada", "votando", "veredictoPublico", "veredictoJueces"].includes(S.fase)) {
     if (sinPreguntar !== true && !confirm("Hay un debate en curso. ¿Terminar la clase igual? Ese debate no cuenta para el ranking.")) return;
     clearInterval(S.reloj);
-    S.finPrep = null;
+    S.finPrep = null; S.finEntrada = null;
+    if (typeof pararMusica === "function") pararMusica();
     $("preparacion")?.remove();
     cerrarEscena();
     const reg = S.debate && S.clase.debates[S.debate.n - 1];
@@ -193,7 +261,9 @@ function terminarClase(sinPreguntar = false) {
 function accionPrincipal() {
   if ($("escena") && $("escena").classList.contains("movimiento")) { window.cerrarRepeticion?.(); cerrarEscena(); return; }
   if (S.fase === "propuesta") { if (typeof publicarPropuestaActual === "function") publicarPropuestaActual(); }
-  else if (S.fase === "listo") abrirRonda();                 // tramo restaurado tras cerrar la pestaña
+  // listo: sin revelación (o restaurado tras cerrar la pestaña) abre el debate; con ella, revela ya
+  else if (S.fase === "listo") (S.revelado ? abrirRonda() : revelar());
+  else if (S.fase === "revelando" || S.fase === "entrada") saltarEscena();
   else if (S.fase === "abierta") cerrarRonda();
   else if (S.fase === "votando") cerrarVotacion();
   else if (S.fase === "veredictoPublico" || S.fase === "veredictoJueces") saltarEscena();
@@ -284,17 +354,26 @@ Responde SOLO un JSON: {"pregunta": "…", "porQue": "máx. 20 palabras: por qu�
 async function prepararPropuesta() {
   // con brújula, el par más lejano en el mapa (entre los que menos han debatido)
   const posDe = Object.fromEntries((S.clase.gruposInfo || []).map(g => [g.n, g.pos]));
-  const par = (conBrujula() && emparejarLejanos(gruposDisponibles(), S.clase.debates, posDe)) || emparejar(gruposDisponibles(), S.clase.debates);
+  let par = (conBrujula() && emparejarLejanos(gruposDisponibles(), S.clase.debates, posDe)) || emparejar(gruposDisponibles(), S.clase.debates);
+  // con revelación, a veces repite un grupo que ya debatió: que nadie se sienta a salvo. Va antes
+  // de `base`, así la moción de la IA (con brújula) cae sobre el par final.
+  if (!PERS && opcion("revelacion") && opcion("revancha")) par = conRevancha(par, gruposDisponibles(), S.clase.debates);
   const base = { A: par ? par.A : null, B: par ? par.B : null };
   const escritas = typeof PREGUNTAS !== "undefined" ? PREGUNTAS : [];
   const usadas = [...S.clase.debates.map(d => d.pregunta), ...(S.clase.descartadas || [])];
-  const escrita = proximaPreguntaEscrita(escritas, usadas);
+  // con personajes y revelación, el duelo se sortea entre los que faltan y tienen gente en los
+  // dos lados (el descartado con «Pedir otra» se evita una vez); si no, en el orden del archivo
+  const sorteo = PERS && opcion("revelacion");
+  const escrita = sorteo ? sortearDuelo(escritas, usadas, PERS, conteoAhora(), Math.random, S.clase.evitar || null)
+    : proximaPreguntaEscrita(escritas, usadas);
+  if (sorteo) S.clase.evitar = null;
   // clase con personajes: el duelo viene fijo en la pregunta (no se llama a emparejar). Si uno de
   // los dos personajes no tiene a nadie inscrito, la propuesta lo dice y no se publica sola.
   const duelo = PERS && escrita ? dueloEnGrupos(escrita.duelo, PERS) : null;
   if (duelo) {
     S.clase.propuesta = { ...duelo, estado: "lista", pregunta: escrita.texto, favor: escrita.favor || "", contra: escrita.contra || "",
-      porQue: `Duelo ${S.clase.debates.length + 1} de ${escritas.length}, escrito por ti en el archivo de la semana.`,
+      porQue: sorteo ? `Duelo sorteado entre los ${duelosPendientes(escritas, usadas, PERS).length} que faltan.`
+        : `Duelo ${S.clase.debates.length + 1} de ${escritas.length}, escrito por ti en el archivo de la semana.`,
       mejorFavor: "", mejorContra: "", fuente: "escrita", aviso: avisoDuelo(duelo.A, duelo.B) };
     if (S.fase === "propuesta") mostrarPropuesta();
     return;
@@ -378,10 +457,7 @@ function mostrarPropuesta() {
   el.onpointerdown = detener; el.onfocusin = detener;
   $("prPublicar").onclick = publicarPropuestaActual;
   $("prCambiar").onclick = () => { const a = $("prA").value; $("prA").value = $("prB").value; $("prB").value = a; };
-  $("prOtra").onclick = () => {
-    if (p.pregunta) (S.clase.descartadas = S.clase.descartadas || []).push(p.pregunta);   // no volver a proponerla
-    S.clase.propuesta = null; prepararPropuesta();
-  };
+  $("prOtra").onclick = pedirOtraPropuesta;
   const listo = p.estado === "lista" && !faltan && !p.aviso;
   $("btnPrincipal").textContent = "PUBLICAR PREGUNTA";
   if (listo) {
@@ -393,6 +469,17 @@ function mostrarPropuesta() {
       if ($("prCuenta")) $("prCuenta").textContent = `se publica en ${resta} s`;
     }, 1000);
   }
+}
+
+// «Pedir otra» (en la pantalla o desde el control). Un duelo descartado tiene que poder jugarse
+// después: solo se evita en el próximo sorteo. Una pregunta sin personajes no se vuelve a proponer.
+function pedirOtraPropuesta() {
+  const p = S.clase.propuesta;
+  if (p && p.pregunta) {
+    if (PERS && opcion("revelacion")) S.clase.evitar = p.pregunta;
+    else (S.clase.descartadas = S.clase.descartadas || []).push(p.pregunta);
+  }
+  S.clase.propuesta = null; prepararPropuesta();
 }
 
 function publicarPropuestaActual() {

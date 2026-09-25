@@ -528,6 +528,10 @@ function pintarRonda() {
 const fmt = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
 function abrirRonda() {
+  // la música y la escena de la preparación, la revelación o la entrada (musica.js, escenas.js)
+  if (typeof pararMusica === "function") pararMusica();
+  if ($("escena") && ["listo", "revelando", "entrada"].includes(S.fase) && typeof cerrarEscena === "function") cerrarEscena();
+  S.finEntrada = null;
   clearInterval(S.reloj);                                // la cuenta del minuto de preparación
   S.finPrep = null;
   $("preparacion")?.remove();
