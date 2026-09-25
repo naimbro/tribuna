@@ -337,7 +337,16 @@ function pasoVivo() {
   const ahora = Date.now();
   let cambio = false;
   if (S.punto) {
-    const p = vencerPunto(S.punto, ahora);
+    let p = vencerPunto(S.punto, ahora);
+    // Terminó antes: quien pidió el punto ya habló y lleva un respiro callado (punto.js,
+    // cerrarPuntoSiTermino). Se sigue por punto (su t): uno nuevo empieza sin haber hablado.
+    if (p && p.estado === "aceptado") {
+      const v = S.puntoVoz && S.puntoVoz.t === p.t ? S.puntoVoz : (S.puntoVoz = { t: p.t, hablo: false, silencioDesde: null });
+      const habla = hablaAhora().some(h => h.uid === p.de);
+      if (habla) { v.hablo = true; v.silencioDesde = null; }
+      else if (v.hablo && v.silencioDesde === null) v.silencioDesde = ahora;
+      p = cerrarPuntoSiTermino(p, { hablo: v.hablo, hablandoAhora: habla, silencioDesde: v.silencioDesde, ahora });
+    }
     if (p !== S.punto) { S.punto = p; cambio = true; }
   }
   if (S.banco && S.debate) {

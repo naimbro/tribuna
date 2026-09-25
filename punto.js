@@ -6,7 +6,7 @@
    (pruebas/punto.test.js). Spec: docs/superpowers/specs/2026-09-25-debate-en-vivo-design.md
    ===================================================================== */
 
-const PUNTO = { ESPERA: 10000, DURA: 15000, ENFRIA: 30000, MUESTRA: 4000 };
+const PUNTO = { ESPERA: 10000, DURA: 15000, ENFRIA: 30000, MUESTRA: 4000, SILENCIO_FIN: 1500 };
 const otroLado = k => (k === "A" ? "B" : "A");
 const puntoActivo = p => !!p && (p.estado === "pedido" || p.estado === "aceptado");
 
@@ -46,8 +46,18 @@ function vencerPunto(actual, ahora) {
   return actual;
 }
 
+// Un punto aceptado no tiene por qué durar los 15 s enteros: si quien lo pidió ya habló y lleva
+// SILENCIO_FIN callado, terminó y la palabra vuelve al lado que cedió. Si nunca habla, sigue
+// valiendo el límite de DURA (vencerPunto). hablo: habló durante el punto; hablandoAhora: habla en
+// este momento; silencioDesde: desde cuándo está callado (hora de esta pantalla).
+function cerrarPuntoSiTermino(p, { hablo, hablandoAhora, silencioDesde, ahora } = {}) {
+  if (!p || p.estado !== "aceptado" || !hablo || hablandoAhora || silencioDesde == null) return p;
+  if (ahora - silencioDesde < PUNTO.SILENCIO_FIN) return p;
+  return { ...p, estado: "terminado", hasta: ahora + PUNTO.MUESTRA };
+}
+
 // En el teléfono, para dejar hablar basta `estado === "aceptado" && de === uid` (el proyector es
 // quien publica cuándo termina). `puedeHablarPorPunto`, con `fin`, es para el reloj del proyector.
 const puedeHablarPorPunto = (p, uid, ahora) => !!p && p.estado === "aceptado" && p.de === uid && ahora < p.fin;
 
-if (typeof module !== "undefined") module.exports = { PUNTO, otroLado, puntoActivo, pedirPunto, responderPunto, vencerPunto, puedeHablarPorPunto };
+if (typeof module !== "undefined") module.exports = { PUNTO, otroLado, puntoActivo, pedirPunto, responderPunto, vencerPunto, cerrarPuntoSiTermino, puedeHablarPorPunto };

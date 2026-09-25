@@ -91,3 +91,25 @@ test("activo y puedeHablar: quien pidió habla solo con el punto aceptado", () =
   assert.equal(P.puedeHablarPorPunto(punto, "u1", 3000), false);
   assert.equal(P.puntoActivo(P.responderPunto(punto, { t: 500, acepta: false }, 2000)), false);
 });
+
+test("cerrar si terminó: quien pidió habló y lleva SILENCIO_FIN callado → terminado", () => {
+  const { punto } = P.pedirPunto(null, pedido(), base);
+  const a = P.responderPunto(punto, { t: 500, acepta: true }, 2000);
+  const S = P.PUNTO.SILENCIO_FIN;
+  assert.equal(P.cerrarPuntoSiTermino(a, { hablo: false, hablandoAhora: false, silencioDesde: null, ahora: 9000 }), a);  // no habló aún
+  assert.equal(P.cerrarPuntoSiTermino(a, { hablo: true, hablandoAhora: false, silencioDesde: 5000, ahora: 5000 + S - 100 }), a);  // 1,4 s
+  const t = P.cerrarPuntoSiTermino(a, { hablo: true, hablandoAhora: false, silencioDesde: 5000, ahora: 5000 + S });
+  assert.equal(t.estado, "terminado");
+  assert.equal(t.hasta, 5000 + S + P.PUNTO.MUESTRA);
+  assert.equal(P.puntoActivo(t), false);
+  assert.equal(P.cerrarPuntoSiTermino(a, { hablo: true, hablandoAhora: true, silencioDesde: 5000, ahora: 9000 }), a);  // sigue hablando
+});
+
+test("cerrar si terminó: un punto que no está aceptado no cambia", () => {
+  const { punto } = P.pedirPunto(null, pedido(), base);
+  const opts = { hablo: true, hablandoAhora: false, silencioDesde: 0, ahora: 9000 };
+  assert.equal(P.cerrarPuntoSiTermino(punto, opts), punto);
+  const r = P.responderPunto(punto, { t: 500, acepta: false }, 2000);
+  assert.equal(P.cerrarPuntoSiTermino(r, opts), r);
+  assert.equal(P.cerrarPuntoSiTermino(null, opts), null);
+});
