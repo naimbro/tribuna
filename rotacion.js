@@ -272,7 +272,7 @@ function mejorIntervencion(historial) {
    Cada conducta nueva tiene un interruptor en S.clase.opciones; lo que falta cuenta como
    encendido, así las salas creadas antes siguen funcionando. Apagado = la clase de siempre. */
 const OPCIONES_DEFECTO = { revelacion: true, revancha: true, musica: true, voz: true, reloj: true, punto: true, vozIA: true };
-const opcionActiva = (ops, k) => (ops && k in ops ? ops[k] !== false : OPCIONES_DEFECTO[k] !== false);
+const opcionActiva = (ops, k) => (ops && typeof ops === "object" && k in ops ? ops[k] !== false : OPCIONES_DEFECTO[k] !== false);
 
 // Los duelos escritos que faltan, en números de grupo (con personajes). Mismo orden que PREGUNTAS.
 function duelosPendientes(escritas, usadas, ps) {
@@ -288,9 +288,10 @@ function duelosPendientes(escritas, usadas, ps) {
 function sortearDuelo(escritas, usadas, ps, conteo, azar = Math.random, evitar = null) {
   const pend = duelosPendientes(escritas, usadas, ps);
   if (!pend.length) return null;
-  const conGente = pend.filter(p => p.A && p.B && (conteo || {})[p.A] > 0 && (conteo || {})[p.B] > 0);
-  let pool = conGente.length ? conGente : [pend[0]];
   const ev = String(evitar || "").trim().toLowerCase();
+  const conGente = pend.filter(p => p.A && p.B && (conteo || {})[p.A] > 0 && (conteo || {})[p.B] > 0);
+  // sin nadie inscrito en ningún duelo, el que cae por defecto también respeta 'evitar' si hay otro
+  let pool = conGente.length ? conGente : [pend.find(p => p.texto.toLowerCase() !== ev) || pend[0]];
   if (ev && pool.length > 1) pool = pool.filter(p => p.texto.toLowerCase() !== ev);
   const p = pool[Math.min(pool.length - 1, Math.floor(azar() * pool.length))];
   return { texto: p.texto, afirma: null, favor: p.favor, contra: p.contra, duelo: p.duelo };

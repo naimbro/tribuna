@@ -258,7 +258,13 @@ test("opcionActiva: sin opciones, todo encendido; false apaga; claves desconocid
   assert.equal(R.opcionActiva({}, "revelacion"), true);
   assert.equal(R.opcionActiva({ voz: false }, "voz"), false);
   assert.equal(R.opcionActiva({ voz: false }, "musica"), true);
+  assert.equal(R.opcionActiva({}, "otra"), true);
   assert.deepEqual(Object.keys(R.OPCIONES_DEFECTO).sort(), ["musica", "punto", "reloj", "revancha", "revelacion", "voz", "vozIA"]);
+});
+
+test("opcionActiva: ops que no es un objeto (dato corrupto) no revienta, cae al valor por defecto", () => {
+  assert.equal(R.opcionActiva(5, "voz"), true);
+  assert.equal(R.opcionActiva("x", "voz"), true);
 });
 
 const PS = R.numerarPersonajes([
@@ -298,6 +304,10 @@ test("sortearDuelo: 'evitar' se salta si hay otro; los jugados no vuelven; sin g
   assert.equal(R.sortearDuelo(DUELOS, ["Moción uno", "Moción dos", "Moción tres"], PS, LLENO, seq([0])), null);
 });
 
+test("sortearDuelo: sin gente en ningún duelo, el que cae por defecto también respeta 'evitar'", () => {
+  assert.equal(R.sortearDuelo(DUELOS, [], PS, {}, seq([0]), "Moción uno").texto, "Moción dos");
+});
+
 test("sortearDuelo devuelve la forma de proximaPreguntaEscrita (texto, favor, contra, duelo)", () => {
   const d = R.sortearDuelo(DUELOS, [], PS, LLENO, seq([0]));
   assert.deepEqual(d, { texto: "Moción uno", afirma: null, favor: "f1", contra: "c1", duelo: { A: "huang", B: "amodei" } });
@@ -315,7 +325,9 @@ test("conRevancha: con suerte, un cupo cae en un grupo que ya debatió", () => {
   // azar: 0.1 (< P_REVANCHA) → hay revancha; 0 → el primero de los que ya jugaron; 0.7 → reemplaza a B
   assert.deepEqual(R.conRevancha({ A: 3, B: 4 }, [1, 2, 3, 4], [{ A: 1, B: 2 }], seq([0.1, 0, 0.7])), { A: 3, B: 1 });
   assert.deepEqual(R.conRevancha({ A: 3, B: 4 }, [1, 2, 3, 4], [{ A: 1, B: 2 }], seq([0.1, 0.99, 0.2])), { A: 2, B: 4 });
-  // nunca deja a un grupo contra sí mismo
+  // nunca deja a un grupo contra sí mismo: grupo 1 ya debatió, par {A:1,B:3} → la revancha
+  // solo puede caer en el grupo 2 (el único que debatió y no es ni A ni B)
   const r = R.conRevancha({ A: 1, B: 3 }, [1, 2, 3], [{ A: 1, B: 2 }], seq([0.1, 0, 0.2]));
   assert.notEqual(r.A, r.B);
+  assert.deepEqual(r, { A: 2, B: 3 });
 });

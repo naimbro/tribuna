@@ -10,22 +10,30 @@ const PUNTO = { ESPERA: 10000, DURA: 15000, ENFRIA: 30000, MUESTRA: 4000 };
 const otroLado = k => (k === "A" ? "B" : "A");
 const puntoActivo = p => !!p && (p.estado === "pedido" || p.estado === "aceptado");
 
-// pedido: { uid, nombre, grupo, lado, t }. ultimo: { A, B } → cuándo pidió cada lado por última vez.
+// pedido: { uid, nombre, grupo, lado, t }. ultimo: { A, B, tA, tB } → cuándo pidió cada lado por
+// última vez y el t del último pedido ya atendido de ese lado. El teléfono nunca borra su campo
+// punto: {debate, t}, así que ese mismo t sigue llegando después del enfriamiento (fantasma) —
+// por eso, además del tiempo, se recuerda el t ya atendido y se ignora si vuelve a aparecer.
 // Devuelve { punto, ultimo }; si el pedido no vale, el punto de antes y ultimo sin cambios.
-function pedirPunto(actual, pedido, { ahora, hablando, ultimo = {} }) {
+function pedirPunto(actual, pedido, { ahora, hablando, ultimo }) {
+  const u = ultimo || {};
   const lado = pedido && pedido.lado, para = otroLado(lado);
-  const vale = (lado === "A" || lado === "B") && !puntoActivo(actual) && hablando && hablando[para]
-    && ahora - (ultimo[lado] ?? -Infinity) >= PUNTO.ENFRIA;
-  if (!vale) return { punto: actual, ultimo };
+  const fantasma = pedido && pedido.t === u["t" + lado];
+  const vale = (lado === "A" || lado === "B") && !puntoActivo(actual) && !fantasma && hablando && hablando[para]
+    && ahora - (u[lado] ?? -Infinity) >= PUNTO.ENFRIA;
+  if (!vale) return { punto: actual, ultimo: u };
   return {
     punto: { de: pedido.uid, nombre: pedido.nombre || "", grupo: pedido.grupo || 0, lado, para, estado: "pedido", t: pedido.t, fin: ahora + PUNTO.ESPERA, hasta: null },
-    ultimo: { ...ultimo, [lado]: ahora }
+    ultimo: { ...u, [lado]: ahora, ["t" + lado]: pedido.t }
   };
 }
 
-// respuesta: { t, acepta } — t tiene que ser el del pedido en curso.
+// respuesta: { t, acepta, lado? } — t tiene que ser el del pedido en curso; si viene lado, tiene
+// que ser el del lado que habla (actual.para): el otro lado no puede aceptar ni rechazar por él.
 function responderPunto(actual, respuesta, ahora) {
   if (!actual || actual.estado !== "pedido" || !respuesta || respuesta.t !== actual.t) return actual;
+  if (ahora >= actual.fin) return actual;                                   // respuesta tardía: ya venció
+  if (respuesta.lado && respuesta.lado !== actual.para) return actual;
   return respuesta.acepta ? { ...actual, estado: "aceptado", fin: ahora + PUNTO.DURA }
     : { ...actual, estado: "rechazado", fin: null, hasta: ahora + PUNTO.MUESTRA };
 }
@@ -38,6 +46,8 @@ function vencerPunto(actual, ahora) {
   return actual;
 }
 
+// En el teléfono, para dejar hablar basta `estado === "aceptado" && de === uid` (el proyector es
+// quien publica cuándo termina). `puedeHablarPorPunto`, con `fin`, es para el reloj del proyector.
 const puedeHablarPorPunto = (p, uid, ahora) => !!p && p.estado === "aceptado" && p.de === uid && ahora < p.fin;
 
 if (typeof module !== "undefined") module.exports = { PUNTO, otroLado, puntoActivo, pedirPunto, responderPunto, vencerPunto, puedeHablarPorPunto };

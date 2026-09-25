@@ -11,16 +11,17 @@
 
 const AJ = {
   LATIDO: 2500,   // una ficha con habla cuyo último latido llegó hace más de esto cuenta como callada
-  MARGEN: 90,     // segundos de margen sobre el tramo: el debate no se alarga para siempre con silencios
+  MARGEN: 150,    // segundos de margen sobre el tramo: los turnos hablados de la moderadora no usan
+                  // ningún banco pero sí corren contra este margen, por eso quedó holgado
   DT_MAX: 2000    // un paso de reloj nunca descuenta más que esto (pestaña dormida, reloj que salta)
 };
 
 const nuevoBanco = segTramo => ({ A: Math.round(segTramo * 500), B: Math.round(segTramo * 500) });
 
 // Descuenta dt ms a cada lado que habla. agotados: los lados que llegaron a cero en este paso.
-function avanzar(banco, hablando, dt) {
+function avanzarBanco(banco, hablando, dt) {
   const paso = Math.max(0, Math.min(AJ.DT_MAX, dt || 0));
-  const out = { A: banco.A, B: banco.B }, agotados = [];
+  const out = { A: +banco.A || 0, B: +banco.B || 0 }, agotados = [];
   for (const k of ["A", "B"]) {
     if (!hablando || !hablando[k] || out[k] <= 0) continue;
     out[k] = Math.max(0, out[k] - paso);
@@ -40,16 +41,20 @@ function hablandoPorLado(xs, { debate, A, B, ahora }) {
   return out;
 }
 
-const terminado = (banco, { abre, seg, ahora }) =>
-  (banco.A <= 0 && banco.B <= 0) || ahora - abre >= (seg + AJ.MARGEN) * 1000;
+// extra: los ms sumados con «+30 s» — se agregan al límite de pared para que esa gracia del
+// profesor no se la coma el margen (si solo estirara el margen, +30 s podría no alargar nada).
+const bancoTerminado = (banco, { abre, seg, ahora, extra = 0 }) =>
+  (banco.A <= 0 && banco.B <= 0) || ahora - abre >= (seg + AJ.MARGEN) * 1000 + extra;
 
-const sumar = (banco, ms) => ({ A: banco.A + ms, B: banco.B + ms });
+const sumarBanco = (banco, ms) => ({ A: banco.A + ms, B: banco.B + ms });
 
 // En el teléfono: la foto publicada { A, B, corre: { A, B }, t } y la hora de ahora → lo que queda.
-function restante(foto, ahora) {
+// foto.t tiene que ser el instante en que ESTE aparato recibió la foto (no el reloj del proyector),
+// mismo principio que `visto` en hablandoPorLado: así no dependemos de que los relojes coincidan.
+function bancoRestante(foto, ahora) {
   const pasado = Math.max(0, ahora - (foto.t || ahora));
   const r = k => Math.max(0, foto[k] - (foto.corre && foto.corre[k] ? pasado : 0));
   return { A: r("A"), B: r("B") };
 }
 
-if (typeof module !== "undefined") module.exports = { AJ, nuevoBanco, avanzar, hablandoPorLado, terminado, sumar, restante };
+if (typeof module !== "undefined") module.exports = { AJ, nuevoBanco, avanzarBanco, hablandoPorLado, bancoTerminado, sumarBanco, bancoRestante };
