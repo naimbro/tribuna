@@ -581,28 +581,250 @@ async function mostrarVeredictoJueces(d, jueces, panel) {
   await esperar(ROT.SEG_TOTALES * 1000);
 }
 
-/* ------------------------ 6. PREPARACIÓN, REVELACIÓN Y ENTRADA (provisional; la Task 8 las reemplaza) ------------------------ */
-// Versiones mínimas para que el ciclo nuevo de clase.js funcione mientras llegan las escenas de verdad.
-function mostrarPreparacion(d, { tema, duelos } = {}) {
+
+/* ------------------ 6. PREPARACIÓN, REVELACIÓN Y ENTRADA ------------------ */
+// El minuto en que toda la sala prepara sin saber quién pasa al frente, la revelación (una
+// tragamonedas de grupos o, con personajes, un foco que recorre los duelos) y la entrada al
+// escenario, tipo boxeo. clase.js las llama en ese orden (prepararEnSuspenso → revelar →
+// entrada). Todo lo que dura pasa por esperar(), así el botón principal lo salta; después de
+// cada espera se comprueba que la escena siga abierta (el profesor pudo terminar la clase).
+
+const R_ANILLO = 54, C_ANILLO = 2 * Math.PI * R_ANILLO;
+// El color de un grupo en escena: el de su personaje si la semana los tiene; si no, el del lado.
+const colorDe = (n, k) => (personajeDe(n, PERS) || {}).color || EQUIPOS[k].color;
+// La letra de la moción según su largo: una de 25 palabras no cabe con la letra de una de 8.
+const claseLargo = t => { const n = String(t || "").length; return n > 150 ? "larga" : n > 90 ? "media" : ""; };
+const mismoTexto = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+// Lo que va bajo el nombre: el cargo del personaje o el campo de la brújula («Frenar por ley»).
+const subtituloGrupo = n => (personajeDe(n, PERS) || {}).cargo || ((S.clase.gruposInfo || []).find(x => x.n === n) || {}).nombre || "";
+
+// El tic de la ruleta: un clic por paso, solo si la música está encendida.
+function ticRuleta() {
+  if (typeof musicaActiva !== "function" || typeof musicaTic !== "function" || !musicaActiva()) return;
+  const ac = audioCtx(); if (ac) musicaTic(ac, ac.currentTime + 0.005, true);
+}
+// El golpe visual de un nombre: un destello del color en toda la pantalla y un remezón corto
+// (sin remezón si el sistema pide menos movimiento: lo resuelve el CSS).
+function destello(el, fondo) {
+  const f = document.createElement("div");
+  f.className = "rv-flash"; f.style.background = fondo;
+  el.appendChild(f);
+  setTimeout(() => f.remove(), 1000);
+  const c = el.querySelector(".rv-cuerpo");
+  if (c) { c.classList.remove("sacude"); void c.offsetWidth; c.classList.add("sacude"); }
+}
+const halo = c => `radial-gradient(60% 60% at 50% 50%,${c} 0%,transparent 75%)`;
+
+function retrato(n) {   // círculo con iniciales en el color del personaje, y su nombre debajo
+  const p = personajeDe(n, PERS) || { nombre: nombreG(n), color: "var(--dim)" };
+  return `<div class="pp-ret" style="--c:${p.color}"><i>${escHtml(iniciales(p.nombre))}</i><b>${escHtml(p.nombre)}</b></div>`;
+}
+const tarjetaDuelo = x => `<div class="pp-duelo" data-t="${escHtml(x.texto)}" data-a="${x.A}" data-b="${x.B}">
+  ${retrato(x.A)}<div class="pp-dm"><span>VS</span><q>${escHtml(x.texto)}</q></div>${retrato(x.B)}</div>`;
+
+// PREPARACIÓN: nada más que la moción (o los duelos que quedan), las dos posturas y el anillo.
+// Sin nombres de grupo: nadie sabe quién pasa al frente.
+function mostrarPreparacion(d, { tema, duelos, ultimo } = {}) {
   const el = escena("preparacion");
-  const cuerpo = duelos
-    ? `<div class="es-q">${escHtml(tema || "")}</div>` + duelos.map(x => `<div class="es-pie">${escHtml(nombreG(x.A))} vs ${escHtml(nombreG(x.B))} · «${escHtml(x.texto)}»</div>`).join("")
-    : `<div class="es-q">«${escHtml(d.pregunta)}»</div>` + ["A", "B"].map(k => `<div class="es-pie" style="color:${EQUIPOS[k].color}">${k === "A" ? "A FAVOR" : "EN CONTRA"} · ${escHtml((d.posturas || {})[k] || "")}</div>`).join("");
-  el.innerHTML = `<div class="es-k">DEBATE ${d.n} · PREPARACIÓN</div>${cuerpo}<div class="es-ganador on mono" id="ppNum"></div>`;
+  const conDuelos = Array.isArray(duelos) && duelos.length > 0;
+  const cuerpo = conDuelos
+    ? `<div class="es-k">${ultimo ? "ÚLTIMO DUELO" : "¿QUÉ DUELO SIGUE?"} · PREPARACIÓN</div>
+       <div class="pp-tema">${escHtml(tema || "")}</div>
+       <div class="pp-duelos${duelos.length > 3 ? " muchos" : ""}">${duelos.map(tarjetaDuelo).join("")}</div>`
+    : `<div class="es-k">DEBATE ${d.n} · PREPARACIÓN · TODOS PREPARAN LOS DOS LADOS</div>
+       <div class="pp-q ${claseLargo(d.pregunta)}">«${escHtml(d.pregunta)}»</div>
+       <div class="pp-lados">${["A", "B"].map(k => `<div class="pp-lado" style="--c:${EQUIPOS[k].color}">
+         <b>${k === "A" ? "A FAVOR" : "EN CONTRA"}</b><span>${escHtml((d.posturas || {})[k] || "")}</span></div>`).join("")}</div>`;
+  const pie = conDuelos && ultimo ? "Es el último duelo: al llegar a cero, suben al escenario."
+    : conDuelos ? "Nadie sabe qué duelo sigue. Al llegar a cero, el relator lo revela."
+    : "Nadie sabe quién pasa al frente. Al llegar a cero, el relator lo revela.";
+  el.innerHTML = `${cuerpo}
+    <div class="pp-pie"><div class="pp-reloj" id="ppReloj">
+        <svg id="ppAnillo" viewBox="0 0 120 120"><circle class="pp-riel" cx="60" cy="60" r="${R_ANILLO}"/>
+          <circle class="pp-arco" id="ppArco" cx="60" cy="60" r="${R_ANILLO}" style="stroke-dasharray:${C_ANILLO.toFixed(1)};stroke-dashoffset:0"/></svg>
+        <b id="ppNum" class="mono"></b></div>
+      <span>${pie}</span></div>`;
   botonEscena("REVELAR YA ▶");
 }
-function actualizarPreparacion(resta) { if ($("ppNum")) $("ppNum").textContent = resta; }
-async function mostrarRevelacion(d) {
-  const el = escena("revelacion");
-  el.innerHTML = `<div class="es-k">¿QUIÉN PASA AL FRENTE?</div>
-    <div class="es-q" style="color:${EQUIPOS.A.color}">A FAVOR… ${escHtml(nombreGrupo(d.A))}</div>
-    <div class="es-q" style="color:${EQUIPOS.B.color}">EN CONTRA… ${escHtml(nombreGrupo(d.B))}</div>`;
-  await esperar(3000);
+
+// Cada 250 ms: el anillo se vacía de forma continua (con S.finPrep) y el número baja por segundo.
+// En los últimos 10 s el anillo se pone rojo y late, y los bordes de la pantalla también.
+function actualizarPreparacion(resta, total) {
+  const arco = $("ppArco"); if (!arco) return;
+  const ms = S.finPrep ? Math.max(0, S.finPrep - Date.now()) : resta * 1000;
+  const frac = total ? Math.min(1, ms / (total * 1000)) : 0;
+  arco.style.strokeDashoffset = (C_ANILLO * (1 - frac)).toFixed(1);
+  $("ppNum").textContent = resta;
+  const urge = resta <= 10;
+  $("ppReloj").classList.toggle("urgente", urge);
+  $("escena")?.classList.toggle("urgente", urge);
 }
+
+// REVELACIÓN (~8 s). Con personajes, qué duelo sigue; si no, qué grupo va a cada lado.
+async function mostrarRevelacion(d, { duelos } = {}) {
+  if (Array.isArray(duelos) && duelos.length) return revelarDuelo(d, duelos);
+  return revelarGrupos(d);
+}
+
+// La tragamonedas: pasa por los nombres al azar y se frena al final, como una ruleta.
+async function tragamonedas(slot, nombres, dur) {
+  const t0 = Date.now();
+  let ultimo = "";
+  while (!ESC.rapido && slot.isConnected) {
+    const p = (Date.now() - t0) / dur;
+    if (p >= 1) break;
+    const otros = nombres.length > 1 ? nombres.filter(n => n !== ultimo) : nombres;
+    ultimo = otros[Math.floor(Math.random() * otros.length)] || "";
+    const paso = Math.round(70 + 260 * p * p);
+    slot.innerHTML = `<span style="animation-duration:${paso}ms">${escHtml(ultimo)}</span>`;
+    ticRuleta();
+    await esperar(paso);
+  }
+}
+
+// Sin personajes: «A FAVOR… Grupo 3» (pausa) «EN CONTRA… Grupo 1».
+async function revelarGrupos(d) {
+  const el = escena("revelacion");
+  const pool = [...new Set([...gruposDisponibles(), d.A, d.B])].filter(g => g > 0);
+  const largo = Math.max(...pool.map(g => nombreGrupo(g).length)) > 16;
+  el.innerHTML = `<div class="rv-cuerpo">
+      <div class="rv-t">¿QUIÉN PASA AL FRENTE?</div>
+      ${["A", "B"].map(k => `<div class="rv-fila" id="rvf${k}" style="--c:${colorDe(d[k], k)}">
+        <div class="rv-lado">${k === "A" ? "A FAVOR…" : "EN CONTRA…"}</div>
+        <div class="rv-slot${largo ? " largo" : ""}" id="rvs${k}"><span>&nbsp;</span></div></div>`).join("")}
+    </div>`;
+  await esperar(500);
+  for (const k of ["A", "B"]) {
+    if (!el.isConnected) return;
+    $("rvf" + k).classList.add("on");
+    redobleRevelacion();
+    await tragamonedas($("rvs" + k), pool.filter(g => k === "A" || g !== d.A).map(nombreGrupo), 2400);
+    if (!el.isConnected) return;
+    const c = colorDe(d[k], k);
+    $("rvs" + k).innerHTML = `<span class="rv-golpe">${escHtml(nombreGrupo(d[k]))}</span>`;
+    $("rvf" + k).classList.add("fijo");
+    destello(el, halo(c));
+    golpeRevelacion();
+    await esperar(k === "A" ? 1500 : 2000);
+  }
+}
+
+// El foco recorre las tarjetas, cada vez más lento, hasta detenerse en la elegida.
+async function recorrer(cartas, elegida, dur) {
+  const t0 = Date.now();
+  for (let i = 0; !ESC.rapido && elegida.isConnected; i++) {
+    const c = cartas[i % cartas.length];
+    cartas.forEach(x => x.classList.toggle("foco", x === c));
+    ticRuleta();
+    const p = (Date.now() - t0) / dur;
+    if (p >= 1 && c === elegida) break;
+    await esperar(p >= 1 ? 420 : Math.round(110 + 240 * p * p));
+  }
+  cartas.forEach(x => x.classList.remove("foco"));
+}
+
+// Con personajes: las tarjetas que no tocan se apagan, la elegida viaja al centro, sus dos
+// personajes se iluminan (un golpe cada uno) y la moción queda en grande.
+async function revelarDuelo(d, duelos) {
+  let el = $("escena");
+  if (el && el.classList.contains("preparacion") && el.querySelector(".pp-duelos")) {
+    // se reutilizan las tarjetas de la preparación: la sala ve el mismo tablero ponerse en marcha
+    // (el pie se desvanece sin salir del flujo: si se quitara, las tarjetas saltarían)
+    el.className = "escena revelacion"; ESC.rapido = false;
+    botonEscena("SALTAR ▶");
+  } else {
+    el = escena("revelacion");
+    el.innerHTML = `<div class="es-k">¿QUÉ DUELO SIGUE?</div><div class="pp-tema">${escHtml(S.clase.tema || SESION.tema)}</div>
+      <div class="pp-duelos${duelos.length > 3 ? " muchos" : ""}">${duelos.map(tarjetaDuelo).join("")}</div>`;
+  }
+  const k0 = el.querySelector(".es-k");
+  if (k0) k0.textContent = "¿QUÉ DUELO SIGUE?";
+  const cartas = [...el.querySelectorAll(".pp-duelo")];
+  const elegida = cartas.find(c => mismoTexto(c.dataset.t, d.pregunta)) || cartas.find(c => +c.dataset.a === d.A && +c.dataset.b === d.B);
+  if (elegida) {
+    if (cartas.length > 1) {
+      redobleRevelacion();
+      await recorrer(cartas, elegida, 2400);
+      if (!el.isConnected) return;
+    }
+    cartas.forEach(c => c.classList.toggle("apaga", c !== elegida));
+    // viaja al centro de la pantalla y crece, sin salirse por los lados en 1280×720
+    const r = elegida.getBoundingClientRect(), crece = Math.min(1.12, innerWidth * 0.97 / r.width);
+    elegida.style.transform = `translateY(${Math.round(innerHeight / 2 - (r.top + r.height / 2))}px) scale(${crece.toFixed(3)})`;
+    elegida.classList.add("elegida");
+    golpeRevelacion();
+    destello(el, `linear-gradient(90deg,${colorDe(d.A, "A")} 0%,transparent 45%,transparent 55%,${colorDe(d.B, "B")} 100%)`);
+    await esperar(1200);
+    if (!el.isConnected) return;
+  }
+  // el cara a cara: los dos personajes en grande y la moción
+  const p = k => personajeDe(d[k], PERS) || { nombre: nombreG(d[k]), cargo: "" };
+  el.className = "escena revelacion";
+  el.innerHTML = `<div class="rv-cuerpo">
+      <div class="es-k">DEBATE ${d.n} · SUBEN AL ESCENARIO</div>
+      <div class="rv-vs">${["A", "B"].map(k => `<div class="rv-p" id="rvp${k}" style="--c:${colorDe(d[k], k)}">
+          <i>${escHtml(iniciales(p(k).nombre))}</i><b>${escHtml(p(k).nombre)}</b>
+          <small>${escHtml(p(k).cargo ? p(k).cargo + " · " : "")}${k === "A" ? "A FAVOR" : "EN CONTRA"}</small></div>`).join(`<div class="rv-x">vs</div>`)}</div>
+      <div class="pp-q ${claseLargo(d.pregunta)}">«${escHtml(d.pregunta)}»</div>
+    </div>`;
+  for (const k of ["A", "B"]) {
+    await esperar(k === "A" ? 250 : 550);
+    if (!el.isConnected) return;
+    $("rvp" + k).classList.add("on");
+    golpeRevelacion();
+    destello(el, `radial-gradient(45% 60% at ${k === "A" ? "25%" : "75%"} 45%,${colorDe(d[k], k)} 0%,transparent 75%)`);
+  }
+  await esperar(2400);
+}
+
+// ENTRADA (20 s): «EN ESTA ESQUINA…», el nombre enorme en su color y las caras que llegan de a
+// una; después el otro lado; al final, los dos frente a frente con la moción.
 async function mostrarEntrada(d, integrantes, segundos) {
   const el = escena("entrada");
   botonEscena("▶ EMPEZAR DEBATE");
-  el.innerHTML = ["A", "B"].map(k => `<div class="es-q" style="color:${EQUIPOS[k].color}">${escHtml(nombreG(d[k]))}</div>
-    <div class="es-pie">${(integrantes[k] || []).map(j => escHtml(j.nombre)).join(" · ")}</div>`).join("");
-  await esperar(segundos * 1000);
+  const total = Math.max(1, segundos) * 1000, t0 = Date.now();
+  const cierre = Math.min(4000, total * 0.2), mitad = (total - cierre) / 2;
+  el.innerHTML = `<div class="en-fondo" id="enFondo"></div><div class="en-cuerpo" id="enCuerpo"></div>
+    <div class="en-barra"><i style="animation-duration:${total}ms"></i></div>`;
+  for (const k of ["A", "B"]) {
+    await esquina(el, d, k, (integrantes || {})[k] || [], mitad);
+    if (!el.isConnected || ESC.rapido) return;
+  }
+  el.style.setProperty("--cA", colorDe(d.A, "A")); el.style.setProperty("--cB", colorDe(d.B, "B"));
+  $("enFondo").className = "en-fondo frente";
+  $("enCuerpo").innerHTML = `<div class="en-frente">${["A", "B"].map(k => `<div class="en-col" style="--c:${colorDe(d[k], k)}">
+      <div class="en-lado">${k === "A" ? "A FAVOR" : "EN CONTRA"}</div>
+      <div class="en-nombre chico on">${escHtml(nombreG(d[k]))}</div>
+      <div class="en-caras mini">${((integrantes || {})[k] || []).map(j => caraEntrada(j, colorDe(d[k], k), 52)).join("")}</div></div>`).join(`<div class="en-vs">VS</div>`)}</div>
+    <div class="pp-q ${claseLargo(d.pregunta)} en-mocion">«${escHtml(d.pregunta)}»</div>`;
+  await esperar(Math.max(0, total - (Date.now() - t0)));
+}
+
+// Una cara de la entrada: la foto de Google (o las iniciales) con el color del lado.
+const caraEntrada = (j, c, tam) => `<div class="en-j">${avatarHtml({ ...j, equipo: "" }, tam).replace(/--c:[^;]+;/, `--c:${c};`)}
+  <div class="en-n">${escHtml(String(j.nombre || "").split(/\s+/).slice(0, 2).join(" "))}</div></div>`;
+
+async function esquina(el, d, k, gente, ms) {
+  const t0 = Date.now(), c = colorDe(d[k], k), nombre = nombreG(d[k]), sub = subtituloGrupo(d[k]);
+  el.style.setProperty("--c", c);
+  const f = $("enFondo"); f.className = "en-fondo"; void f.offsetWidth; f.classList.add("on");
+  const tam = Math.round(Math.min(112, innerHeight * 0.12) * (gente.length > 6 ? 0.78 : 1));
+  $("enCuerpo").innerHTML = `<div class="en-esquina">${k === "A" ? "EN ESTA ESQUINA…" : "Y EN ESTA OTRA ESQUINA…"}</div>
+    <div class="en-nombre${nombre.length > 14 ? " largo" : ""}" id="enNombre">${escHtml(nombre)}</div>
+    <div class="en-sub" id="enSub">${sub ? `${escHtml(sub)} · ` : ""}<b>${k === "A" ? "A FAVOR" : "EN CONTRA"}</b></div>
+    <div class="en-caras" id="enCaras"></div>`;
+  await esperar(900);
+  if (!el.isConnected) return;
+  $("enNombre").classList.add("on");
+  await esperar(600);
+  if (!el.isConnected) return;
+  $("enSub").classList.add("on");
+  await esperar(500);
+  const paso = gente.length ? Math.min(550, Math.max(150, (ms - 3500) / gente.length)) : 0;
+  for (const j of gente) {
+    if (!el.isConnected || ESC.rapido) return;
+    $("enCaras").insertAdjacentHTML("beforeend", caraEntrada(j, c, tam));
+    await esperar(paso);
+  }
+  if (el.isConnected) await esperar(Math.max(0, ms - (Date.now() - t0)));
 }
