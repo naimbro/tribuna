@@ -94,8 +94,7 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 #btnMic.on{background:#f43f5e;border-color:#f43f5e;animation:micPulso 1.2s ease-in-out infinite}
 #btnMic:disabled{opacity:.35}
 @keyframes micPulso{50%{box-shadow:0 0 0 8px #f43f5e33}}
-/* viva voz: mantener para hablar. Grande y redondo en la vista en vivo; en la fila sobre la caja
-   de escribir, una píldora ancha (se aprieta con el pulgar sin tapar lo que se escribe). */
+/* viva voz: mantener para hablar (vive en el centro de la vista en vivo) */
 .hablar{width:min(62vw,260px);aspect-ratio:1;border-radius:50%;border:6px solid #fff3;background:radial-gradient(circle,#fff2,#0000),var(--c,var(--neon));color:#fff;font:900 20px system-ui;line-height:1.15;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;transition:transform .12s}
 .hablar small{font-size:.62em;font-weight:700;opacity:.9}
 .hablar *{pointer-events:none}
@@ -105,13 +104,133 @@ body.es-publico .msg.res, body.es-publico .marca{display:none!important}
 .mi-habla{font-size:15px;line-height:1.35;color:var(--txt);text-align:center;min-height:1.35em;margin-top:8px;overflow-wrap:anywhere}
 .mi-habla:empty{min-height:0;margin:0}
 .mi-habla.aviso{color:var(--amber);font-size:13px}
-.fila-hablar{display:flex;flex-direction:column;align-items:stretch;margin-bottom:8px}
-.fila-hablar .hablar{width:100%;aspect-ratio:auto;height:58px;border-radius:29px;border-width:3px;font-size:16px;line-height:1.1}
-.fila-hablar .hablar br{display:none}
-.fila-hablar .hablar small{margin-left:.5em}
-.fila-hablar .hablar.on{box-shadow:0 0 0 6px #ffffff22,0 0 30px var(--c,var(--neon));transform:scale(.97);animation-name:hablaPulsoChico}
-@keyframes hablaPulsoChico{50%{box-shadow:0 0 0 9px #ffffff14,0 0 40px var(--c,var(--neon))}}
-.fila-hablar .mi-habla{margin-top:6px;max-height:4.2em;overflow-y:auto}
+/* la vista en vivo (viva voz): oscura, tipografía grande, un solo acento (--c: el color de mi lado
+   o de mi personaje; en el público, el de quien habla). Todo se alcanza con el pulgar: lo que se
+   toca (botón, punto, reacciones, pie) está de la mitad hacia abajo. */
+.vivo{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:12px;padding:14px 16px calc(12px + env(safe-area-inset-bottom));
+  background:radial-gradient(130% 62% at 50% 44%,color-mix(in srgb,var(--c) 30%,#000) 0%,color-mix(in srgb,var(--c) 8%,var(--bg)) 55%,var(--bg) 100%)}
+.vivo.publico{background:linear-gradient(180deg,#0e1520 0%,var(--bg) 60%)}
+.vv-cab{text-align:center}
+.vv-rol{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px}
+.vv-rol b{font-weight:800}
+.vv-rol span{font-size:10.5px;font-weight:800;letter-spacing:.16em;color:var(--c);padding:2px 9px;border:1px solid color-mix(in srgb,var(--c) 70%,transparent);border-radius:99px}
+.vv-reloj{font-size:50px;font-weight:800;line-height:1;letter-spacing:-.03em;margin-top:8px;font-variant-numeric:tabular-nums}
+.vv-reloj.bajo{color:var(--B)}
+.vv-reloj.cero{color:var(--B);opacity:.5}
+.vv-rnota{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:3px}
+.vv-rnota.corre::before,.vv-rc.corre::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:1px;animation:pulso .9s infinite}
+.vv-rnota.sin{color:var(--B);font-weight:800;font-size:12.5px;letter-spacing:.06em}
+.vv-mod{flex:0 0 auto;background:#1b1830;border:1px solid #4c3fa0;border-left:4px solid var(--mod);border-radius:12px;padding:8px 12px 9px;font-size:14px;line-height:1.4;animation:vvEntra .35s ease-out}
+.vv-mod-tx{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.vv-mod .q{display:block;color:var(--mod);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:2px}
+@keyframes vvEntra{from{opacity:0;transform:translateY(-6px)}}
+/* el botón toma el espacio que queda: con la moderadora, un compañero y un punto a la vez, se achica
+   en vez de empujar la tarjeta del punto fuera de la pantalla */
+.vv-centro{flex:1 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.vivo .hablar{width:min(64vw,250px,33dvh)}
+@supports (container-type:size){
+  .vv-centro{flex:1 1 0;min-height:200px;container-type:size}
+  .vivo .hablar{width:min(64vw,250px,calc(100cqh - 62px))}
+}
+body.en-vivo.vv-banco header .reloj{visibility:hidden}
+.vv-comp:empty{display:none}
+.vv-cmp{font-size:14.5px;text-align:center;color:var(--txt)}
+.vv-cmp span{display:block;font-size:13px;color:var(--dim);font-style:italic;margin-top:2px}
+.vv-boton{display:flex;flex-direction:column;align-items:center;width:100%}
+.vivo .hablar{border-color:color-mix(in srgb,#fff 22%,var(--c));font-size:19px;
+  box-shadow:0 18px 50px -12px color-mix(in srgb,var(--c) 70%,transparent),inset 0 -8px 20px #0003}
+.vivo .hablar.on{box-shadow:0 0 0 14px #ffffff22,0 0 60px var(--c)}
+.vivo .hablar:disabled{box-shadow:none}
+/* lo que voy diciendo: las últimas dos líneas (lo viejo se corta por arriba) */
+.vivo .mi-habla{font-size:16.5px;line-height:1.35;height:2.7em;overflow:hidden;width:100%;margin-top:10px;display:flex;flex-direction:column;justify-content:flex-end}
+.vivo .mi-habla:empty{height:2.7em;margin-top:10px}
+.vivo .mi-habla.aviso{height:auto;max-height:6.2em;overflow-y:auto;justify-content:flex-start}
+.vivo .mi-habla.aviso{font-size:13.5px}
+.vv-punto{display:flex;flex-direction:column;gap:8px}
+.vv-punto:empty{display:none}
+.vv-otro{font-size:14px;text-align:center;color:var(--dim)}
+.vv-otro b{color:var(--txt)}
+.vv-pto{width:100%;padding:12px;border-radius:16px;border:2px solid var(--amber);background:#2a1d05;color:var(--amber);font:900 21px system-ui;letter-spacing:.05em;cursor:pointer}
+.vv-pto small{display:block;font-size:12px;font-weight:600;letter-spacing:0;color:#e9c46a;margin-top:1px}
+.vv-pto:disabled{opacity:.55;cursor:default}
+.vv-card{background:#261b06;border:2px solid var(--amber);border-radius:16px;padding:12px 12px 12px;box-shadow:0 0 30px #f5b30133;animation:vvEntra .3s ease-out}
+.vv-card-t{font-size:17px;font-weight:800;line-height:1.25}
+.vv-card-t b{color:var(--amber)}
+.vv-card-s{font-size:13px;color:var(--dim);margin-top:3px}
+.vv-2{display:flex;gap:10px;margin-top:10px}
+.vv-2 button{flex:1;padding:15px 8px;border-radius:12px;font:800 17px system-ui;cursor:pointer}
+.vv-si{background:var(--amber);color:#1a1200;border:none}
+.vv-no{background:transparent;color:var(--txt);border:1px solid #ffffff40}
+.vv-palabra{text-align:center;padding:12px;border-radius:16px;background:#261b06;border:2px solid var(--amber);font-size:18px;font-weight:800;color:var(--amber)}
+.vv-palabra b{font-size:26px;color:#fff;margin-left:4px}
+.vv-palabra small{display:block;font-size:13px;font-weight:500;color:var(--dim);margin-top:2px}
+.vv-estado{font-size:14px;text-align:center;color:var(--amber)}
+.vv-estado.apagado{color:var(--dim)}
+.vv-nota{font-size:13px;text-align:center;color:var(--amber)}
+.vv-pie{flex:0 0 auto;display:flex;gap:10px}
+.vv-pie-b{flex:1;padding:12px 8px;border-radius:12px;border:1px solid #ffffff1f;background:#0b141acc;color:var(--txt);font:600 14.5px system-ui;cursor:pointer}
+.vivo.agotado .vv-pie-b[data-acc=escribir]{background:var(--c);color:#06121a;border-color:transparent;font-weight:800}
+.vv-volver{flex:0 0 auto;display:block;width:100%;border:none;background:var(--c,#a78bfa);color:#06121a;font:800 14px system-ui;padding:9px 12px;cursor:pointer;letter-spacing:.02em}
+/* el público: lo que se dice ahora */
+.vv-duelo{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px}
+.vv-duelo>i{font-style:normal;color:var(--dim2);font-size:11px;font-weight:800;letter-spacing:.16em}
+.vv-ld{border-top:3px solid var(--l);background:#0f161d;border-radius:12px;padding:7px 10px 8px;min-width:0;--c:var(--l)}
+.vv-ld.der{text-align:right}
+.vv-ld b{display:block;color:var(--l);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vv-ld small{display:block;font-size:9.5px;letter-spacing:.14em;color:var(--dim);font-weight:700}
+.vv-rc{display:block;font-size:21px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.vv-rc:empty{display:none}
+.vv-rc.corre{color:var(--l)}
+.vv-rc.bajo{color:var(--B)}
+.vv-pp{font-size:13.5px;color:var(--amber);text-align:center}
+.vv-pp:empty{display:none}
+/* la escena toma lo que queda; el subtítulo se ancla abajo: lo último que se dijo siempre se ve */
+.vv-escena{flex:1 1 0;min-height:150px;display:flex;flex-direction:column;justify-content:center;gap:16px;overflow:hidden}
+.vv-hab{border-left:4px solid var(--l);padding:2px 0 2px 14px;display:flex;flex-direction:column;min-height:0;flex:0 1 auto}
+.vv-en{font-size:10.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--l)}
+.vv-en i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff4d5e;margin-right:7px;vertical-align:1px;box-shadow:0 0 10px #ff4d5e;animation:pulso .9s infinite}
+.vv-nom{font-size:24px;font-weight:900;line-height:1.1;margin-top:5px;overflow-wrap:anywhere}
+.vv-gr{font-size:13px;color:var(--l);font-weight:700;margin-top:1px}
+.vv-tx{font-size:clamp(19px,2.9dvh,23px);line-height:1.35;margin-top:8px;font-weight:600;overflow-wrap:anywhere;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+.vv-tx.corta{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 2.2em);mask-image:linear-gradient(to bottom,transparent,#000 2.2em)}
+.vv-hab.quieto .vv-tx{font-size:clamp(16px,2.2dvh,18px);font-weight:500;color:#d5dde5;justify-content:flex-start}
+.vv-hab.quieto .vv-tx.corta{-webkit-mask-image:linear-gradient(to top,transparent,#000 2.2em);mask-image:linear-gradient(to top,transparent,#000 2.2em)}
+.vv-hab.quieto .vv-en{color:var(--dim)}
+.vv-pts{animation:pulso .9s infinite;font-style:normal}
+.vv-escena.dos{justify-content:flex-start;gap:10px}
+.vv-escena.dos .vv-hab{flex:1 1 0;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);column-gap:8px;align-items:baseline}
+.vv-escena.dos .vv-hab .vv-en{display:none}
+.vv-escena.dos .vv-nom{font-size:18px;margin-top:0}
+.vv-escena.dos .vv-gr{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vv-escena.dos .vv-tx{grid-column:1/-1;align-self:stretch;font-size:18px;margin-top:4px}
+.vv-escena.dos .vv-tx.corta{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 1.2em);mask-image:linear-gradient(to bottom,transparent,#000 1.2em)}
+.vv-dos{--l:var(--txt);flex:0 0 auto}
+.vv-vacio{text-align:center;font-size:19px;font-weight:700;color:var(--txt)}
+.vv-vacio small{display:block;font-size:13.5px;font-weight:500;color:var(--dim);margin-top:4px}
+.vv-rx:empty{display:none}
+.vv-rx-q{font-size:12.5px;color:var(--dim);margin-bottom:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vv-rx-q b{color:var(--txt)}
+.vv-rxs{display:flex;gap:8px}
+.vv-rxb{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 4px 7px;border-radius:14px;border:1px solid var(--line);background:#0f161d;color:var(--dim);font:inherit;cursor:pointer;position:relative}
+.vv-rxb span{font-size:25px;line-height:1.1}
+.vv-rxb small{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.vv-rxb b{position:absolute;top:5px;right:8px;font-size:12px;color:var(--txt)}
+.vv-rxb.on{border-color:#a78bfa;background:#241d3d;color:var(--txt);box-shadow:0 0 0 1px #a78bfa}
+@media (max-height:700px){
+  .vivo{gap:8px;padding-top:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+  .vv-rol{font-size:14px}
+  .vv-reloj{font-size:42px;margin-top:4px}
+  .vv-mod{font-size:13.5px}
+  .vv-mod-tx{-webkit-line-clamp:3}
+  .vv-pto{padding:8px;font-size:19px}
+  .vv-centro{min-height:180px}
+  .vv-pie-b{padding:10px 8px}
+  .vv-ld{padding:6px 9px 7px}
+  .vv-rc{font-size:18px}
+  .vv-nom{font-size:21px}
+  .vv-rxb{padding:6px 4px 5px}
+  .vv-rxb span{font-size:22px}
+}
 .nota-caja{font-size:11.5px;color:var(--dim2);margin:4px 4px 0}
 .nota-caja.ati{color:var(--neon)}
 /* espera (portada / intro) y feedback: tapan la conversación */
@@ -290,18 +409,20 @@ body.sube #entre{background:radial-gradient(circle at 50% 30%,color-mix(in srgb,
 <div id="entre" class="capa oculto"></div>
 
 <!-- 3. la conversación -->
+<!-- en la vista de siempre durante el vivo: vuelve al botón de hablar (como «volver a la llamada») -->
+<button type="button" id="vvVolver" class="vv-volver oculto">🎙 Volver al vivo</button>
 <div id="estado" class="estado oculto">
   <div><b id="tramoLbl"></b> <span id="pauta"></span></div>
   <div class="marca" id="marca"></div>
   <div id="barraTel"></div>
 </div>
 <section id="pJuego" class="pant oculto"></section>
+<!-- viva voz con el debate abierto: el botón de hablar para quien debate, lo que se dice ahora para el público -->
+<section id="pVivo" class="vivo oculto"></section>
 <div id="escribiendo" class="escr"></div>
 
 <div id="caja" class="abajo oculto">
   <div class="sugiere" id="sugiere"></div>
-  <!-- viva voz: mantener para hablar (jugar.js monta aquí el botón mientras no esté la vista en vivo) -->
-  <div id="filaHablar" class="fila-hablar oculto"></div>
   <div class="fila">
     <textarea id="tx" rows="1" placeholder="Escribe…"></textarea>
     <button id="btnMic" class="oculto" title="Dictar por voz">🎤</button>

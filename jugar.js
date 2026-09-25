@@ -19,7 +19,7 @@ const app = HAY_FIREBASE ? initializeApp(firebaseConfig) : null;
 const auth = HAY_FIREBASE ? getAuth(app) : null;
 const db = HAY_FIREBASE ? getFirestore(app) : null;
 
-const J = { gente: [], uid: null, email: null, foto: null, fbListo: false, codigo: null, nombre: "", equipo: null, grupo: null, sala: null, chat: [], reloj: null, primera: true };
+const J = { gente: [], vistaClasica: false, uid: null, email: null, foto: null, fbListo: false, codigo: null, nombre: "", equipo: null, grupo: null, sala: null, chat: [], reloj: null, primera: true };
 const google = new GoogleAuthProvider();
 const colorRigor = t => t >= 14 ? "var(--neon)" : t >= 9 ? "var(--amber)" : "var(--B)";
 const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -84,7 +84,8 @@ $("btnEntrar").onclick = async () => {
 };
 
 function mostrarBancadas() {
-  ["pEntrar", "pJuego", "estado", "caja", "voto", "espera", "fb", "entre"].forEach(id => $(id)?.classList.add("oculto"));
+  ["pEntrar", "pJuego", "pVivo", "vvVolver", "estado", "caja", "voto", "espera", "fb", "entre"].forEach(id => $(id)?.classList.add("oculto"));
+  VV.visible = false;
   $("pBancada").classList.remove("oculto");
   document.body.classList.remove("sube"); document.body.style.removeProperty("--c");
   $("mocion1").textContent = J.sala.temaGeneral || J.sala.tema;
@@ -181,11 +182,17 @@ async function entrarAlJuego() {
   }, () => {}));
   // quiénes están en la sala: para sugerir nombres al escribir @
   subs.push(onSnapshot(collection(db, "salas", J.codigo, "jugadores"), snap => {
-    J.gente = []; snap.forEach(d => J.gente.push({ uid: d.id, nombre: d.data().nombre || "", grupo: d.data().grupo || 0, escribe: d.data().escribe || null }));
+    J.gente = []; snap.forEach(d => J.gente.push({ uid: d.id, nombre: d.data().nombre || "", grupo: d.data().grupo || 0, escribe: d.data().escribe || null, habla: d.data().habla || null }));
     for (const g of J.gente) if (g.escribe && (!ESCR.visto[g.uid] || ESCR.visto[g.uid].t !== g.escribe.t))
       ESCR.visto[g.uid] = { t: g.escribe.t, en: ESCR.primera ? 0 : Date.now() };   // la primera foto trae marcas viejas
+    // el habla, igual: visto es cuándo ESTE teléfono vio cambiar el latido (los relojes no coinciden)
+    for (const g of J.gente) {
+      if (g.habla && (!VV.hablaVisto[g.uid] || VV.hablaVisto[g.uid].t !== g.habla.t))
+        VV.hablaVisto[g.uid] = { t: g.habla.t, en: ESCR.primera ? 0 : Date.now() };
+      g.visto = g.habla && VV.hablaVisto[g.uid] ? VV.hablaVisto[g.uid].en : 0;
+    }
     ESCR.primera = false;
-    pintarBarraTel(); pintarEscribiendo();
+    pintarBarraTel(); pintarEscribiendo(); pintarVivoParcial();
   }));
   // el profesor puede moverme de grupo: el rol y lo que escribo dependen de mi grupo actual
   subs.push(onSnapshot(doc(db, "salas", J.codigo, "jugadores", J.uid), snap => {
@@ -201,7 +208,9 @@ async function entrarAlJuego() {
     const antes = new Set(J.chat.map(m => m.id));
     J.chat = []; snap.forEach(d => J.chat.push({ ...d.data(), id: d.id }));
     const nuevos = J.chat.filter(m => !antes.has(m.id));
+    if (!J.primera) for (const m of nuevos) VV.llega[m.id] = Date.now();   // «hace 60 s» con el reloj de este teléfono
     pintarChat();
+    pintarVivoParcial();
     pintarBarraTel();
     if (J.sala) pintarVotar(J.sala);                  // el resumen del relator llega con la votación ya abierta
     if (!J.primera) avisarNuevos(nuevos);
@@ -307,6 +316,9 @@ function pintarSala() {
   pintarFeedback(s);
   if (s.veredicto && !J.ceremoniaVista && J.fbListo) { J.ceremoniaVista = true; ceremonia(s, s.veredicto); }
   pintarChat(); pintarCaja(); pintarReloj();
+  // la vista de siempre que eligió el alumno dura lo que dura el debate
+  if (s.fase === "votando" || (d && J.vistaDe !== d.n)) { J.vistaClasica = false; J.vistaDe = d ? d.n : null; }
+  pintarVivo(s);
 }
 
 function pintarReloj() {
@@ -396,7 +408,7 @@ function suscribirPublicoActivo(n) {
     const xs = []; PA.mias = {};
     snap.forEach(d => { const x = d.data(); xs.push(x); if (x.uid === J.uid && x.r) PA.mias[x.msg] = x.r; });
     PA.conteos = contarReacciones(xs);
-    pintarChat();
+    pintarChat(); pintarVivoParcial();
   }, () => {}));
   // tras recargar: el termómetro y la pregunta vuelven a donde estaban
   getDoc(doc(db, "salas", J.codigo, "termometro", `${n}_${J.uid}`)).then(d => {
@@ -432,19 +444,22 @@ function guardarTermometro() {
     { uid: J.uid, debate: d.n, grupo: J.grupo, pos: PA.tm.pos, pos0: PA.tm.pos0, t: Date.now() })
     .catch(e => { $("avisoVoto").textContent = "🌡 No se guardó: " + e.code; }), 600);
 }
+// Una reacción por mensaje: tocar la misma la quita. La usan la conversación y la vista en vivo.
+async function reaccionar(msg, rid) {
+  const s = J.sala, d = s && s.debate;
+  if (!msg || !d || rolEn(s) !== "P" || s.fase !== "abierta") return;
+  const r = PA.mias[msg] === rid ? null : rid;
+  PA.mias[msg] = r;                                   // se ve al tiro; el conteo llega del servidor
+  navigator.vibrate?.(20);
+  pintarChat(); pintarVivoParcial();
+  try { await setDoc(doc(db, "salas", J.codigo, "reacciones", `${msg}_${J.uid}`), { uid: J.uid, msg, debate: d.n, r, t: Date.now() }); }
+  catch (err) { $("avisoVoto").textContent = "No se guardó la reacción: " + err.code; }
+}
 function prepararPublicoActivo() {
   $("tm").oninput = guardarTermometro;
-  $("pJuego").addEventListener("click", async e => {
+  $("pJuego").addEventListener("click", e => {
     const b = e.target.closest("button.rxb");
-    if (!b) return;
-    const s = J.sala, d = s && s.debate;
-    if (!d || rolEn(s) !== "P" || s.fase !== "abierta") return;
-    const msg = b.dataset.m, r = PA.mias[msg] === b.dataset.r ? null : b.dataset.r;
-    PA.mias[msg] = r;                                   // se ve al tiro; el conteo llega del servidor
-    navigator.vibrate?.(20);
-    pintarChat();
-    try { await setDoc(doc(db, "salas", J.codigo, "reacciones", `${msg}_${J.uid}`), { uid: J.uid, msg, debate: d.n, r, t: Date.now() }); }
-    catch (err) { $("avisoVoto").textContent = "No se guardó la reacción: " + err.code; }
+    if (b) reaccionar(b.dataset.m, b.dataset.r);
   });
   $("btnPreg").onclick = () => {
     $("pregCaja").classList.toggle("oculto");
@@ -662,7 +677,6 @@ function pintarCaja() {
   if ($("btnMic")) $("btnMic").disabled = !abierta;
   if (!abierta) cortarDictado();
   if (!abierta && HABLA.apretado) soltarHablar({ enviar: false });   // se cerró el tramo mientras hablaba: no se envía
-  pintarHablarEnCaja(J.sala);
   $("btnEnviar").disabled = !abierta || !$("tx").value.trim();
   if (!abierta) { $("notaCaja").textContent = ""; $("notaCaja").classList.remove("ati"); }
 }
@@ -965,8 +979,8 @@ window.addEventListener("pagehide", () => {
   if (HABLA.toma && J.codigo && J.uid) setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { habla: null }, { merge: true }).catch(() => {});
 });
 
-// El botón y lo que voy diciendo, dentro de `contenedor` (la vista en vivo, o por ahora la fila
-// sobre la caja de escribir). Si ya existen, se mueven ahí; mientras se aprieta no se tocan, para
+// El botón y lo que voy diciendo, dentro de `contenedor` (el centro de la vista en vivo). Si ya
+// existen, se mueven ahí; mientras se aprieta no se tocan, para
 // no perder la captura del dedo. Sin reconocimiento de voz no hay botón: queda el teclado.
 function montarBotonHablar(contenedor) {
   if (!contenedor || !Reconocedor) return null;
@@ -1004,19 +1018,275 @@ function pintarBotonHablar(s) {
   b.setAttribute("aria-label", { apretado: "Te escucho: suelta para enviar", agotado: "Sin tiempo: solo puedes escribir" }[estado] || "Mantén apretado para hablar");
 }
 
-// Mientras no llegue la vista en vivo del teléfono, el botón vive en una fila sobre la caja de
-// escribir, para quien debate y solo con la viva voz encendida.
-function pintarHablarEnCaja(s) {
-  const fila = $("filaHablar");
-  if (!fila || !s) return;
-  const lado = miLado(s);
-  const toca = !!(lado && Reconocedor && opcionActiva(s.opciones, "voz"));
-  fila.classList.toggle("oculto", !toca);
-  if (!toca) return;
-  const p = personajeDe(J.grupo, PJ());
-  fila.style.setProperty("--c", (p && p.color) || s.equipos[lado].color);
-  montarBotonHablar(fila);
+/* ---------- la vista en vivo (viva voz, con el debate abierto) ----------
+   Con la voz encendida el teléfono deja de ser un chat. Quien debate ve su reloj, el botón de
+   hablar enorme y lo que le toca atender (la moderadora que lo nombra, un punto de información);
+   el público ve lo que se está diciendo ahora, en grande, y reacciona a eso. «⌨ escribir» y «ver
+   conversación» vuelven a la vista de siempre (J.vistaClasica) y la franja «🎙 volver al vivo» la
+   deshace. El armazón se arma una vez por debate y rol; cada 300 ms se repinta solo lo que cambia
+   (reloj, subtítulos, punto), porque el botón de hablar no se puede rehacer mientras se aprieta:
+   perdería la captura del dedo. Quien debate sin reconocimiento de voz (algunos iPhone) se queda
+   con la vista de siempre: sin botón, lo suyo es el teclado. */
+const VV = { visible: false, clave: "", llega: {}, hablaVisto: {}, pedido: null, enfria: 0, ladoVisto: null,
+  respondido: null, avisado: null, palabra: null, aviso: null, modClave: "", modLista: [] };
+const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
+const ladoDe = (g, d) => (g === d.A ? "A" : g === d.B ? "B" : null);
+const colorGrupo = (g, s) => { const p = personajeDe(g, PJ()), k = ladoDe(g, s.debate); return (p && p.color) || (k ? s.equipos[k].color : "var(--dim)"); };
+// el final de un texto largo (el subtítulo muestra lo último que se dijo)
+const cola = (t, n) => { t = String(t || "").trim(); return t.length > n ? "…" + t.slice(-n).replace(/^\S*\s/, "") : t; };
+// innerHTML solo si cambió: un botón rehecho entre el pointerdown y el pointerup pierde el toque
+const poner = (el, html) => { if (el && el._h !== html) { el._h = html; el.innerHTML = html; } };
+
+function tocaVivo(s) {
+  if (!s || s.etapa != null || !opcionActiva(s.opciones, "voz") || s.fase !== "abierta" || !s.debate || enSuspenso(s)) return false;
+  const rol = rolEn(s);
+  return rol === "P" || ((rol === "A" || rol === "B") && !!Reconocedor);
 }
+// Quienes hablan ahora (sin contarme): ficha con habla de este debate y un latido que este
+// teléfono vio llegar hace menos de AJ.LATIDO (un teléfono que se apagó a mitad cuenta como callado).
+function quienesHablan(s) {
+  const d = s.debate, ahora = Date.now();
+  return J.gente.filter(g => g.uid !== J.uid && g.habla && g.habla.debate === d.n && g.visto
+    && ahora - g.visto <= AJ.LATIDO && ladoDe(g.grupo, d));
+}
+// El reloj de un lado: el banco (contado aquí desde la última foto) o, sin reloj de ajedrez, el tramo.
+function relojVivo(s) {
+  const banco = opcionActiva(s.opciones, "reloj") ? bancoMio(s) : null;
+  const corre = k => !!(banco && J.bancoFoto && J.bancoFoto.corre && J.bancoFoto.corre[k] && banco[k] > 0);
+  const tramo = s.abreEn ? s.seg * 1000 - (Date.now() - s.abreEn) : null;
+  return { banco, corre, tramo };
+}
+
+function pintarVivo(s) {
+  const ver = tocaVivo(s) && !J.vistaClasica;
+  const volver = $("vvVolver");
+  volver.classList.toggle("oculto", !(tocaVivo(s) && J.vistaClasica));
+  if (!volver.classList.contains("oculto")) {
+    const lado = miLado(s);
+    volver.style.setProperty("--c", lado ? colorGrupo(J.grupo, s) : "#a78bfa");
+  }
+  $("pVivo").classList.toggle("oculto", !ver);
+  document.body.classList.toggle("en-vivo", ver);
+  // con el banco a la vista, el reloj del tramo de la cabecera confunde (el tramo lo cierran los bancos)
+  document.body.classList.toggle("vv-banco", ver && !!s.banco && opcionActiva(s.opciones, "reloj"));
+  if (ver) ["pJuego", "estado", "caja"].forEach(id => $(id).classList.add("oculto"));
+  else if (VV.visible) { $("pJuego").classList.remove("oculto"); $("estado").classList.remove("oculto"); }   // solo si los escondí yo
+  VV.visible = ver;
+  if (!ver) return;
+  const rol = rolEn(s), d = s.debate;
+  const clave = [rol, d.n, d.A, d.B, J.grupo, (PJ() || []).length].join("#");
+  if (VV.clave !== clave) { VV.clave = clave; armarVivo(s, rol); }
+  pintarVivoParcial();
+}
+
+function armarVivo(s, rol) {
+  const el = $("pVivo"), d = s.debate;
+  // el botón de hablar y lo que voy diciendo sobreviven al armazón nuevo: se sacan antes
+  for (const id of ["btnHablar", "miHabla"]) { const x = $(id); if (x && el.contains(x)) x.remove(); }
+  const pie = b => `<div class="vv-pie">${b ? `<button type="button" class="vv-pie-b" data-acc="escribir">⌨ escribir</button>` : ""}<button type="button" class="vv-pie-b" data-acc="conv">ver conversación</button></div>`;
+  if (rol === "P") {
+    el.className = "vivo publico";
+    el.style.setProperty("--c", "#a78bfa");
+    const lado = k => `<div class="vv-ld ${k === "B" ? "der" : ""}" style="--l:${colorGrupo(d[k], s)}">
+        <b>${esc(nomG(d[k]))}</b><small>${esc(s.equipos[k].nombre)}</small><span class="vv-rc mono" id="vvR${k}"></span></div>`;
+    el.innerHTML = `<div class="vv-duelo">${lado("A")}<i>vs</i>${lado("B")}</div>
+      <div class="vv-pp" id="vvPuntoP"></div>
+      <div class="vv-escena" id="vvEscena" aria-live="polite"></div>
+      <div class="vv-rx" id="vvRx"></div>${pie(false)}`;
+    return;
+  }
+  el.className = "vivo debate";
+  el.style.setProperty("--c", colorGrupo(J.grupo, s));
+  el.innerHTML = `<div class="vv-cab">
+      <div class="vv-rol"><b>${esc(nomG(J.grupo))}</b><span>${esc(s.equipos[rol].nombre)}</span></div>
+      <div class="vv-reloj mono" id="vvReloj"></div><div class="vv-rnota" id="vvRNota"></div></div>
+    <div class="vv-mod oculto" id="vvMod"></div>
+    <div class="vv-comp" id="vvComp"></div>
+    <div class="vv-centro"><div class="vv-boton" id="vvBoton"></div></div>
+    <div class="vv-punto" id="vvPunto"></div>${pie(true)}`;
+  montarBotonHablar($("vvBoton"));
+}
+
+function pintarVivoParcial() {
+  const s = J.sala;
+  if (!VV.visible || !s || !s.debate) return;
+  const rol = rolEn(s);
+  if (rol === "P") parcialPublico(s);
+  else if (rol === "A" || rol === "B") parcialDebate(s, rol);
+}
+
+// La última línea de la moderadora que me nombra (a mí o a mi grupo) en este debate, de hace
+// menos de un minuto. meNombran es caro: se recalcula solo cuando cambia la conversación.
+function modParaMi(s, ahora) {
+  const ult = J.chat[J.chat.length - 1];
+  const clave = s.debate.n + "|" + J.chat.length + "|" + (ult ? ult.id : "") + "|" + J.grupo;
+  if (VV.modClave !== clave) {
+    VV.modClave = clave;
+    VV.modLista = J.chat.slice(-40).filter(m => m.tipo === "mod" && m.debate === s.debate.n && m.texto && meNombran(m.texto));
+  }
+  for (let i = VV.modLista.length - 1; i >= 0; i--) {
+    const m = VV.modLista[i];
+    if (ahora - (VV.llega[m.id] || m.t) <= 60000) return m;
+  }
+  return null;
+}
+
+function parcialDebate(s, lado) {
+  const d = s.debate, ahora = Date.now(), el = $("pVivo");
+  if (!HABLA.apretado && $("vvBoton") && (!$("btnHablar") || $("btnHablar").parentNode !== $("vvBoton"))) montarBotonHablar($("vvBoton"));
+  // mi reloj: el banco de mi lado, o el tramo si no hay reloj de ajedrez
+  const { banco, corre, tramo } = relojVivo(s);
+  const ms = banco ? banco[lado] : tramo;
+  const agotado = !!banco && banco[lado] <= 0;
+  const reloj = $("vvReloj"), nota = $("vvRNota");
+  reloj.textContent = ms == null ? "" : mmss(ms);
+  reloj.classList.toggle("bajo", ms != null && ms < 20000 && !agotado);
+  reloj.classList.toggle("cero", agotado);
+  const porPunto = hablaPorPunto(s);
+  nota.textContent = agotado ? (porPunto ? "sin tiempo · hablas por tu punto" : "SIN TIEMPO · solo puedes escribir")
+    : banco ? (corre(lado) ? "tu tiempo · corriendo" : "el tiempo de tu lado") : "queda del tramo";
+  nota.classList.toggle("sin", agotado);
+  nota.classList.toggle("corre", !agotado && corre(lado));
+  el.classList.toggle("agotado", agotado && !porPunto);
+  // la moderadora me habla (mientras me piden un punto, la tarjeta manda: tiene 10 s)
+  const pide = !!(s.punto && s.punto.estado === "pedido" && s.punto.para === lado);
+  const m = pide ? null : modParaMi(s, ahora), mod = $("vvMod");
+  mod.classList.toggle("oculto", !m);
+  poner(mod, m ? `<b class="q">🎙 La moderadora te pregunta</b><span class="vv-mod-tx">${menciones(m.texto)}</span>` : "");
+  // quién de mi lado está hablando (para no pisarse) y quién del otro lado
+  const hablan = quienesHablan(s);
+  const mios = hablan.filter(g => ladoDe(g.grupo, d) === lado), otros = hablan.filter(g => ladoDe(g.grupo, d) !== lado);
+  poner($("vvComp"), mios.map(g => `<div class="vv-cmp">🎙 <b>${esc(corto(g.nombre))}</b> está hablando${g.habla.texto ? `<span>${esc(cola(g.habla.texto, 90))}</span>` : ""}</div>`).join(""));
+  poner($("vvPunto"), puntoDebate(s, lado, otros, ahora));
+}
+
+// Lo del punto de información en el teléfono de quien debate (ver punto.js). El proyector decide;
+// aquí solo se pide, se responde y se muestra lo que publicó.
+function puntoDebate(s, lado, otros, ahora) {
+  const p = s.punto, conPunto = opcionActiva(s.opciones, "punto");
+  if (VV.aviso && ahora > VV.aviso.hasta) VV.aviso = null;
+  // un pedido de mi lado (mío o de un compañero) enfría el botón 30 s, como en el proyector
+  if (p && p.lado === lado && VV.ladoVisto !== p.t) { VV.ladoVisto = p.t; VV.enfria = Math.max(VV.enfria, ahora); }
+  if (VV.pedido && p && p.t === VV.pedido.t) VV.pedido = null;                   // ya lo refleja la sala
+  if (VV.pedido && ahora - VV.pedido.en > 6000) {
+    VV.pedido = null;
+    VV.aviso = { txt: "✋ El punto no entró: pídelo de nuevo cuando vuelvan a hablar.", hasta: ahora + 4000 };
+  }
+  const aviso = VV.aviso ? `<div class="vv-nota">${esc(VV.aviso.txt)}</div>` : "";
+  const quien = x => `<b>${esc(x.nombre || "Alguien")}</b>${x.grupo && x.grupo !== J.grupo ? ` (${esc(nomG(x.grupo))})` : ""}`;
+  if (p && p.estado === "pedido" && p.para === lado) {
+    if (VV.avisado !== p.t) { VV.avisado = p.t; navigator.vibrate?.([90, 50, 90]); }
+    if (VV.respondido && VV.respondido.t === p.t)
+      return `<div class="vv-card"><div class="vv-card-t">✋ ${quien(p)} pide un punto</div><div class="vv-card-s">${VV.respondido.acepta ? "Aceptaste" : "Rechazaste"}: esperando la pantalla…</div></div>`;
+    return `<div class="vv-card"><div class="vv-card-t">✋ ${quien(p)} pide un punto</div>
+      <div class="vv-card-s">Si aceptas, tiene 15 s y corre el reloj de su lado.</div>
+      <div class="vv-2"><button type="button" class="vv-si" data-acc="acepta">Aceptar</button><button type="button" class="vv-no" data-acc="rechaza">Rechazar</button></div></div>`;
+  }
+  if (p && p.estado === "aceptado" && p.de === J.uid) {
+    if (!VV.palabra || VV.palabra.t !== p.t) { VV.palabra = { t: p.t, desde: ahora }; navigator.vibrate?.([60, 40, 220]); }
+    const n = Math.max(0, Math.ceil((PUNTO.DURA - (ahora - VV.palabra.desde)) / 1000));
+    return `<div class="vv-palabra">✋ Tienes la palabra: <b class="mono">${n}</b> s<small>Mantén el botón y haz tu punto.</small></div>`;
+  }
+  if (p && p.estado === "aceptado") return `<div class="vv-estado">✋ ${quien(p)} tiene la palabra: punto de información.</div>`;
+  if (p && p.estado === "pedido" && p.de === J.uid) return `<div class="vv-estado">✋ Pediste un punto: esperando que respondan…</div>`;
+  if (p && p.estado === "pedido") return `<div class="vv-estado">✋ ${quien(p)} pidió un punto.</div>`;
+  if (p && p.estado === "rechazado") return `<div class="vv-estado apagado">✋ Punto rechazado.</div>` + aviso;
+  if (p && p.estado === "vencido") return `<div class="vv-estado apagado">✋ Nadie respondió el punto.</div>` + aviso;
+  if (!otros.length) return aviso;
+  const g = otros[0];
+  const habla = `<div class="vv-otro">🎙 <b>${esc(corto(g.nombre))}</b> · ${esc(nomG(g.grupo))} está hablando</div>`;
+  if (!conPunto || puntoActivo(p)) return habla + aviso;
+  if (VV.pedido) return habla + `<button type="button" class="vv-pto" disabled>Pedido…</button>`;
+  const falta = PUNTO.ENFRIA - (ahora - VV.enfria);
+  if (falta > 0) return habla + `<button type="button" class="vv-pto" disabled>✋ PUNTO<small>de nuevo en ${Math.ceil(falta / 1000)} s</small></button>` + aviso;
+  return habla + `<button type="button" class="vv-pto" data-acc="punto">✋ PUNTO<small>pide la palabra 15 s</small></button>` + aviso;
+}
+
+function pedirPuntoTel(s) {
+  const lado = miLado(s);
+  if (!lado || !s.debate || puntoActivo(s.punto) || VV.pedido || !opcionActiva(s.opciones, "punto")) return;
+  const t = Date.now();
+  VV.pedido = { t, en: t }; VV.enfria = t;
+  navigator.vibrate?.(30);
+  setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { punto: { debate: s.debate.n, t } }, { merge: true })
+    .catch(e => { VV.pedido = null; VV.enfria = 0; VV.aviso = { txt: "✋ No se pidió el punto: " + e.code, hasta: Date.now() + 4000 }; });
+  pintarVivoParcial();
+}
+function responderPuntoTel(s, acepta) {
+  const p = s && s.punto, lado = miLado(s);
+  if (!p || p.estado !== "pedido" || p.para !== lado || (VV.respondido && VV.respondido.t === p.t)) return;
+  VV.respondido = { t: p.t, acepta };
+  navigator.vibrate?.(30);
+  setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { respondePunto: { t: p.t, acepta, lado } }, { merge: true })
+    .catch(e => { VV.respondido = null; VV.aviso = { txt: "✋ No se envió tu respuesta: " + e.code, hasta: Date.now() + 4000 }; });
+  pintarVivoParcial();
+}
+
+function parcialPublico(s) {
+  const d = s.debate;
+  const { banco, corre } = relojVivo(s);
+  for (const k of ["A", "B"]) {
+    const r = $("vvR" + k);
+    r.textContent = banco ? mmss(banco[k]) : "";
+    r.classList.toggle("corre", corre(k));
+    r.classList.toggle("bajo", !!banco && banco[k] < 20000);
+  }
+  // el punto de información, en una línea
+  const p = s.punto, quien = p ? `<b>${esc(p.nombre || "Alguien")}</b> (${esc(nomG(p.grupo))})` : "";
+  const pp = !p ? "" : p.estado === "pedido" ? `✋ ${quien} pide un punto de información`
+    : p.estado === "aceptado" ? `✋ Punto de información: ${quien} tiene la palabra`
+    : p.estado === "rechazado" ? "✋ Punto rechazado" : p.estado === "vencido" ? "✋ Nadie respondió el punto" : "";
+  poner($("vvPuntoP"), pp);
+  // quien habla, grande; en silencio, el último mensaje de alumno del debate
+  const hablan = quienesHablan(s).slice(0, 2);
+  const msgs = J.chat.filter(m => m.tipo === "alumno" && m.debate === d.n);
+  const k0 = hablan.length ? ladoDe(hablan[0].grupo, d) : null;
+  const obj = [...msgs].reverse().find(m => !k0 || m.equipo === k0);          // al que se reacciona
+  let escena;
+  if (hablan.length) {
+    // los dos lados a la vez (una interrupción): cada uno en su mitad, más compactos
+    escena = (hablan.length > 1 ? `<div class="vv-en vv-dos"><i></i>Hablan los dos lados</div>` : "") + hablan.map(g => { const k = ladoDe(g.grupo, d);
+      return `<div class="vv-hab" style="--l:${colorGrupo(g.grupo, s)}"><div class="vv-en"><i></i>Habla ahora</div>
+        <div class="vv-nom">${esc(g.nombre)}</div><div class="vv-gr">${esc(nomG(g.grupo))} · ${esc(s.equipos[k].nombre)}</div>
+        <div class="vv-tx"><span>${g.habla.texto ? esc(cola(g.habla.texto, hablan.length > 1 ? 140 : 280)) : `<i class="vv-pts">…</i>`}</span></div></div>`; }).join("");
+  } else if (msgs.length) {
+    const m = msgs[msgs.length - 1], g = grupoDeMensaje(m);
+    escena = `<div class="vv-hab quieto" style="--l:${g ? colorGrupo(g, s) : s.equipos[m.equipo]?.color || "var(--dim)"}"><div class="vv-en">${m.voz ? "🎤 " : ""}Lo último que se dijo</div>
+      <div class="vv-nom">${esc(m.nombre)}</div><div class="vv-gr">${esc(g ? nomG(g) : "")}${m.equipo && s.equipos[m.equipo] ? " · " + esc(s.equipos[m.equipo].nombre) : ""}</div>
+      <div class="vv-tx"><span>${esc(m.texto)}</span></div></div>`;
+  } else escena = `<div class="vv-vacio">Todavía no habla nadie.<small>Cuando alguien apriete su botón, lo que dice aparece aquí.</small></div>`;
+  poner($("vvEscena"), escena);
+  $("vvEscena").classList.toggle("dos", hablan.length > 1);
+  // si el texto no cabe, se desvanece por donde se corta (arriba en vivo, abajo en silencio)
+  for (const tx of $("vvEscena").querySelectorAll(".vv-tx")) tx.classList.toggle("corta", tx.firstElementChild.offsetHeight > tx.clientHeight + 2);
+  // 🔥🤔🤝 para ese mensaje (mientras alguien habla: lo último que dijo ese lado)
+  let rx = "";
+  if (obj) {
+    const c = PA.conteos[obj.id] || {}, mia = PA.mias[obj.id];
+    rx = `<div class="vv-rx-q">${hablan.length ? `Reacciona a lo último de <b>${esc(corto(obj.nombre))}</b>: «${esc(obj.texto.slice(0, 60))}${obj.texto.length > 60 ? "…" : ""}»` : "Reacciona a este mensaje"}</div>
+      <div class="vv-rxs">${PUB.REACCIONES.map(r => `<button type="button" class="vv-rxb ${mia === r.id ? "on" : ""}" data-acc="rx" data-m="${obj.id}" data-r="${r.id}" aria-pressed="${mia === r.id}">
+        <span>${r.emoji}</span><small>${esc(r.nombre)}</small>${c[r.id] ? `<b>${c[r.id]}</b>` : ""}</button>`).join("")}</div>`;
+  }
+  poner($("vvRx"), rx);
+}
+
+function verClasica(escribir) {
+  J.vistaClasica = true;
+  pintarSala();
+  const p = $("pJuego"); p.scrollTop = p.scrollHeight;
+  if (escribir && !$("tx").disabled) $("tx").focus();
+}
+$("pVivo").addEventListener("click", e => {
+  const b = e.target.closest("[data-acc]");
+  if (!b || b.disabled) return;
+  const acc = b.dataset.acc, s = J.sala;
+  if (acc === "escribir" || acc === "conv") verClasica(acc === "escribir");
+  else if (acc === "punto") pedirPuntoTel(s);
+  else if (acc === "acepta" || acc === "rechaza") responderPuntoTel(s, acc === "acepta");
+  else if (acc === "rx") reaccionar(b.dataset.m, b.dataset.r);
+});
+$("vvVolver").onclick = () => { $("tx").blur(); J.vistaClasica = false; pintarSala(); };
+setInterval(pintarVivoParcial, 300);
 
 /* ---------- votar: quién argumentó mejor y a quién elegirá el jurado ---------- */
 // El resumen del relator de este debate, compacto, sobre las preguntas: es lo que pide revisar antes de votar.
