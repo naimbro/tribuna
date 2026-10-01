@@ -776,7 +776,9 @@ async function crearSala() {
   S.clase.gruposInfo = [];
   // con personajes: un grupo por personaje, el cupo que propone la semana y la inscripción sin abrir
   if (PERS) Object.assign(S.clase, { grupos: PERS.length, cupo: SESION.cupo || 4, inscripcion: null });
-  S.clase.opciones = { ...OPCIONES_DEFECTO };     // los interruptores del debate en vivo (rotacion.js)
+  // los interruptores del debate en vivo (rotacion.js); la semana puede traer otros por defecto
+  // (SESION.opciones: con tres grupos, la 402 parte sin revancha)
+  S.clase.opciones = { ...OPCIONES_DEFECTO, ...(SESION.opciones || {}) };
   S.fase = "propuesta";
   await setDoc(doc(db, "salas", ON.codigo), limpio({ ...estadoPublico(), creada: Date.now() }));
   await setDoc(doc(db, "salas", ON.codigo, "privado", "estado"), limpio(estadoPrivado()));

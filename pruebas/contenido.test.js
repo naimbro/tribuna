@@ -216,6 +216,14 @@ test("clase 2 del doctorado: las dos lecturas, cinco jueces, preguntas con campo
   assert.ok(s.PREGUNTAS.length >= 1, "falta la pregunta del primer debate");
   const campos = new Set(s.BRUJULA.campos.map(c => c.id));
   for (const p of s.PREGUNTAS) assert.ok(p.texto && campos.has(p.afirma), `pregunta sin campo válido: ${JSON.stringify(p)}`);
+  // el minuto de preparación y la revelación: cada lado lee su postura en una frase
+  for (const p of s.PREGUNTAS) for (const k of ["favor", "contra"])
+    assert.ok(p[k] && p[k].length >= 30 && p[k].length <= 200, `${k} de «${p.texto.slice(0, 30)}…»`);
+  // una sola sale en su turno (el segundo debate lo escribe la moderadora); el resto es reserva
+  assert.equal(s.PREGUNTAS.filter(p => !p.reserva).length, 1);
+  assert.ok(s.PREGUNTAS.filter(p => p.reserva).length >= 2, "faltan preguntas de reserva");
+  // con tres grupos y dos debates, la revancha podía repetir el primer par y dejar a uno sin debatir
+  assert.equal(s.SESION.opciones.revancha, false);
   // los ejemplos separan los marcadores: la arenga no atribuye, el manual sí
   for (const r of ["apertura", "refutacion", "cierre"])
     for (const k of ["A", "B"]) assert.ok(s.EJEMPLOS_SESION[r][k].length > 200, `${r}.${k}`);

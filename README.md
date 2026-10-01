@@ -388,7 +388,9 @@ la boca; escribir a mano sigue funcionando igual que siempre. Spec en
   escenario, A FAVOR arriba y EN CONTRA abajo, como en los debates de televisión; un mensaje que junta
   suficientes 🤔 se estampa con «LA TRIBUNA DUDA».
 - **Los siete interruptores**, en `S.clase.opciones`, editables desde el control y por defecto todos
-  encendidos (lo que falta en `opciones` cuenta como encendido, así una sala vieja sigue funcionando):
+  encendidos (lo que falta en `opciones` cuenta como encendido, así una sala vieja sigue funcionando).
+  Una semana puede traer otros valores de partida en `SESION.opciones` (la 402, con tres grupos, parte
+  con `{ revancha: false }`: la revancha podía repetir el primer par y dejar a uno sin debatir):
 
   | Interruptor | Apagado |
   |---|---|
@@ -542,6 +544,11 @@ editan seis cosas:
 
 Opcionales: `BRUJULA` (la brújula corta), `PREGUNTAS` (mociones escritas), `JUECES` y `JUECES_COMUN`,
 `EJEMPLOS_SESION`, `INSTRUMENTOS` y `PERSONAJES` (la clase con personajes; ver arriba).
+
+Cada entrada de `PREGUNTAS` es `{ texto, afirma, favor, contra }`: `favor` y `contra` son la postura
+de cada lado en una frase, la que lee la sala en el minuto de preparación (sin ellas sale una
+genérica). Las marcadas `reserva: true` no salen en su turno: la moderadora las propone, en orden,
+solo si no pudo escribir la suya (sin motor LLM o con una respuesta inválida).
 
 Dos invariantes al editar:
 

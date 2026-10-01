@@ -735,13 +735,14 @@ async function enviar() {
    texto se pone por código (sin evento input), no mueve maxInsercion; por eso largoPrev se
    actualiza a mano después de cada frase. */
 const Reconocedor = window.SpeechRecognition || window.webkitSpeechRecognition;
-const VOZ = { rec: null, base: "", final: "" };
+const VOZ = { rec: null, base: "", final: "", parar: false };
 function prepararDictado() {
   const b = $("btnMic");
   if (!b) return;
   if (!Reconocedor) { b.remove(); return; }     // navegador sin reconocimiento de voz: no se ofrece
   b.classList.remove("oculto");
-  b.onclick = () => (VOZ.rec ? VOZ.rec.stop() : empezarDictado());
+  // apretar de nuevo termina: la frase en curso se cierra con su resultado y no se abre otra
+  b.onclick = () => { if (VOZ.rec) { VOZ.parar = true; try { VOZ.rec.stop(); } catch { cortarDictado(false); } } else empezarDictado(); };
 }
 function ponerTexto(valor) {
   const tx = $("tx");
@@ -753,28 +754,44 @@ function ponerTexto(valor) {
 function empezarDictado() {
   const tx = $("tx");
   if (tx.disabled || HABLA.apretado || HABLA.toma) return;   // un solo micrófono: mientras habla (o su toma aún se envía), no se dicta
-  const rec = new Reconocedor();
-  rec.lang = "es-CL"; rec.continuous = true; rec.interimResults = true;
-  VOZ.rec = rec; VOZ.final = "";
+  VOZ.final = ""; VOZ.parar = false;
   VOZ.base = tx.value && !/\s$/.test(tx.value) ? tx.value + " " : tx.value;
   const r = registro();
   if (r.primera === null) r.primera = Date.now();
+  if (!dictarFrase()) return;
+  $("btnMic").classList.add("on");
+  $("notaCaja").textContent = "🎤 Te escucho… aprieta de nuevo para terminar. Revisa el texto antes de enviar.";
+}
+// Una frase del dictado (no continuo, como el mantener para hablar: ver escuchar). Al terminar la
+// frase se abre otra hasta que el alumno aprieta de nuevo; si se cierra sin haber oído nada, termina.
+function dictarFrase() {
+  const rec = new Reconocedor();
+  rec.lang = "es-CL"; rec.continuous = CONTINUO; rec.interimResults = true;
+  let interino = "", oyo = false;
   rec.onresult = e => {
-    let interino = "";
+    interino = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) VOZ.final += e.results[i][0].transcript;
+      if (e.results[i].isFinal) { VOZ.final = unir(VOZ.final, e.results[i][0].transcript); oyo = true; }
       else interino += e.results[i][0].transcript;
     }
-    ponerTexto(VOZ.base + VOZ.final + interino);
+    if (interino) oyo = true;
+    ponerTexto(VOZ.base + unir(VOZ.final, interino));
   };
   rec.onerror = e => {
     $("notaCaja").textContent = e.error === "not-allowed" || e.error === "service-not-allowed"
       ? "🎤 Para dictar, permite el micrófono en el navegador." : e.error === "no-speech" ? "🎤 No te escuché. Aprieta de nuevo y habla." : "🎤 No se pudo dictar: " + e.error;
   };
-  rec.onend = () => cortarDictado(false);
-  try { rec.start(); } catch { VOZ.rec = null; return; }
-  $("btnMic").classList.add("on");
-  $("notaCaja").textContent = "🎤 Te escucho… aprieta de nuevo para terminar. Revisa el texto antes de enviar.";
+  rec.onend = () => {
+    if (VOZ.rec !== rec) return;
+    if (interino) { VOZ.final = unir(VOZ.final, interino); interino = ""; }   // lo último oído pasa a firme
+    if (VOZ.parar || !oyo) { cortarDictado(false); return; }               // apretó de nuevo, o silencio: termina
+    if (!dictarFrase()) cortarDictado(false);
+  };
+  // pasa a ser el reconocedor en curso solo si arrancó: si no, el anterior (ya cerrado) sigue
+  // siendo VOZ.rec y cortarDictado lo termina bien
+  try { rec.start(); } catch { rec.onend = rec.onresult = rec.onerror = null; return false; }
+  VOZ.rec = rec;
+  return true;
 }
 // Termina el dictado y anota en la telemetría cuánto se dictó. Si terminó solo, queda en la caja
 // lo reconocido en firme; si se corta (envía, tipea o se cierra el tramo), queda lo que se ve.
@@ -848,11 +865,15 @@ function alBorde(s) {
 function avisoHabla(txt) { const m = $("miHabla"); if (m) { m.textContent = txt; m.classList.toggle("aviso", !!txt); } }
 function pintarMiHabla(txt) { const m = $("miHabla"); if (m) { m.textContent = txt; m.classList.remove("aviso"); } }
 
-// Un reconocedor para la toma h. Chrome corta solo tras unos segundos de silencio: si el botón
-// sigue apretado se abre otro y el texto sigue sumando en la misma toma.
+// Un reconocedor para la toma h, de una frase a la vez: al terminar la frase se cierra y, si el
+// botón sigue apretado, se abre otro y el texto sigue sumando en la misma toma. No continuo: en
+// Chrome de Android (probado el 1-oct-2026 en un teléfono real) el modo continuo entrega cada
+// pedazo como un resultado final nuevo con todo el texto acumulado, y la toma salía «Aló Aló
+// estoy Aló estoy probando…»; en iPhone el modo continuo tiene fallas conocidas.
+const CONTINUO = false;
 function escuchar(h) {
   const rec = new Reconocedor();
-  rec.lang = "es-CL"; rec.continuous = true; rec.interimResults = true;
+  rec.lang = "es-CL"; rec.continuous = CONTINUO; rec.interimResults = true;
   rec.onresult = e => {
     let interino = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {

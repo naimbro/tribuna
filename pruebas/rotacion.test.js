@@ -226,6 +226,16 @@ test("proximaPreguntaEscrita: trae la postura de cada lado si la pregunta la def
     { texto: "Ley ya.", afirma: "ley_antes", favor: "Hay que legislar ahora.", contra: "Legislar ahora es un error." });
 });
 
+test("proximaPreguntaEscrita: las de reserva no salen en su turno, solo cuando se piden", () => {
+  const ps = [{ texto: "Escrita.", afirma: "a" }, { texto: "Reserva 1.", afirma: "b", favor: "Sí.", contra: "No.", reserva: true }, { texto: "Reserva 2.", reserva: true }];
+  assert.deepEqual(R.proximaPreguntaEscrita(ps, []), { texto: "Escrita.", afirma: "a" });
+  assert.equal(R.proximaPreguntaEscrita(ps, ["Escrita."]), null);              // la moderadora escribe la suya
+  assert.deepEqual(R.proximaPreguntaEscrita(ps, ["Escrita."], { reserva: true }), { texto: "Reserva 1.", afirma: "b", favor: "Sí.", contra: "No." });
+  assert.deepEqual(R.proximaPreguntaEscrita(ps, ["Reserva 1."], { reserva: true }), { texto: "Reserva 2.", afirma: null });
+  assert.equal(R.proximaPreguntaEscrita(ps, ["Reserva 1.", "Reserva 2."], { reserva: true }), null);
+  assert.equal(R.proximaPreguntaEscrita(["texto suelto"], [], { reserva: true }), null);
+});
+
 test("posturasDebate: usa la postura escrita y, si no hay, una genérica que no regala argumentos", () => {
   assert.deepEqual(R.posturasDebate({ favor: " Sí, ya. ", contra: "No, todavía." }), { A: "Sí, ya.", B: "No, todavía." });
   const g = R.posturasDebate({});

@@ -6,8 +6,9 @@
    ===================================================================== */
 
 const publicarEstado = () => { if (typeof window.publicarEstado === "function") window.publicarEstado(); };
-// Los interruptores del debate en vivo (rotacion.js): apagado = la conducta de antes.
-const opcion = k => opcionActiva(S.clase.opciones, k);
+// Los interruptores del debate en vivo (rotacion.js): apagado = la conducta de antes. Lo que fije
+// la semana (SESION.opciones) vale si la partida no dice otra cosa.
+const opcion = k => opcionActiva({ ...(SESION.opciones || {}), ...(S.clase.opciones || {}) }, k);
 
 function gruposDisponibles() {
   if (typeof window.gruposConectados === "function") return window.gruposConectados();
@@ -538,7 +539,15 @@ async function prepararPropuesta() {
       mejorFavor: String(j.mejorFavor || "").slice(0, 200), mejorContra: String(j.mejorContra || "").slice(0, 200), fuente: "ia" };
   } catch (e) {
     console.warn("propuesta:", e);
-    S.clase.propuesta = { ...base, estado: "vacia", pregunta: "", porQue: "", mejorFavor: "", mejorContra: "", fuente: "ia" };
+    // sin moderadora, la primera pregunta de reserva que dejó el profesor en el archivo, con su
+    // postura por lado y el lado que le toca a cada grupo (como las escritas)
+    const res = proximaPreguntaEscrita(escritas, usadas, { reserva: true });
+    const campo = res && res.afirma && typeof BRUJULA !== "undefined" ? BRUJULA.campos.find(c => c.id === res.afirma) : null;
+    S.clase.propuesta = res
+      ? { ...(conBrujula() && campo ? ladoQueAfirma(base, campo.id, BRUJULA.campos, posDe) : base), estado: "lista", pregunta: res.texto,
+          favor: res.favor || "", contra: res.contra || "", mejorFavor: "", mejorContra: "", fuente: "escrita",
+          porQue: "La moderadora no pudo escribir la suya: pregunta de reserva del archivo de la semana." + (conBrujula() && campo ? ` A FAVOR, el grupo más cercano a «${campo.nombre}».` : "") }
+      : { ...base, estado: "vacia", pregunta: "", porQue: "", mejorFavor: "", mejorContra: "", fuente: "ia" };
   }
   if (S.fase === "propuesta") mostrarPropuesta();
 }

@@ -1,8 +1,11 @@
 /* =====================================================================
    TRIBUNA — contenido de una sesión.
    Doctorado en Procesos e Instituciones Políticas (UAI) · Usos de la IA en
-   Investigación Académica · Clase 2. Jueves 24 de septiembre de 2026, ~12:00.
-   Tres doctorandos en ciencia política, desde el teléfono.
+   Investigación Académica · «Agentes de programación en la práctica». Iba el
+   jueves 24-sep y se cambió con la clase 3: se juega el jueves 1 de octubre de
+   2026, bloque 2 (debate 12:02–12:32). Tres doctorandos en ciencia política,
+   desde el teléfono. El 24-sep leyeron Lyttelton, Massenkoff y Wilmers y a
+   Pepinsky: no se anclan aquí (no están en el knowledge base).
 
    Material (naimbro.github.io/materiales/2026_ai_research):
    1) Las dos lecturas, leídas en sala e impresas: Mollick, «The twilight of the
@@ -17,6 +20,11 @@
    tres alumnos, formarGruposEnK arma tres grupos de uno: cada debate enfrenta a
    los dos más lejanos del mapa y el tercero es el público. Se juegan dos debates.
    Con un solo espectador, el 🤔 y la frase del debate no se activan (piden 2).
+
+   Debate en vivo (desde el 29-sep, MGT300 clase 8): todos preparan, la revelación
+   dice quién sube y se habla con el teléfono. La revancha va apagada
+   (SESION.opciones): con tres grupos y dos debates, podía repetir el primer par y
+   dejar a uno sin debatir. Se enciende desde el control si sobra tiempo.
    ===================================================================== */
 
 const SESION = {
@@ -25,6 +33,7 @@ const SESION = {
   tema: "¿Los agentes de IA mejoran la ciencia o solo a los científicos?",
   mocion: "Los agentes de IA van a mejorar la ciencia social, no solo las carreras de quienes la hacen.",
   grupos: 3,                // 3 doctorandos: 3 grupos de uno
+  opciones: { revancha: false },   // ver la cabecera: nadie se queda sin debatir
   favor: "A FAVOR",
   contra: "EN CONTRA"
 };
@@ -278,20 +287,28 @@ const EJEMPLOS_SESION = {
 };
 
 /* --- Preguntas escritas por el profesor -------------------------------
-   Una sola, para el primer debate: las escritas salen antes que las de la moderadora (clase.js,
-   prepararPropuesta) y con dos debates la moderadora nunca escribiría la suya. El segundo
-   debate lo escribe ella con el jurado LLM, sobre lo que separa a ese par. `afirma` es el campo
-   de la brújula que sostiene la moción: A FAVOR le toca al grupo del par más cercano a ese campo.
+   Una sola en su turno, para el primer debate: las escritas salen antes que las de la moderadora
+   (clase.js, prepararPropuesta) y con dos debates la moderadora nunca escribiría la suya. El
+   segundo debate lo escribe ella con el jurado LLM, sobre lo que separa a ese par. `afirma` es el
+   campo de la brújula que sostiene la moción: A FAVOR le toca al grupo del par más cercano a ese
+   campo. `favor` y `contra`: la postura de cada lado en una frase, para el minuto de preparación
+   y la pantalla de la revelación (sin ellas sale una genérica).
 
-   De reserva, para pegar con «escribe la suya» si el motor LLM cae al heurístico:
-   - «El mayor riesgo de los agentes para la ciencia política son los errores que nadie revisa,
-     no que todos terminen haciendo las mismas preguntas.»  → A FAVOR: amplia_si_verifica
-   - «Un doctorando que empieza a usar agentes en 2026 ya llega tarde: la ventaja fue de los
-     primeros.»  → A FAVOR: ciencia_normal
-   - «Si cualquiera puede producir un paper empírico competente, las revistas deben juzgar
-     primero "por qué importa" y después "si está bien hecho".»  → A FAVOR: disciplina_en_crisis */
+   Las tres con `reserva: true` no salen en su turno: las propone la moderadora solo si no pudo
+   escribir la suya (el motor LLM cae al heurístico), en este orden y con su postura por lado. */
 const PREGUNTAS = [
-  { texto: "En la era de los agentes, lo que distingue a un buen investigador es su expertise en el tema, no el dominio de la herramienta.", afirma: "manos_a_la_obra" }
+  { texto: "En la era de los agentes, lo que distingue a un buen investigador es su expertise en el tema, no el dominio de la herramienta.", afirma: "manos_a_la_obra",
+    favor: "Lo que distingue al buen investigador es saber de su tema; la herramienta la aprende cualquiera.",
+    contra: "Dominar y verificar la herramienta pesa tanto o más que saber del tema: la expertise sola ya no distingue." },
+  { texto: "El mayor riesgo de los agentes para la ciencia política son los errores que nadie revisa, no que todos terminen haciendo las mismas preguntas.", afirma: "amplia_si_verifica", reserva: true,
+    favor: "El peligro principal es confiarle al agente sin revisar lo que entrega.",
+    contra: "El peligro principal es que todos terminen estudiando las mismas preguntas, aunque nadie se equivoque." },
+  { texto: "Un doctorando que empieza a usar agentes en 2026 ya llega tarde: la ventaja fue de los primeros.", afirma: "ciencia_normal", reserva: true,
+    favor: "Llegar en 2026 es llegar tarde: la ventaja de los agentes ya se la llevaron los primeros.",
+    contra: "No llega tarde: la ventaja no se agotó con los primeros, o nunca estuvo en llegar antes." },
+  { texto: "Si cualquiera puede producir un paper empírico competente, las revistas deben juzgar primero «por qué importa» y después «si está bien hecho».", afirma: "disciplina_en_crisis", reserva: true,
+    favor: "Las revistas tienen que juzgar primero si la pregunta importa y después si el paper está bien hecho.",
+    contra: "Las revistas no deben cambiar el orden: «si está bien hecho» tiene que seguir yendo primero." }
 ];
 
 /* --- Brújula corta ------------------------------------------------------

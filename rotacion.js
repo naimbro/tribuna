@@ -158,10 +158,13 @@ function ranking(grupos, debates) {
 // Las preguntas que el profesor dejó escritas en el archivo de la semana se usan primero. Cada una
 // es un texto o { texto, afirma }, donde afirma es el id del campo de la brújula cuya posición
 // afirma la moción (así A FAVOR le toca al grupo que de verdad piensa eso). Devuelve { texto, afirma }.
+// Las marcadas { reserva: true } no salen en su turno: son las que usa la moderadora si no pudo
+// escribir la suya (sin motor LLM o con una respuesta inválida), y se piden con { reserva: true }.
 const textoPregunta = p => String(p && typeof p === "object" ? p.texto : p ?? "").trim();
-function proximaPreguntaEscrita(preguntas, usadas) {
+const esReserva = p => !!(p && typeof p === "object" && p.reserva);
+function proximaPreguntaEscrita(preguntas, usadas, { reserva = false } = {}) {
   const ya = new Set((usadas || []).map(x => textoPregunta(x).toLowerCase()));
-  const p = (preguntas || []).find(x => textoPregunta(x) && !ya.has(textoPregunta(x).toLowerCase()));
+  const p = (preguntas || []).find(x => textoPregunta(x) && esReserva(x) === reserva && !ya.has(textoPregunta(x).toLowerCase()));
   if (!p) return null;
   const out = { texto: textoPregunta(p), afirma: (typeof p === "object" && p.afirma) || null };
   if (typeof p === "object" && p.favor) out.favor = p.favor;
