@@ -228,6 +228,16 @@ function dueloEnGrupos(duelo, ps) {
 // Los personajes del duelo que no tienen a nadie inscrito (A primero)
 const faltanEnDuelo = (par, conteo, ps) => ["A", "B"].map(k => par[k]).filter(n => !(conteo[n] > 0)).map(n => rotuloGrupo(n, ps));
 
+/* --- Debate libre (desde el 1-oct-2026) ---------------------------------
+   Sin personajes nadie tiene un lado asignado: cada grupo defiende lo que de verdad piensa, la
+   moderadora busca dónde se separan y el público vota quién argumentó mejor, no quién tiene razón.
+   Con personajes los lados siguen fijos (A FAVOR / EN CONTRA): un personaje ya trae su postura.
+   A y B quedan como los dos lados de la pantalla (izquierda y derecha, con su color). */
+const ladosFijos = ps => Array.isArray(ps) && ps.length > 0;
+const LADO_FIJO = { A: "A FAVOR", B: "EN CONTRA" };
+// «A FAVOR · Grupo 3» con lados fijos; «Grupo 3» en el debate libre.
+const conLado = (k, nombre, fijos) => (fijos && LADO_FIJO[k] ? `${LADO_FIJO[k]} · ${nombre}` : String(nombre));
+
 // Lo que sostiene cada lado, en una frase, para el minuto de preparación. Es la postura, no el
 // argumento: los argumentos los buscan ellos en las lecturas. Sin postura escrita, una genérica.
 function posturasDebate(p) {
@@ -316,4 +326,4 @@ function conRevancha(par, disponibles, debates, azar = Math.random) {
 if (typeof module !== "undefined") module.exports = { ROT, TRAMOS, emparejar, panelJueces, votoPublico, acumularOraculos, rankingOraculos, puntajeDebate, ranking, proximaPreguntaEscrita, posturasDebate, gruposEscribiendo, sumarPuntoPregunta, mejorIntervencion, conGrupo,
   numerarPersonajes, personajeDe, rotuloGrupo, rotuloCorto, mencionGrupo, aliasGrupo, conteoPersonajes, personajeLleno, todosLlenos,
   cupoSugerido, personajeParaAtrasado, dueloEnGrupos, faltanEnDuelo,
-  OPCIONES_DEFECTO, opcionActiva, duelosPendientes, sortearDuelo, conRevancha };
+  OPCIONES_DEFECTO, opcionActiva, duelosPendientes, sortearDuelo, conRevancha, ladosFijos, LADO_FIJO, conLado };

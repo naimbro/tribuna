@@ -123,7 +123,7 @@ function pintar() {
   mostrar("deb", conDebate || antes);
   if (antes) $("deb").textContent = c.etapa === "portada" ? "Los alumnos entran con el QR del proyector." : "El proyector muestra la moción de la clase.";
   else if (conDebate) $("deb").innerHTML = `<q>${esc(d.pregunta)}</q><div class="par">
-    <span class="tag" style="--c:var(--A)">A FAVOR · ${esc(nombreDe(d.A))}</span><span class="tag" style="--c:var(--B)">EN CONTRA · ${esc(nombreDe(d.B))}</span></div>`;
+    <span class="tag" style="--c:var(--A)">${esc(conLado("A", nombreDe(d.A), c.ladosFijos))}</span><span class="tag" style="--c:var(--B)">${esc(conLado("B", nombreDe(d.B), c.ladosFijos))}</span></div>`;
 
   // el botón principal: el mismo rótulo que en la pantalla (en la portada y la intro, el de la escena),
   // salvo mientras pide la confirmación; si la fase cambió entretanto, la pregunta ya no corre
@@ -165,6 +165,9 @@ function pintarPropuesta(c) {
     : p.estado === "hechos" ? "Los duelos ya se jugaron. Para cerrar, 🏁 Terminar clase; o escribe otra pregunta y elige los grupos." : "";
   $("prEstado").textContent = estado; mostrar("prEstado", !!estado);
   $("prAviso").textContent = (p && p.aviso) || ""; mostrar("prAviso", !!(p && p.aviso));
+  // debate libre: los dos selectores son solo izquierda y derecha de la pantalla
+  $("prLadoA").textContent = c.ladosFijos ? "A FAVOR" : "Grupo";
+  $("prLadoB").textContent = c.ladosFijos ? "EN CONTRA" : "y grupo";
   // una pregunta nueva de la pantalla reemplaza el borrador, salvo que el profesor esté escribiendo la suya
   const base = p ? p.pregunta || "" : "";
   if (base !== BORR.base) { BORR.base = base; if (!BORR.sucio) $("prTexto").value = base; }
@@ -211,7 +214,7 @@ function pintarRelojes() {
     $("bancos").innerHTML = ["A", "B"].map(k => {
       const seg = Math.ceil(r[k] / 1000);
       const cl = seg <= 0 ? "cero" : C.foto.corre && C.foto.corre[k] ? "corre" : "";
-      return `<div class="banco ${cl}" style="--c:var(--${k})"><div class="n">${k === "A" ? "A FAVOR" : "EN CONTRA"} · ${esc(nombreDe(d[k]))}</div>
+      return `<div class="banco ${cl}" style="--c:var(--${k})"><div class="n">${esc(conLado(k, nombreDe(d[k]), c.ladosFijos))}</div>
         <div class="t mono">${seg <= 0 ? "0:00" : fmt(seg)}</div></div>`;
     }).join("");
   }
@@ -252,7 +255,7 @@ function pintarInterruptores(c) {
 function publicarDesdeAqui(boton) {
   const pregunta = $("prTexto").value.trim(), A = +$("prA").value, B = +$("prB").value;
   if (!pregunta) { nota("Escribe una pregunta o pide otra a la moderadora."); return; }
-  if (!A || !B || A === B) { nota("Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA."); return; }
+  if (!A || !B || A === B) { nota(C.dato && C.dato.ladosFijos ? "Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA." : "Elige dos grupos distintos."); return; }
   BORR.sucio = false;
   mandar("publicar", { pregunta, A, B }, boton);
 }

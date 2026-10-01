@@ -43,7 +43,10 @@ const mocionActual = () => (S.debate && S.debate.pregunta) || SESION.mocion;
 // PERSONAJES en la semana, PERS es null y todo dice «Grupo N» como siempre.
 const PERS = typeof PERSONAJES !== "undefined" ? numerarPersonajes(PERSONAJES) : null;
 const nombreG = n => rotuloGrupo(n, PERS);
-const ladoNombre = k => S.debate ? `${EQUIPOS[k].nombre} · ${nombreG(S.debate[k])}` : EQUIPOS[k].nombre;
+// Debate libre (rotacion.js): sin personajes nadie tiene un lado asignado y A/B son solo los dos
+// lados de la pantalla. FIJOS = con personajes, que sí traen A FAVOR / EN CONTRA.
+const FIJOS = ladosFijos(PERS);
+const ladoNombre = k => S.debate ? conLado(k, nombreG(S.debate[k]), FIJOS) : EQUIPOS[k].nombre;
 const delDebate = h => !S.debate || h.debate === S.debate.n;
 
 /* ====================== 1. LECTURA DEL TEXTO ========================= */
@@ -364,8 +367,8 @@ function pintarMarcador() {
     $("nom" + k).textContent = S.debate ? nombreG(S.debate[k]).toUpperCase() : EQUIPOS[k].nombre;
     const gi = S.debate ? (S.clase.gruposInfo || []).find(g => g.n === S.debate[k]) : null;
     const per = S.debate ? personajeDe(S.debate[k], PERS) : null;
-    $("lema" + k).textContent = S.debate ? EQUIPOS[k].nombre + (gi ? " · " + gi.nombre : per ? " · " + per.cargo : "") : EQUIPOS[k].lema;
-    $("chatBanca" + k).textContent = S.debate ? `${EQUIPOS[k].nombre} · ${rotuloCorto(S.debate[k], PERS)}` : `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}`;
+    $("lema" + k).textContent = S.debate ? (FIJOS ? EQUIPOS[k].nombre + (per ? " · " + per.cargo : "") : gi ? gi.nombre : "") : EQUIPOS[k].lema;
+    $("chatBanca" + k).textContent = S.debate ? conLado(k, rotuloCorto(S.debate[k], PERS), FIJOS) : `${EQUIPOS[k].bandera} ${EQUIPOS[k].nombre}`;
   }
   const c = conteo(), P = S.publico || {};
   const reg = S.debate && S.clase.debates[S.debate.n - 1];
@@ -389,7 +392,8 @@ function pintarMarcador() {
 }
 
 // 🌡 El público en vivo (publico.js): la curva del termómetro del debate en curso, arriba de la
-// columna derecha. +100 arriba es A FAVOR, −100 abajo es EN CONTRA. Solo se ve con el debate
+// columna derecha. +100 arriba es el lado A, −100 abajo el B (en el debate libre, «más cerca de
+// lo que dice el Grupo N»; con personajes, A FAVOR y EN CONTRA). Solo se ve con el debate
 // abierto o votando, y solo en línea (el termómetro lo mueven los teléfonos).
 function pintarTermometro() {
   const caja = $("termoCaja");
@@ -420,8 +424,8 @@ function svgTermometro(W, H, o = {}) {
   return `<svg viewBox="0 0 ${W} ${H}" class="${o.clase || "termo-svg"}">
       <rect x="0" y="0" width="${W}" height="${H / 2}" fill="${cA}" opacity=".07"/><rect x="0" y="${H / 2}" width="${W}" height="${H / 2}" fill="${cB}" opacity=".07"/>
       <line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#2c3a48" stroke-dasharray="4 4"/>
-      <text x="${m}" y="${letra * 1.3}" fill="${cA}" font-size="${letra}" font-weight="700">▲ ${esc(nombreG(d.A).toUpperCase())} · A FAVOR</text>
-      <text x="${m}" y="${H - letra * 0.5}" fill="${cB}" font-size="${letra}" font-weight="700">▼ ${esc(nombreG(d.B).toUpperCase())} · EN CONTRA</text>
+      <text x="${m}" y="${letra * 1.3}" fill="${cA}" font-size="${letra}" font-weight="700">▲ ${esc(nombreG(d.A).toUpperCase())}${FIJOS ? " · A FAVOR" : ""}</text>
+      <text x="${m}" y="${H - letra * 0.5}" fill="${cB}" font-size="${letra}" font-weight="700">▼ ${esc(nombreG(d.B).toUpperCase())}${FIJOS ? " · EN CONTRA" : ""}</text>
       ${pts ? `<polyline points="${pts}" fill="none" stroke="#e6edf3" stroke-width="${(letra * 0.22).toFixed(1)}" stroke-linejoin="round"/>` : ""}
       ${ult ? `<circle cx="${X(ult.s).toFixed(1)}" cy="${Y(ult.m).toFixed(1)}" r="${(letra * 0.45).toFixed(1)}" fill="${ult.m > 4 ? cA : ult.m < -4 ? cB : "#e6edf3"}"/>` : ""}
     </svg>`;
@@ -739,7 +743,7 @@ function exportarCsv() {
   const q = t => String(t ?? "").replace(/"/g, "'");
   const filas = [];
   for (const d of S.clase.debates) {
-    const lado = k => EQUIPOS[k].nombre;
+    const lado = k => (FIJOS ? EQUIPOS[k].nombre : nombreG(d[k]));   // debate libre: el lado es el grupo
     for (const m of S.chat) if (m.tipo === "alumno" && m.debate === d.n)
       filas.push(["mensaje", d.n, d.pregunta, m.grupo || d[m.equipo] || "", lado(m.equipo), m.nombre, m.email || "", "", m.texto, "", ""]);
     for (const j of d.jueces || []) for (const k of ["A", "B"])
@@ -848,9 +852,9 @@ function transcripcion(ctx, eq) {
   const previas = ctx.previas || [];
   if (!previas.length) return `TRAMOS ANTERIORES: ninguno, es el primero. Si en la conversación de abajo el otro lado todavía
 no había planteado nada, juzga "refutacion" por cómo anticipa las objeciones previsibles.`;
-  const rival = EQUIPOS[eq === "A" ? "B" : "A"].nombre;
+  const rival = ladoNombre(eq === "A" ? "B" : "A");
   return `DEBATE HASTA AHORA (rondas anteriores; es CONTEXTO, no lo evalúes):
-${previas.map(h => `[${h.rondaNombre} · ${EQUIPOS[h.equipo].nombre}${h.equipo === eq ? " — misma bancada que evalúas" : " — RIVAL"}]
+${previas.map(h => `[${h.rondaNombre} · ${ladoNombre(h.equipo)}${h.equipo === eq ? " — misma bancada que evalúas" : " — RIVAL"}]
 """${h.texto}"""`).join("\n")}
 
 Cómo usar ese contexto:
@@ -881,7 +885,8 @@ Tenlo en cuenta, pero la rúbrica del curso manda.\n`;
 
 function promptEval(texto, ctx, eq) {
   return `Eres el jurado de un debate universitario del curso "${SESION.curso}", semana ${SESION.semana}: ${SESION.tema}.
-MOCIÓN: "${mocionActual()}"
+${S.debate && !FIJOS ? "PREGUNTA" : "MOCIÓN"}: "${mocionActual()}"${S.debate && !FIJOS ? `
+Nadie tenía un lado asignado: cada grupo defendió lo que de verdad piensa. Juzga la calidad del argumento, no la posición.` : ""}
 La intervención a evaluar es de la bancada ${ladoNombre(eq)}, en la ronda "${ctx.rondaNombre || ctx.ronda}".
 PAUTA DE ESTA RONDA: ${ctx.pauta || "—"}
 
@@ -1078,7 +1083,11 @@ function init() {
   $("btnEvento").onclick = lanzarEvento;
   const pintarSonido = () => $("btnSonido").textContent = sonidoActivo() ? "🔊" : "🔇";
   pintarSonido();
-  $("btnSonido").onclick = () => { localStorage.setItem("tribuna_sonido", sonidoActivo() ? "0" : "1"); pintarSonido(); if (sonidoActivo()) sonar("moneda"); };
+  $("btnSonido").onclick = () => {
+    localStorage.setItem("tribuna_sonido", sonidoActivo() ? "0" : "1"); pintarSonido();
+    if (sonidoActivo()) sonar("moneda");
+    else if (typeof callarIA === "function") callarIA();   // 🔇 corta también la voz que está sonando
+  };
   $("btnCsv").onclick = exportarCsv;
   $("btnLlm").onclick = configMotor;
   $("modoLbl").onclick = configMotor;           // el rótulo del motor también abre la configuración

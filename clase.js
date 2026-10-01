@@ -18,7 +18,8 @@ function gruposDisponibles() {
 function publicarDebate({ pregunta, A, B, favor, contra }) {
   const n = S.clase.debates.length + 1;
   const anterior = S.debate;
-  S.debate = { n, pregunta: String(pregunta).trim().slice(0, 300), A, B, posturas: posturasDebate({ favor, contra }) };
+  // debate libre: sin postura asignada (cada grupo dice lo que piensa); con personajes, la de cada lado
+  S.debate = { n, pregunta: String(pregunta).trim().slice(0, 300), A, B, posturas: FIJOS ? posturasDebate({ favor, contra }) : null };
   S.clase.debates.push({ n, pregunta: S.debate.pregunta, A, B, res: null, votantes: [] });
   S.clase.propuesta = null;
   S.tramo = 0;
@@ -32,8 +33,8 @@ function publicarDebate({ pregunta, A, B, favor, contra }) {
   publicarEstado();
 }
 
-// Un minuto antes de abrir el chat: cada grupo ve en el teléfono qué lado defiende y qué sostiene,
-// y acuerda su primera frase. En la clase del 24-sep-2026 cada debate perdía dos minutos antes
+// Un minuto antes de abrir el chat: cada grupo ve la pregunta en el teléfono, decide qué piensa de
+// verdad (con personajes: ve qué lado defiende) y acuerda su primera frase. En la clase del 24-sep-2026 cada debate perdía dos minutos antes
 // del primer mensaje con contenido. Al llegar a cero el chat se abre solo; ▶ ABRIR YA lo adelanta.
 // Con la revelación encendida prepara toda la sala, sin saber quién pasa al frente: el par se
 // revela al llegar a cero (revelar), y después viene la entrada al escenario.
@@ -50,11 +51,12 @@ function empezarPreparacion() {
   clearInterval(S.reloj);
   let el = $("preparacion");
   if (!el) { el = document.createElement("div"); el.id = "preparacion"; document.querySelector("main .col").appendChild(el); }
-  const lado = k => `<div style="--c:${EQUIPOS[k].color}"><b>${EQUIPOS[k].nombre} · ${esc(nombreGrupo(d[k]))}</b>${esc(d.posturas[k])}</div>`;
+  const lado = k => `<div style="--c:${EQUIPOS[k].color}"><b>${esc(conLado(k, nombreGrupo(d[k]), FIJOS))}</b>${esc((d.posturas || {})[k] || "")}</div>`;
   el.innerHTML = `<div class="pr-k">DEBATE ${d.n} · PREPARACIÓN <span class="mono" id="prepReloj"></span></div>
     <div class="prep-q">«${esc(d.pregunta)}»</div>
     <div class="pr-lados">${lado("A")}${lado("B")}</div>
-    <div class="pr-porque">Cada grupo ve su postura en el teléfono y acuerda su primera frase. El chat se abre solo al llegar a cero.</div>`;
+    <div class="pr-porque">${FIJOS ? "Cada grupo ve su postura en el teléfono y acuerda su primera frase."
+      : "Nadie tiene un lado asignado: cada grupo decide qué piensa de verdad y acuerda su primera frase."} El chat se abre solo al llegar a cero.</div>`;
   const tic = () => {
     if (S.fase !== "listo" || !S.finPrep) return;
     const resta = Math.max(0, Math.ceil((S.finPrep - Date.now()) / 1000));
@@ -106,7 +108,8 @@ async function revelar() {
   S.fase = "revelando"; S.revelado = true;
   $("btnPrincipal").textContent = "SALTAR ▶";
   publicarEstado();
-  tick(`Debate ${d.n}: ${nombreG(d.A)} (${EQUIPOS.A.nombre}) contra ${nombreG(d.B)} (${EQUIPOS.B.nombre}).`);
+  tick(FIJOS ? `Debate ${d.n}: ${nombreG(d.A)} (${EQUIPOS.A.nombre}) contra ${nombreG(d.B)} (${EQUIPOS.B.nombre}).`
+    : `Debate ${d.n}: ${nombreG(d.A)} y ${nombreG(d.B)}.`);
   // una escena que falla no puede congelar la clase: se sigue a la entrada igual
   try { await mostrarRevelacion(d, datosPreparacion()); }      // escenas.js
   catch (e) { console.warn("TRIBUNA: falló la escena de revelación", e); }
@@ -447,7 +450,8 @@ function bloqueCampos(par) {
   return `LOS DOS GRUPOS QUE DEBATEN AHORA (se formaron por su posición real):
 - Grupo ${par.A}, campo «${g(par.A).nombre}»: ${c(par.A).afirma || ""}
 - Grupo ${par.B}, campo «${g(par.B).nombre}»: ${c(par.B).afirma || ""}
-La moción tiene que caer justo sobre lo que separa a esos dos campos: debe AFIRMAR la posición de uno de los dos grupos, de modo que el otro la rechace desde la suya. Nadie debe quedar defendiendo algo que no piensa.
+${FIJOS ? "La moción tiene que caer justo sobre lo que separa a esos dos campos: debe AFIRMAR la posición de uno de los dos grupos, de modo que el otro la rechace desde la suya. Nadie debe quedar defendiendo algo que no piensa."
+  : "La pregunta tiene que caer justo sobre lo que separa a esos dos campos: que cada grupo, diciendo lo que de verdad piensa, choque con el otro."}
 
 `;
 }
@@ -477,9 +481,12 @@ ${flojas}
 CONCEPTOS QUE NADIE HA USADO TODAVÍA:
 ${sinUsar}
 
-${bloqueCampos(par)}TU TAREA: propone la próxima pregunta de debate. Tiene que ser una afirmación discutible de una sola línea (máximo 25 palabras), dentro del tema general, que se pueda defender a favor y en contra con el material del curso. Prefiere lo que quedó en disputa o lo que nadie ha tocado. Español de Chile, sin groserías.
+${FIJOS ? `${bloqueCampos(par)}TU TAREA: propone la próxima pregunta de debate. Tiene que ser una afirmación discutible de una sola línea (máximo 25 palabras), dentro del tema general, que se pueda defender a favor y en contra con el material del curso. Prefiere lo que quedó en disputa o lo que nadie ha tocado. Español de Chile, sin groserías.
 
-Responde SOLO un JSON: {"pregunta": "…", "porQue": "máx. 20 palabras: por qué esta y por qué ahora", "mejorFavor": "máx. 20 palabras", "mejorContra": "máx. 20 palabras", "favor": "máx. 18 palabras: qué sostiene A FAVOR (la postura, no el argumento)", "contra": "máx. 18 palabras: qué sostiene EN CONTRA (la postura, no el argumento)"${bloqueCampos(par) ? ', "afirma": número del grupo cuya posición afirma la moción' : ""}}`;
+Responde SOLO un JSON: {"pregunta": "…", "porQue": "máx. 20 palabras: por qué esta y por qué ahora", "mejorFavor": "máx. 20 palabras", "mejorContra": "máx. 20 palabras", "favor": "máx. 18 palabras: qué sostiene A FAVOR (la postura, no el argumento)", "contra": "máx. 18 palabras: qué sostiene EN CONTRA (la postura, no el argumento)"${bloqueCampos(par) ? ', "afirma": número del grupo cuya posición afirma la moción' : ""}}`
+  : `${bloqueCampos(par)}TU TAREA: propone la próxima pregunta de debate. Nadie recibe un lado: cada grupo va a defender lo que de verdad piensa, así que la pregunta tiene que admitir respuestas honestas y distintas, defendibles con el material del curso. Una sola línea (máximo 25 palabras), dentro del tema general, mejor como pregunta (¿…?) que como afirmación. Prefiere lo que quedó en disputa o lo que nadie ha tocado. Español de Chile, sin groserías.
+
+Responde SOLO un JSON: {"pregunta": "…", "porQue": "máx. 20 palabras: por qué esta y por qué ahora", "choque": "máx. 20 palabras: dónde es probable que los dos grupos se separen"}`}`;
 }
 
 async function prepararPropuesta() {
@@ -520,7 +527,7 @@ async function prepararPropuesta() {
     const campo = escrita.afirma && typeof BRUJULA !== "undefined" ? BRUJULA.campos.find(c => c.id === escrita.afirma) : null;
     const lados = conBrujula() && campo ? ladoQueAfirma(base, campo.id, BRUJULA.campos, posDe) : base;
     S.clase.propuesta = { ...lados, estado: "lista", pregunta: escrita.texto, favor: escrita.favor || "", contra: escrita.contra || "",
-      porQue: "Pregunta escrita por ti en el archivo de la semana." + (conBrujula() && campo ? ` A FAVOR, el grupo más cercano a «${campo.nombre}».` : ""),
+      porQue: "Pregunta escrita por ti en el archivo de la semana." + (FIJOS && conBrujula() && campo ? ` A FAVOR, el grupo más cercano a «${campo.nombre}».` : ""),
       mejorFavor: "", mejorContra: "", fuente: "escrita" };
     if (S.fase === "propuesta") mostrarPropuesta();
     return;
@@ -534,7 +541,7 @@ async function prepararPropuesta() {
     if (!pregunta || !limpiaFrase(pregunta)) throw new Error("pregunta vacía o inválida");
     // el grupo cuya posición afirma la moción defiende A FAVOR; si no lo dice, queda el emparejamiento
     const lados = conBrujula() && +j.afirma === base.B ? { A: base.B, B: base.A } : base;
-    S.clase.propuesta = { ...lados, estado: "lista", pregunta, porQue: String(j.porQue || "").slice(0, 200),
+    S.clase.propuesta = { ...lados, estado: "lista", pregunta, porQue: String(j.porQue || "").slice(0, 200), choque: String(j.choque || "").slice(0, 200),
       favor: String(j.favor || "").slice(0, 200), contra: String(j.contra || "").slice(0, 200),
       mejorFavor: String(j.mejorFavor || "").slice(0, 200), mejorContra: String(j.mejorContra || "").slice(0, 200), fuente: "ia" };
   } catch (e) {
@@ -546,7 +553,7 @@ async function prepararPropuesta() {
     S.clase.propuesta = res
       ? { ...(conBrujula() && campo ? ladoQueAfirma(base, campo.id, BRUJULA.campos, posDe) : base), estado: "lista", pregunta: res.texto,
           favor: res.favor || "", contra: res.contra || "", mejorFavor: "", mejorContra: "", fuente: "escrita",
-          porQue: "La moderadora no pudo escribir la suya: pregunta de reserva del archivo de la semana." + (conBrujula() && campo ? ` A FAVOR, el grupo más cercano a «${campo.nombre}».` : "") }
+          porQue: "La moderadora no pudo escribir la suya: pregunta de reserva del archivo de la semana." + (FIJOS && conBrujula() && campo ? ` A FAVOR, el grupo más cercano a «${campo.nombre}».` : "") }
       : { ...base, estado: "vacia", pregunta: "", porQue: "", mejorFavor: "", mejorContra: "", fuente: "ia" };
   }
   if (S.fase === "propuesta") mostrarPropuesta();
@@ -584,8 +591,10 @@ function mostrarPropuesta() {
     ${faltan ? `<div class="pr-aviso">Faltan grupos con alumnos conectados: se necesitan al menos dos.</div>` : ""}
     <textarea id="prTexto" rows="2" maxlength="300" placeholder="Escribe la pregunta del debate">${esc(p.pregunta || "")}</textarea>
     ${p.porQue ? `<div class="pr-porque">${esc(p.porQue)}</div>` : ""}
+    ${p.choque ? `<div class="pr-porque">Dónde chocarían: ${esc(p.choque)}</div>` : ""}
     ${p.mejorFavor || p.mejorContra ? `<div class="pr-lados"><div style="--c:var(--A)"><b>A favor</b>${esc(p.mejorFavor)}</div><div style="--c:var(--B)"><b>En contra</b>${esc(p.mejorContra)}</div></div>` : ""}
-    <div class="pr-grupos"><span style="color:var(--A)">A FAVOR</span>${sel("prA", defA)}<span style="color:var(--B)">EN CONTRA</span>${sel("prB", defB)}<button class="btn sm" id="prCambiar" title="Intercambiar A FAVOR y EN CONTRA">⇄ lados</button></div>
+    <div class="pr-grupos">${FIJOS ? `<span style="color:var(--A)">A FAVOR</span>${sel("prA", defA)}<span style="color:var(--B)">EN CONTRA</span>${sel("prB", defB)}<button class="btn sm" id="prCambiar" title="Intercambiar A FAVOR y EN CONTRA">⇄ lados</button>`
+      : `${sel("prA", defA)}<span>y</span>${sel("prB", defB)}<button class="btn sm" id="prCambiar" title="Intercambiar quién va a la izquierda y quién a la derecha">⇄</button>`}</div>
     <div class="pr-error" id="prError"></div>
     <div class="pr-acc">
       <button class="btn pri" id="prPublicar">Publicar</button>
@@ -623,7 +632,7 @@ function detenerCuentaPropuesta() {
 // Los grupos que ve la pantalla en los selectores (el profesor pudo cambiarlos sin publicar)
 const parEnPantalla = p => ({ A: +($("prA")?.value || p.A) || p.A, B: +($("prB")?.value || p.B) || p.B });
 
-// ⇄ lados: A FAVOR pasa a EN CONTRA y viceversa. El aviso de «sin nadie inscrito» no cambia
+// ⇄ lados: A FAVOR pasa a EN CONTRA y viceversa (en el debate libre, solo cambian de lado en la pantalla). El aviso de «sin nadie inscrito» no cambia
 // (es el mismo par), así que basta con dar vuelta los selectores sin rehacer la tarjeta.
 function cambiarLadosPropuesta() {
   const p = S.clase.propuesta;
@@ -641,7 +650,7 @@ function elegirGruposPropuesta(A, B) {
   const p = S.clase.propuesta;
   const valido = g => Number.isInteger(g) && g >= 1 && g <= S.clase.grupos;
   if (!p || S.fase !== "propuesta" || !valido(A) || !valido(B)) return;
-  if (A === B) { tick("Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA."); return; }
+  if (A === B) { tick(FIJOS ? "Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA." : "Elige dos grupos distintos."); return; }
   p.A = A; p.B = B;
   p.aviso = avisoDuelo(A, B);
   const texto = $("prTexto")?.value;                 // lo que el profesor estaba escribiendo en la pantalla
@@ -671,7 +680,7 @@ function publicarPropuestaActual(datos = null) {
   const A = +(datos ? datos.A : $("prA")?.value || S.clase.propuesta?.A), B = +(datos ? datos.B : $("prB")?.value || S.clase.propuesta?.B);
   const error = t => { tick(t); if ($("prError")) $("prError").textContent = t; };
   if (!pregunta) { error("Escribe una pregunta o pide otra a la moderadora."); return; }
-  if (!A || !B || A === B) { error("Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA."); return; }
+  if (!A || !B || A === B) { error(FIJOS ? "Elige dos grupos distintos: uno A FAVOR y otro EN CONTRA." : "Elige dos grupos distintos."); return; }
   // con personajes, un duelo con un lado sin nadie inscrito no se publica
   if (avisoDuelo(A, B)) { error(avisoDuelo(A, B)); return; }
   // la postura escrita de cada lado vale solo si el profesor no reescribió la pregunta

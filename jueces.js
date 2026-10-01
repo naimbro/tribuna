@@ -56,8 +56,11 @@ TU PERFIL: valoras ${juez.valora}. Te molesta ${juez.molesta}.
 ${criterioComun() ? `PISO COMÚN DEL PANEL (los cinco lo exigen; pesa en tu nota, pero no es tu foco): ${criterioComun()}.
 ` : ""}
 PREGUNTA EN DEBATE: "${d.pregunta}"
-- ${ladoJuez(d, "A")} defiende A FAVOR (sus mensajes aparecen como «A FAVOR»).
-- ${ladoJuez(d, "B")} defiende EN CONTRA (sus mensajes aparecen como «EN CONTRA»).${hayPersonajes(d) ? `
+${hayPersonajes(d) ? `- ${ladoJuez(d, "A")} defiende A FAVOR (sus mensajes aparecen como «A FAVOR»).
+- ${ladoJuez(d, "B")} defiende EN CONTRA (sus mensajes aparecen como «EN CONTRA»).`
+  : `Nadie tenía un lado asignado: cada grupo defendió lo que de verdad piensa.
+- A: el Grupo ${d.A} (sus mensajes aparecen como «Grupo ${d.A}»).
+- B: el Grupo ${d.B} (sus mensajes aparecen como «Grupo ${d.B}»).`}${hayPersonajes(d) ? `
 Cada grupo habla en primera persona, como su personaje, con lo que trae su dossier impreso.` : ""}
 
 MATERIAL DEL CURSO (conceptos y lecturas de la semana):
@@ -76,7 +79,7 @@ ${(transcripcion || "").includes("🎤") ? `
 Los mensajes marcados 🎤 son transcripciones automáticas de algo dicho en voz alta: no castigues muletillas, puntuación ni nombres propios mal transcritos; juzga el argumento.
 ` : ""}
 TU TAREA: desde tu perfil, pon a cada grupo una nota de 0 a 10 (se admiten medios puntos) por la
-CALIDAD de sus argumentos, no por si estás de acuerdo con el lado que defiende. Un grupo que no
+CALIDAD de sus argumentos, no por si estás de acuerdo con la posición que defiende. Un grupo que no
 escribió recibe 0. Escribe además una frase de máximo 15 palabras por grupo, en tu voz, que
 explique la nota desde TU foco (no repitas el piso común: eso ya lo dicen los demás jueces).
 La frase se proyecta frente a toda la clase: habla del grupo y de sus argumentos, y nunca nombres

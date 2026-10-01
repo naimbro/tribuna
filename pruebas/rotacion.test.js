@@ -244,6 +244,16 @@ test("posturasDebate: usa la postura escrita y, si no hay, una genérica que no 
   assert.equal(R.posturasDebate({ favor: "x".repeat(400) }).A.length, 240);
 });
 
+test("debate libre: sin personajes no hay lados fijos y el rótulo es solo el grupo", () => {
+  assert.equal(R.ladosFijos(null), false);
+  assert.equal(R.ladosFijos([]), false);
+  assert.equal(R.ladosFijos(R.numerarPersonajes([{ id: "x", nombre: "X", corto: "X" }])), true);
+  assert.equal(R.conLado("A", "Grupo 3", false), "Grupo 3");
+  assert.equal(R.conLado("B", "Grupo 1", false), "Grupo 1");
+  assert.equal(R.conLado("A", "Huang", true), "A FAVOR · Huang");
+  assert.equal(R.conLado("B", "Amodei", true), "EN CONTRA · Amodei");
+});
+
 test("gruposEscribiendo: los grupos del debate con alguien tecleando hace poco, sin contarme a mí", () => {
   const ahora = 100000;
   const xs = [

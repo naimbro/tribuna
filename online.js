@@ -153,6 +153,7 @@ function estadoControl() {
     // en la portada y la intro, el botón que manda es el de la escena
     principal: (S.etapa === "portada" ? $("poEmpezar") : S.etapa === "intro" ? $("inSig") : $("btnPrincipal"))?.textContent || "",
     debate: S.debate ? { n: S.debate.n, pregunta: S.debate.pregunta, A: S.debate.A, B: S.debate.B } : null,
+    ladosFijos: FIJOS,                   // con personajes: A FAVOR / EN CONTRA; sin ellos, debate libre
     propuesta: p ? { estado: p.estado, pregunta: p.pregunta || "", porQue: p.porQue || "", A: p.A, B: p.B, aviso: p.aviso || "",
       favor: p.favor || "", contra: p.contra || "", cuentaHasta: S.cuentaHasta || null } : null,
     grupos: Array.from({ length: S.clase.grupos }, (_, i) => i + 1).map(n => ({ n, nombre: nombreGrupo(n),

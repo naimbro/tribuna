@@ -1,7 +1,7 @@
 /* =====================================================================
    TRIBUNA — el teléfono del alumno.
-   Una sola conversación, como un grupo de WhatsApp: A FAVOR a la izquierda, EN CONTRA a la
-   derecha, la moderadora (🎙) y el relator (⚖) al centro. Quien debate escribe abajo; si la
+   Una sola conversación, como un grupo de WhatsApp: un grupo a la izquierda, el otro a la
+   derecha (con personajes, A FAVOR y EN CONTRA), la moderadora (🎙) y el relator (⚖) al centro. Quien debate escribe abajo; si la
    moderadora lo nombra, el teléfono vibra y el mensaje se destaca. El público no escribe en la
    conversación, pero juega (publico.js): mueve el termómetro, reacciona a los mensajes y deja
    una pregunta para la moderadora. Al final vota quién argumentó mejor y predice a los jueces.
@@ -28,6 +28,10 @@ let subs = [];
 
 // Clase con personajes (semana 308): la sala publica la lista; sin ella, todo dice «Grupo N».
 const PJ = () => (J.sala && J.sala.personajes) || null;
+// Debate libre (rotacion.js): sin personajes nadie tiene un lado asignado; cada grupo defiende lo
+// que de verdad piensa. Con personajes, A FAVOR / EN CONTRA como siempre.
+const FIJ = () => ladosFijos(PJ());
+const ladoTel = (s, k) => (FIJ() && s.equipos[k] ? s.equipos[k].nombre : "");
 const nomG = n => rotuloGrupo(n, PJ());
 
 // En la rotación el rol cambia en cada debate: "A" o "B" si mi grupo fue llamado, "P" si voto.
@@ -264,13 +268,14 @@ function pintarSala() {
   bancoMio(s);                                      // anota cuándo llegó esta foto del reloj de ajedrez
   const rol = rolEn(s);
   const colorRol = { A: s.equipos.A.color, B: s.equipos.B.color, P: "#a78bfa" }[rol] || "var(--dim)";
-  $("miBancada").textContent = `${J.grupo ? nomG(J.grupo) : PJ() ? "Sin personaje" : "Grupo ?"}${rol === "A" ? ` · ${s.equipos.A.nombre}` : rol === "B" ? ` · ${s.equipos.B.nombre}` : rol === "P" ? " · votas" : ""}${s.oraculoDe && s.oraculoDe[J.uid] ? ` · 🔮 ${s.oraculoDe[J.uid].puntos}` : ""}`;
+  $("miBancada").textContent = `${J.grupo ? nomG(J.grupo) : PJ() ? "Sin personaje" : "Grupo ?"}${(rol === "A" || rol === "B") ? (FIJ() ? ` · ${s.equipos[rol].nombre}` : " · debates") : rol === "P" ? " · votas" : ""}${s.oraculoDe && s.oraculoDe[J.uid] ? ` · 🔮 ${s.oraculoDe[J.uid].puntos}` : ""}`;
   $("miBancada").style.color = colorRol; $("miBancada").style.borderColor = colorRol;
   const d = s.debate;
   $("tramoLbl").textContent = d ? `Debate ${d.n}.` : "Rotación.";
   $("pauta").textContent = !d ? "Esperando la primera pregunta."
     : enSuspenso(s) ? (d.pregunta ? `«${d.pregunta}» — todos preparan; al terminar el minuto se revela quién pasa al frente.` : "Todos preparan: al terminar el minuto se revela qué duelo sigue.")
-    : `«${d.pregunta}» — ${nomG(d.A)} a favor, ${nomG(d.B)} en contra.`;
+    : FIJ() ? `«${d.pregunta}» — ${nomG(d.A)} a favor, ${nomG(d.B)} en contra.`
+    : `«${d.pregunta}» — debaten ${nomG(d.A)} y ${nomG(d.B)}, cada uno con lo que de verdad piensa.`;
   $("marca").innerHTML = "";
   pintarBarraTel();
   const debatiendo = rol === "A" || rol === "B";
@@ -287,7 +292,7 @@ function pintarSala() {
   // el aviso escrito va al abrirse el debate: antes, pintarCaja lo borra (la caja está cerrada)
   if (d && debatiendo && s.fase === "abierta" && J.avisoAbiertaVisto !== d.n) {
     J.avisoAbiertaVisto = d.n;
-    $("notaCaja").textContent = `🎙 Tu grupo debate ${s.equipos[rol].nombre}. ¡Adelante!`; $("notaCaja").classList.add("ati");
+    $("notaCaja").textContent = FIJ() ? `🎙 Tu grupo debate ${s.equipos[rol].nombre}. ¡Adelante!` : "🎙 Le toca a tu grupo: digan lo que de verdad piensan. ¡Adelante!"; $("notaCaja").classList.add("ati");
   }
   // brújula: la repetición del cierre; y si el profesor la apaga, quien no tiene grupo elige a mano
   const bj = s.brujula;
@@ -369,9 +374,12 @@ function burbuja(m, s) {
   if (m.tipo === "mod") return `<div class="msg mod ${meNombran(m.texto) && rolEn(J.sala) !== "P" ? "ati" : ""} ${m.datos && m.datos.tribuna ? "trib" : ""}"><div class="who">🎙 Moderadora${m.datos && m.datos.tribuna ? " · ✋ la tribuna" : ""}<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
   if (m.tipo === "relator") {
     const d = m.datos || {};
+    // debate libre: cada resumen lleva el nombre del grupo (el del debate de ese mensaje)
+    const deb = (s.debates || []).find(x => x.n === m.debate) || (s.debate && s.debate.n === m.debate ? s.debate : null);
+    const rot = k => (FIJ() || !deb || !deb[k] ? s.equipos[k].nombre : nomG(deb[k]));
     return `<div class="msg rel"><div class="who">📣 Relator · llamado a votar<span class="hora">${hora}</span></div>
-      ${d.resumenA ? `<div class="tx"><b style="color:${s.equipos.A.color}">${s.equipos.A.nombre}:</b> ${esc(d.resumenA)}</div>` : ""}
-      ${d.resumenB ? `<div class="tx"><b style="color:${s.equipos.B.color}">${s.equipos.B.nombre}:</b> ${esc(d.resumenB)}</div>` : ""}
+      ${d.resumenA ? `<div class="tx"><b style="color:${s.equipos.A.color}">${esc(rot("A"))}:</b> ${esc(d.resumenA)}</div>` : ""}
+      ${d.resumenB ? `<div class="tx"><b style="color:${s.equipos.B.color}">${esc(rot("B"))}:</b> ${esc(d.resumenB)}</div>` : ""}
       ${d.disputa ? `<div class="tx"><b>En disputa:</b> ${esc(d.disputa)}</div>` : ""}
       ${d.revisar?.length ? `<div class="tx"><b>Antes de votar, revisen:</b><ul>${d.revisar.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
       ${d.criterios?.length ? `<div class="tx"><b>Criterios:</b><ul>${d.criterios.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}</div>`;
@@ -391,8 +399,9 @@ function burbuja(m, s) {
 
 /* ---------- el público activo (publico.js) ----------
    Reacciones: el público las pone (una por mensaje: tocar la misma la quita); todos ven cuántas
-   hay. Termómetro: −100 (EN CONTRA) … +100 (A FAVOR); en el deslizador A FAVOR queda a la
-   izquierda, como en la conversación. Pregunta: una por debate, se puede cambiar. */
+   hay. Termómetro: −100 (lado B) … +100 (lado A); en el deslizador A queda a la izquierda, como en
+   la conversación. En el debate libre mide a quién te acerca lo que oyes; con personajes, A FAVOR
+   y EN CONTRA. Pregunta: una por debate, se puede cambiar. */
 const PA = { debate: null, subs: [], conteos: {}, mias: {}, tm: null, tmEnvio: null, preg: null };
 function reaccionesDe(m, s) {
   if (!s.debate || m.debate !== s.debate.n) return "";
@@ -427,14 +436,15 @@ function pintarPublicoActivo(s, rol) {
   const d = s.debate;
   suscribirPublicoActivo(d ? d.n : null);
   if (!d || rol !== "P" || s.fase !== "abierta") return;
-  $("tmA").innerHTML = `◀ <span style="color:${s.equipos.A.color}">A FAVOR · ${esc(rotuloCorto(d.A, PJ()))}</span>`;
-  $("tmB").innerHTML = `<span style="color:${s.equipos.B.color}">EN CONTRA · ${esc(rotuloCorto(d.B, PJ()))}</span> ▶`;
+  $("tmA").innerHTML = `◀ <span style="color:${s.equipos.A.color}">${esc(conLado("A", rotuloCorto(d.A, PJ()), FIJ()))}</span>`;
+  $("tmB").innerHTML = `<span style="color:${s.equipos.B.color}">${esc(conLado("B", rotuloCorto(d.B, PJ()), FIJ()))}</span> ▶`;
   const tm = $("tm");
   if (document.activeElement !== tm) tm.value = PA.tm ? -PA.tm.pos : 0;
   tm.classList.toggle("nuevo", !PA.tm);
   const v = PA.tm ? PA.tm.pos : null;
   $("tmVal").textContent = v === null ? "muévelo cuando algo te convenza" : Math.abs(v) < 8 ? "parejo"
-    : `${Math.abs(v) >= 60 ? "muy " : ""}${v > 0 ? "a favor" : "en contra"}`;
+    : FIJ() ? `${Math.abs(v) >= 60 ? "muy " : ""}${v > 0 ? "a favor" : "en contra"}`
+    : `${Math.abs(v) >= 60 ? "muy " : "más "}cerca de ${rotuloCorto(v > 0 ? d.A : d.B, PJ())}`;
   $("tmVal").classList.toggle("on", v !== null);
   const usada = preguntaUsada(d.n);
   $("btnPreg").textContent = usada ? "✋ La moderadora ya usó tu pregunta" : PA.preg ? "✋ Tu pregunta está en la fila · cambiarla" : "✋ Preguntar al debate";
@@ -652,7 +662,7 @@ function sugerir() {
   for (const g of J.gente) if (g.nombre && g.uid !== J.uid) por.set(norm(g.nombre), { nombre: g.nombre, grupo: g.grupo });
   for (const x of J.chat) if (x.tipo === "alumno" && x.nombre && x.uid !== J.uid && !por.has(norm(x.nombre))) por.set(norm(x.nombre), { nombre: x.nombre, grupo: grupoDeMensaje(x) });
   const enDebate = g => d && (g.grupo === d.A || g.grupo === d.B);
-  const lado = g => !d ? "" : g.grupo === d.A ? "A FAVOR" : g.grupo === d.B ? "EN CONTRA" : "";
+  const lado = g => !d ? "" : !FIJ() ? (enDebate(g) ? "debate ahora" : "") : g.grupo === d.A ? "A FAVOR" : g.grupo === d.B ? "EN CONTRA" : "";
   const color = g => !d ? "#6b7a8a" : g.grupo === d.A ? J.sala.equipos.A.color : g.grupo === d.B ? J.sala.equipos.B.color : "#6b7a8a";
   // la moderadora siempre se puede mencionar: si le escribes, te responde
   const lista = [{ nombre: "Moderadora", grupo: 0, mod: true }, ...por.values()]
@@ -1154,7 +1164,7 @@ function armarVivo(s, rol) {
     el.className = "vivo publico";
     el.style.setProperty("--c", "#a78bfa");
     const lado = k => `<div class="vv-ld ${k === "B" ? "der" : ""}" style="--l:${colorLado(k, s)}">
-        <b>${puntoPj(d[k])}${esc(nomG(d[k]))}</b><small>${esc(s.equipos[k].nombre)}</small><span class="vv-rc mono" id="vvR${k}"></span></div>`;
+        <b>${puntoPj(d[k])}${esc(nomG(d[k]))}</b><small>${esc(ladoTel(s, k))}</small><span class="vv-rc mono" id="vvR${k}"></span></div>`;
     el.innerHTML = `<div class="vv-duelo">${lado("A")}<i>vs</i>${lado("B")}</div>
       <div class="vv-pp" id="vvPuntoP"></div>
       <div class="vv-escena" id="vvEscena" aria-live="polite"></div>
@@ -1164,7 +1174,7 @@ function armarVivo(s, rol) {
   el.className = "vivo debate";
   el.style.setProperty("--c", colorLado(rol, s));
   el.innerHTML = `<div class="vv-cab">
-      <div class="vv-rol"><b>${puntoPj(J.grupo)}${esc(nomG(J.grupo))}</b><span>${esc(s.equipos[rol].nombre)}</span></div>
+      <div class="vv-rol"><b>${puntoPj(J.grupo)}${esc(nomG(J.grupo))}</b><span>${esc(ladoTel(s, rol))}</span></div>
       <div class="vv-reloj mono" id="vvReloj"></div><div class="vv-rnota" id="vvRNota"></div></div>
     <div class="vv-mod oculto" id="vvMod"></div>
     <div class="vv-comp" id="vvComp"></div>
@@ -1316,12 +1326,12 @@ function parcialPublico(s) {
     // los dos lados a la vez (una interrupción): cada uno en su mitad, más compactos
     escena = (hablan.length > 1 ? `<div class="vv-en vv-dos"><i></i>Hablan los dos lados</div>` : "") + hablan.map(g => { const k = ladoDe(g.grupo, d);
       return `<div class="vv-hab" style="--l:${colorLado(k, s)}"><div class="vv-en"><i></i>Habla ahora</div>
-        <div class="vv-nom">${esc(g.nombre)}</div><div class="vv-gr">${puntoPj(g.grupo)}${esc(nomG(g.grupo))} · ${esc(s.equipos[k].nombre)}</div>
+        <div class="vv-nom">${esc(g.nombre)}</div><div class="vv-gr">${puntoPj(g.grupo)}${esc(conLado(k, nomG(g.grupo), FIJ()))}</div>
         <div class="vv-tx"><span>${g.habla.texto ? esc(cola(g.habla.texto, hablan.length > 1 ? 140 : 280)) : `<i class="vv-pts">…</i>`}</span></div></div>`; }).join("");
   } else if (msgs.length) {
     const m = msgs[msgs.length - 1], g = grupoDeMensaje(m);
     escena = `<div class="vv-hab quieto" style="--l:${colorLado(m.equipo, s)}"><div class="vv-en">${m.voz ? "🎤 " : ""}Lo último que se dijo</div>
-      <div class="vv-nom">${esc(m.nombre)}</div><div class="vv-gr">${g ? puntoPj(g) + esc(nomG(g)) : ""}${m.equipo && s.equipos[m.equipo] ? " · " + esc(s.equipos[m.equipo].nombre) : ""}</div>
+      <div class="vv-nom">${esc(m.nombre)}</div><div class="vv-gr">${g ? puntoPj(g) + esc(nomG(g)) : ""}${m.equipo && ladoTel(s, m.equipo) ? " · " + esc(ladoTel(s, m.equipo)) : ""}</div>
       <div class="vv-tx"><span>${esc(m.texto)}</span></div></div>`;
   } else escena = `<div class="vv-vacio">Todavía no habla nadie.<small>Cuando alguien apriete su botón, lo que dice aparece aquí.</small></div>`;
   const esc0 = $("vvEscena");
@@ -1393,7 +1403,7 @@ function pintarVotar(s) {
   if (J.votarVisto !== d.n) { J.votarVisto = d.n; navigator.vibrate?.([120, 60, 120]); }
   if (!VOTO[d.n]) { cargarVoto(d.n); el.innerHTML = `<h1>Cargando tu voto…</h1>`; return; }
   const mio = VOTO[d.n];
-  const boton = (campo, k) => `<button class="vt ${mio[campo] === k ? "on" : ""}" data-c="${campo}" data-k="${k}" style="--c:${s.equipos[k].color}">${esc(s.equipos[k].nombre)}<small>${esc(nomG(d[k]))}</small></button>`;
+  const boton = (campo, k) => `<button class="vt ${mio[campo] === k ? "on" : ""}" data-c="${campo}" data-k="${k}" style="--c:${s.equipos[k].color}">${FIJ() ? `${esc(s.equipos[k].nombre)}<small>${esc(nomG(d[k]))}</small>` : esc(nomG(d[k]))}</button>`;
   el.innerHTML = `<div class="k">Debate ${d.n} · vota</div>
     <div class="es-mocion" style="font-size:17px">«${esc(d.pregunta)}»</div>
     ${relatorDe(d.n)}
@@ -1529,7 +1539,7 @@ function pintarEspera(s) {
   const av = `<div class="av" style="--c:${r.color};--t:92px">${J.foto ? `<img src="${esc(J.foto)}" referrerpolicy="no-referrer" alt="">` : `<span>${iniciales(J.nombre)}</span>`}</div>`;
   const per = personajeDe(J.grupo, PJ());
   const papel = per ? `Eres <b>${esc(per.nombre)}</b> (${esc(per.cargo || "")}). Debates una vez, en el duelo ${per.duelo}, ${per.lado === "A" ? "A FAVOR" : "EN CONTRA"} de la moción, y hablas en primera persona, como tu personaje: los jueces premian que lo diría y que puedas decir dónde lo dijo. Mientras debaten otros, juegas desde el teléfono: mueves el termómetro, reaccionas a los mensajes y puedes mandar una pregunta; al final votas quién argumentó mejor y predices a los jueces.`
-    : `Estás en el <b>Grupo ${J.grupo}</b>. Cuando la moderadora lo llame, tu grupo debate A FAVOR o EN CONTRA de la pregunta: escribe en la conversación y responde lo que te pregunten, con argumentos y lecturas del curso. Mientras debaten otros, juegas desde el teléfono: mueves el termómetro, reaccionas a los mensajes y puedes mandar una pregunta; al final votas quién argumentó mejor y predices a los jueces.`;
+    : `Estás en el <b>Grupo ${J.grupo}</b>. Cuando la moderadora lo llame, tu grupo defiende lo que de verdad piensa sobre la pregunta (nadie recibe un lado): escribe en la conversación y responde lo que te pregunten, con argumentos y lecturas del curso. Mientras debaten otros, juegas desde el teléfono: mueves el termómetro, reaccionas a los mensajes y puedes mandar una pregunta; al final votas quién argumentó mejor y predices a los jueces.`;
   el.innerHTML = s.etapa === "portada"
     ? `${av}<h1 style="margin-top:14px">¡Estás dentro, ${esc(J.nombre.split(" ")[0])}!</h1>
        <span class="chip" style="--c:${r.color}">${r.bandera} ${esc(r.nombre)}${gi ? " · " + esc(gi.nombre) : ""}</span>
@@ -1538,10 +1548,10 @@ function pintarEspera(s) {
        ${gi || (PJ() && s.inscripcion !== "abierta") ? "" : `<button class="link" id="esCambiar">${PJ() ? "cambiar de personaje" : "cambiar de rol"}</button>`}`
     : `<div class="k">Semana ${s.semana} · tema general</div>
        <div class="es-mocion">«${esc(s.temaGeneral || s.tema)}»</div>
-       <div class="es-lados">
+       ${FIJ() ? `<div class="es-lados">
          <div style="--c:${s.equipos.A.color}"><b>${s.equipos.A.bandera} ${esc(s.equipos.A.nombre)}</b>${esc(s.equipos.A.lema || "Defiende la moción.")}</div>
          <div style="--c:${s.equipos.B.color}"><b>${s.equipos.B.bandera} ${esc(s.equipos.B.nombre)}</b>${esc(s.equipos.B.lema || "Rechaza la moción.")}</div>
-       </div>
+       </div>` : ""}
        <div class="es-papel">${papel}</div>`;
   if ($("bjOfrecer")) $("bjOfrecer").onclick = () => { BJ.modo = ""; mostrarBrujula("inicio"); };
   const b = $("esCambiar"); if (b) b.onclick = () => {
@@ -1615,9 +1625,14 @@ function pintarEntre(s) {
     + (orac ? `<div class="es-papel">🔮 Oráculo: <b>${orac.puntos}</b> punto${orac.puntos === 1 ? "" : "s"} · #${orac.puesto} de la clase<br><small style="color:var(--dim)">+1 por acertar a los jueces, +1 si la moderadora elige tu pregunta</small></div>` : "");
   if (s.fase === "listo" && d) {
     const pos = d.posturas || {};
-    const lado = k => `<div style="--c:${s.equipos[k].color}"><b>${esc(s.equipos[k].nombre)} · ${esc(nomG(d[k]))}</b>${esc(pos[k] || "")}</div>`;
+    const lado = k => `<div style="--c:${s.equipos[k].color}"><b>${esc(conLado(k, nomG(d[k]), FIJ()))}</b>${esc(pos[k] || "")}</div>`;
     const reloj = `<div class="prep-reloj mono" id="prepReloj">${s.finPrep ? "" : "…"}</div>`;
-    el.innerHTML = rol === "A" || rol === "B"
+    el.innerHTML = (rol === "A" || rol === "B") && !FIJ()
+      ? `<div class="k">Debate ${d.n} · preparación</div>
+         <h1 style="color:${s.equipos[rol].color}">¿Qué piensan ustedes?</h1>
+         <div class="es-mocion" style="font-size:17px">«${esc(d.pregunta)}»</div>${reloj}
+         <div class="es-papel">Nadie les asigna un lado: defiendan lo que de verdad piensan. Júntense con su grupo, acuerden su posición en una frase y escríbanla apenas se abra el chat. Se vota quién argumenta mejor, no quién tiene la razón.</div>`
+      : rol === "A" || rol === "B"
       ? `<div class="k">Debate ${d.n} · preparación</div>
          <h1 style="color:${s.equipos[rol].color}">Tu grupo defiende ${esc(s.equipos[rol].nombre)}</h1>
          <div class="es-mocion" style="font-size:17px">«${esc(d.pregunta)}»</div>
@@ -1625,7 +1640,7 @@ function pintarEntre(s) {
          <div class="es-papel">Júntense con su grupo y acuerden la primera frase. Cuando se abra el chat, escríbanla de inmediato: cualquiera del grupo puede partir.</div>`
       : `<div class="k">Debate ${d.n} · preparación</div><h1>${PJ() ? `${esc(nomG(d.A))} y ${esc(nomG(d.B))} se preparan` : `Los grupos ${d.A} y ${d.B} se preparan`}</h1>
          <div class="es-mocion" style="font-size:17px">«${esc(d.pregunta)}»</div>
-         <div class="es-lados">${lado("A")}${lado("B")}</div>${reloj}
+         ${FIJ() ? `<div class="es-lados">${lado("A")}${lado("B")}</div>` : ""}${reloj}
          <div class="es-papel">Cuando se abra el chat: mueve el termómetro, reacciona a los mensajes y manda una pregunta. Al final votas quién argumentó mejor y apuestas a quién eligen los jueces 🔮.</div>` + pie;
     pintarReloj();
     return;
@@ -1701,12 +1716,17 @@ function vistaPreparacion(el, s, d) {
   } else {
     const pos = d.posturas || {};
     const postura = k => `<div class="prep-postura" style="--c:${s.equipos[k].color}"><b>${esc(s.equipos[k].nombre)}</b>${esc(pos[k] || s.equipos[k].lema || "")}</div>`;
-    cuerpo = `<div class="k">Debate ${d.n} · preparación</div>
+    cuerpo = FIJ() ? `<div class="k">Debate ${d.n} · preparación</div>
       <h1 class="pv-t">Prepara los dos lados</h1>
       ${d.pregunta ? `<div class="es-mocion pv-q">«${esc(d.pregunta)}»</div>` : ""}
       <div class="pv-lados">${postura("A")}${postura("B")}</div>
       ${reloj}
-      <div class="es-papel">${J.grupo ? "Nadie sabe quién pasa al frente: al terminar el minuto se revela. Puedes ser tú, de cualquiera de los dos lados." : SIN_GRUPO}</div>`;
+      <div class="es-papel">${J.grupo ? "Nadie sabe quién pasa al frente: al terminar el minuto se revela. Puedes ser tú, de cualquiera de los dos lados." : SIN_GRUPO}</div>`
+    : `<div class="k">Debate ${d.n} · preparación</div>
+      <h1 class="pv-t">¿Qué piensan ustedes?</h1>
+      ${d.pregunta ? `<div class="es-mocion pv-q">«${esc(d.pregunta)}»</div>` : ""}
+      ${reloj}
+      <div class="es-papel">${J.grupo ? "Nadie recibe un lado: si sube tu grupo, defienden lo que de verdad piensan. Acuerden su posición en una frase. Al terminar el minuto se revela quién pasa al frente." : SIN_GRUPO}</div>`;
   }
   el.innerHTML = `<div class="pv">${cuerpo}${mic}</div>`;
   prepararProbarMic();
@@ -1730,7 +1750,7 @@ function vistaRevelacion(el, s, d, rol) {
     el.innerHTML = `<div class="pv">
       <div class="k">Debate ${d.n}</div>
       <h1 class="sube-t">¡SUBEN AL ESCENARIO!</h1>
-      <div class="sube-lado">${esc(nomG(J.grupo))} · tu grupo defiende <b>${esc(s.equipos[rol].nombre)}</b></div>
+      <div class="sube-lado">${FIJ() ? `${esc(nomG(J.grupo))} · tu grupo defiende <b>${esc(s.equipos[rol].nombre)}</b>` : `${esc(nomG(J.grupo))} · digan lo que de verdad piensan`}</div>
       ${mocion}
       ${pos ? `<div class="prep-postura" style="--c:${color(rol)}"><b>Lo que ustedes sostienen</b>${esc(pos)}</div>` : ""}
       ${entrada ? `<div class="sube-ya">Pasen al frente con el teléfono: el debate es en voz alta.</div>${reloj}`

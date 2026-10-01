@@ -103,6 +103,7 @@ function trozosParaVoz(texto, max = 180) {
 const COLA_VOZ = { voz: null };
 function hablarIA(texto) {
   if (!texto || typeof speechSynthesis === "undefined") return;
+  if (typeof sonidoActivo === "function" && !sonidoActivo()) return;   // el 🔇 del proyector calla también la voz
   if (!COLA_VOZ.voz) COLA_VOZ.voz = elegirVoz(speechSynthesis.getVoices());
   for (const trozo of trozosParaVoz(texto)) {
     const u = new SpeechSynthesisUtterance(trozo);

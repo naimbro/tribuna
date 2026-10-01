@@ -1,6 +1,6 @@
 /* =====================================================================
    TRIBUNA — la barra de participación en el proyector (barra.js tiene la lógica).
-   Dos barras enfrentadas sobre la conversación, A FAVOR a la izquierda y EN CONTRA a la
+   Dos barras enfrentadas sobre la conversación, un grupo a la izquierda y el otro a la
    derecha, con una tajada por integrante. Todo el curso la ve. Al cruzar la mitad suena; al
    llenarse, confeti desde la barra, fanfarria y un cartel. Cada hito, una vez por debate.
    ===================================================================== */
@@ -37,7 +37,7 @@ function pintarBarras() {
     if (BV.claves[k] !== clave || !el.querySelector(".bz")) {
       BV.claves[k] = clave;
       el.innerHTML = `<div class="bz" style="--c:var(--${k})">
-        <div class="bz-cab"><b>${EQUIPOS[k].bandera} ${esc(nombreG(d[k]))} · ${EQUIPOS[k].nombre}</b><span class="bz-sello"></span><span class="bz-pct mono"></span></div>
+        <div class="bz-cab"><b>${EQUIPOS[k].bandera} ${esc(nombreG(d[k]))}${FIJOS ? ` · ${EQUIPOS[k].nombre}` : ""}</b><span class="bz-sello"></span><span class="bz-pct mono"></span></div>
         <div class="bz-barra"><div class="bz-llen"></div></div>
         <div class="bz-tajadas">${r.personas.map(p => `<span class="bz-t" data-c="${esc(p.clave).replace(/"/g, "&quot;")}"><i></i><em>${esc(primerNombre(p.nombre))}</em></span>`).join("") || `<span class="bz-vacio">nadie en el grupo aún</span>`}</div></div>`;
     }

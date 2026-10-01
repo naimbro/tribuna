@@ -3,7 +3,7 @@
    index.html sigue siendo la pantalla del profesor y el motor sigue corriendo ahí; con
    ⛶ ESCENARIO (o ?escenario=1, o la orden del control) se esconden los controles y la
    conversación se reemplaza por una vista hecha para leerse desde el fondo de la sala:
-     · dos podios (A FAVOR a la izquierda, EN CONTRA a la derecha) con las caras, el reloj de
+     · dos podios (un grupo a cada lado; con personajes, A FAVOR y EN CONTRA) con las caras, el reloj de
        ajedrez de cada lado y su barra de participación;
      · el subtítulo en vivo de quien habla, bajo su lado;
      · los últimos mensajes al centro, con las reacciones del público que suben flotando y el
@@ -38,7 +38,7 @@ const escnEnModo = () => document.body.classList.contains("escenario");
 // Cambia el texto solo si es otro (asignar el mismo texto igual rehace el nodo).
 function escnTexto(el, t) { if (el && el.textContent !== t) el.textContent = t; }
 function escnClase(el, c) { if (el && el.className !== c) el.className = c; }
-// El debate en vivo va en el color del LADO (A FAVOR / EN CONTRA), el mismo de los teléfonos, el
+// El debate en vivo va en el color del LADO (izquierda / derecha), el mismo de los teléfonos, el
 // control, el chat y los resultados. El del personaje queda solo en el punto junto a su nombre
 // (las escenas de revelación y entrada, que son sobre los personajes, siguen con el suyo).
 const escnColor = k => (EQUIPOS[k] && EQUIPOS[k].color) || `var(--${k})`;
@@ -69,7 +69,7 @@ function escnArmar() {
   if (!v || v.dataset.armada) return;
   v.dataset.armada = "1";
   const podio = k => `<section class="escn-podio" id="escnPodio${k}" data-k="${k}">
-      <div class="escn-lado">${k === "A" ? "A FAVOR" : "EN CONTRA"}</div>
+      ${FIJOS ? `<div class="escn-lado">${k === "A" ? "A FAVOR" : "EN CONTRA"}</div>` : ""}
       <div class="escn-nombre"></div><div class="escn-cargo"></div>
       <div class="escn-caras"></div>
       <div class="escn-crono"><b class="mono"></b><small></small></div>
@@ -459,10 +459,10 @@ function escnPintarEspera() {
   let clave, html;
   if (S.fase === "listo" && d) {
     clave = "prep|" + d.n;
-    const lado = k => `<div class="escn-es-lado" style="--c:${escnColor(k)}"><b>${k === "A" ? "A FAVOR" : "EN CONTRA"} · ${escHtml(nombreGrupo(d[k]))}</b><span>${escHtml((d.posturas || {})[k] || "")}</span></div>`;
+    const lado = k => `<div class="escn-es-lado" style="--c:${escnColor(k)}"><b>${escHtml(conLado(k, nombreGrupo(d[k]), FIJOS))}</b><span>${escHtml((d.posturas || {})[k] || "")}</span></div>`;
     html = `<div class="escn-es-k">DEBATE ${d.n} · PREPARACIÓN</div><div class="escn-es-reloj mono" id="escnPrepReloj"></div>
       <div class="escn-es-q">«${escHtml(d.pregunta)}»</div><div class="escn-es-lados">${lado("A")}${lado("B")}</div>
-      <div class="escn-es-pie">Cada grupo acuerda su primera frase. El debate se abre al llegar a cero.</div>`;
+      <div class="escn-es-pie">${FIJOS ? "" : "Nadie tiene un lado asignado: cada grupo defiende lo que de verdad piensa. "}Cada grupo acuerda su primera frase. El debate se abre al llegar a cero.</div>`;
   } else if (["votando", "veredictoPublico", "veredictoJueces"].includes(S.fase) && d) {
     clave = "vota|" + d.n;
     html = `<div class="escn-es-k">DEBATE ${d.n}</div><div class="escn-es-t">🗳 VOTEN EN SU TELÉFONO</div><div class="escn-es-q">«${escHtml(d.pregunta)}»</div>`;
@@ -484,7 +484,7 @@ function escnPintarEspera() {
 // Chrome no deja sonar nada (ni la música ni la voz de la moderadora) hasta el primer clic o
 // tecla en la página. En el escenario nadie toca la pantalla: un aviso discreto lo pide.
 function escnFaltaAudio() {
-  const quiere = (typeof sonidoActivo === "function" && sonidoActivo()) || opcionActiva(S.clase.opciones, "vozIA");
+  const quiere = typeof sonidoActivo !== "function" || sonidoActivo();   // con 🔇 no suena nada, ni la voz
   if (!quiere) return false;
   const activada = navigator.userActivation ? navigator.userActivation.hasBeenActive : ESCN.vozOk;
   const ac = typeof _ac !== "undefined" ? _ac : null;

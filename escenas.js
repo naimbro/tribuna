@@ -231,7 +231,7 @@ function laminasIntro() {
      <div class="in-sub">Hablan en primera persona, como su personaje. Los jueces premian la fidelidad: que tu personaje lo diría, y que puedas decir dónde lo dijo.</div>`] : []),
     `<div class="in-k">CÓMO FUNCIONA</div>
      <div class="in-jueces">
-       <div><div class="in-e">🎙</div><b>LA MODERADORA LLAMA</b><span>${PERS ? "Llama a los dos personajes de cada duelo, en orden: uno a favor y otro en contra." : "Plantea una pregunta y llama a dos grupos: uno a favor y otro en contra."}</span></div>
+       <div><div class="in-e">🎙</div><b>LA MODERADORA LLAMA</b><span>${PERS ? "Llama a los dos personajes de cada duelo, en orden: uno a favor y otro en contra." : "Plantea una pregunta y llama a dos grupos que piensan distinto. Nadie recibe un lado: cada grupo defiende lo que de verdad piensa."}</span></div>
        <div><div class="in-e">💬</div><b>DEBATEN</b><span>Un tramo abierto de ${mm(ROT.SEG_DEBATE)}: la posición de entrada y después libre. La moderadora da la palabra.</span></div>
        <div><div class="in-e">🗳</div><b>LOS DEMÁS VOTAN</b><span>Los grupos que no debaten votan quién argumentó mejor —aunque no piensen como él— y predicen a los jueces: cada acierto suma un punto de oráculo. Después, rotan.</span></div>
      </div>`,
@@ -500,7 +500,7 @@ function mostrarVotacion(d) {
   el.innerHTML = `<div class="es-k">EL PÚBLICO VOTA · ¿quién argumentó mejor, aunque no pienses como él?</div>
     <div class="es-q">«${escHtml(d.pregunta)}»</div>
     <div class="vb">${["A", "B"].map(k => `<div class="vb-fila" id="vbf${k}" style="--c:${EQUIPOS[k].color}">
-        <div class="vb-n">${EQUIPOS[k].nombre} · ${escHtml(nombreG(d[k]).toUpperCase())}</div>
+        <div class="vb-n">${escHtml(conLado(k, nombreG(d[k]).toUpperCase(), FIJOS))}</div>
         <div class="vb-barra"><i id="vb${k}"></i></div><div class="vb-c mono" id="vbc${k}">0</div></div>`).join("")}</div>
     <div class="es-pie mono" id="vbPie"></div>
     <div class="es-oraculo">🔮 En el teléfono, además: apuesten a quién eligen los 5 jueces de IA. Cada acierto, +1 punto de oráculo.</div>`;
@@ -553,7 +553,7 @@ async function mostrarVeredictoJueces(d, jueces, panel) {
   const tarjeta = (j, k) => `<div class="tj" id="tj-${j.id}-${k}" style="--c:${EQUIPOS[k].color}">${fmtNota(j[k])}</div>`;
   el.innerHTML = `<div class="es-k">EL PANEL DE JUECES</div>
     <div class="es-q">«${escHtml(d.pregunta)}»</div>
-    <div class="jz-lados"><span style="color:${EQUIPOS.A.color}">■ ${escHtml(nombreG(d.A).toUpperCase())} · A FAVOR</span><span style="color:${EQUIPOS.B.color}">■ ${escHtml(nombreG(d.B).toUpperCase())} · EN CONTRA</span></div>
+    <div class="jz-lados"><span style="color:${EQUIPOS.A.color}">■ ${escHtml(nombreG(d.A).toUpperCase())}${FIJOS ? " · A FAVOR" : ""}</span><span style="color:${EQUIPOS.B.color}">■ ${escHtml(nombreG(d.B).toUpperCase())}${FIJOS ? " · EN CONTRA" : ""}</span></div>
     <div class="jz">${jueces.map(j => `<div class="jz-col" id="jz-${j.id}">
         <div class="jz-e">${j.emoji}</div><div class="jz-n">${escHtml(j.nombre)}</div><div class="jz-p">${escHtml(j.valora)}</div>
         <div class="jz-t">${tarjeta(j, "A")}${tarjeta(j, "B")}</div>
@@ -629,7 +629,8 @@ function escRetrato(n) {   // círculo con iniciales en el color del personaje, 
 const escTarjetaDuelo = x => `<div class="pp-duelo" data-t="${escHtml(x.texto)}" data-a="${x.A}" data-b="${x.B}">
   ${escRetrato(x.A)}<div class="pp-dm"><span>VS</span><q>${escHtml(x.texto)}</q></div>${escRetrato(x.B)}</div>`;
 
-// PREPARACIÓN: nada más que la moción (o los duelos que quedan), las dos posturas y el anillo.
+// PREPARACIÓN: nada más que la moción (o los duelos que quedan), las dos posturas y el anillo. En el
+// debate libre no hay posturas: cada grupo decide qué piensa.
 // Sin nombres de grupo: nadie sabe quién pasa al frente.
 function mostrarPreparacion(d, { tema, duelos, ultimo } = {}) {
   const el = escena("preparacion");
@@ -638,6 +639,9 @@ function mostrarPreparacion(d, { tema, duelos, ultimo } = {}) {
     ? `<div class="es-k">${ultimo ? "ÚLTIMO DUELO" : "¿QUÉ DUELO SIGUE?"} · PREPARACIÓN</div>
        <div class="pp-tema">${escHtml(tema || "")}</div>
        <div class="pp-duelos${duelos.length > 3 ? " muchos" : ""}">${duelos.map(escTarjetaDuelo).join("")}</div>`
+    : !FIJOS ? `<div class="es-k">DEBATE ${d.n} · PREPARACIÓN · ¿QUÉ PIENSAN USTEDES, DE VERDAD?</div>
+       <div class="pp-q ${escClaseLargo(d.pregunta)}">«${escHtml(d.pregunta)}»</div>
+       <div class="pp-tema">Nadie recibe un lado: cada grupo defiende lo que de verdad piensa. Se vota quién argumenta mejor.</div>`
     : `<div class="es-k">DEBATE ${d.n} · PREPARACIÓN · TODOS PREPARAN LOS DOS LADOS</div>
        <div class="pp-q ${escClaseLargo(d.pregunta)}">«${escHtml(d.pregunta)}»</div>
        <div class="pp-lados">${["A", "B"].map(k => `<div class="pp-lado" style="--c:${EQUIPOS[k].color}">
@@ -694,7 +698,7 @@ async function revTragamonedas(slot, nombres, dur) {
   }
 }
 
-// Sin personajes: «A FAVOR… Grupo 3» (pausa) «EN CONTRA… Grupo 1».
+// Sin personajes (debate libre): «SUBE… Grupo 3» (pausa) «Y FRENTE A ELLOS… Grupo 1».
 async function revelarGrupos(d) {
   const el = escena("revelacion");
   const pool = [...new Set([...gruposDisponibles(), d.A, d.B])].filter(g => g > 0);
@@ -702,7 +706,7 @@ async function revelarGrupos(d) {
   el.innerHTML = `<div class="rv-cuerpo">
       <div class="rv-t">¿QUIÉN PASA AL FRENTE?</div>
       ${["A", "B"].map(k => `<div class="rv-fila" id="rvf${k}" style="--c:${escColorDe(d[k], k)}">
-        <div class="rv-lado">${k === "A" ? "A FAVOR…" : "EN CONTRA…"}</div>
+        <div class="rv-lado">${FIJOS ? (k === "A" ? "A FAVOR…" : "EN CONTRA…") : k === "A" ? "SUBE…" : "Y FRENTE A ELLOS…"}</div>
         <div class="rv-slot${largo ? " largo" : ""}" id="rvs${k}"><span>&nbsp;</span></div></div>`).join("")}
     </div>`;
   await esperar(500);
@@ -805,7 +809,7 @@ async function mostrarEntrada(d, integrantes, segundos) {
   el.style.setProperty("--cA", escColorDe(d.A, "A")); el.style.setProperty("--cB", escColorDe(d.B, "B"));
   $("enFondo").className = "en-fondo frente";
   $("enCuerpo").innerHTML = `<div class="en-frente">${["A", "B"].map(k => `<div class="en-col" style="--c:${escColorDe(d[k], k)}">
-      <div class="en-lado">${k === "A" ? "A FAVOR" : "EN CONTRA"}</div>
+      ${FIJOS ? `<div class="en-lado">${k === "A" ? "A FAVOR" : "EN CONTRA"}</div>` : ""}
       <div class="en-nombre chico on">${escHtml(nombreG(d[k]))}</div>
       <div class="en-caras mini">${((integrantes || {})[k] || []).map(j => escCaraEntrada(j, escColorDe(d[k], k), 52)).join("")}</div></div>`).join(`<div class="en-vs">VS</div>`)}</div>
     <div class="pp-q ${escClaseLargo(d.pregunta)} en-mocion">«${escHtml(d.pregunta)}»</div>`;
@@ -823,7 +827,7 @@ async function escEsquina(el, d, k, gente, ms) {
   const tam = Math.round(Math.min(112, innerHeight * 0.12) * (gente.length > 6 ? 0.78 : 1));
   $("enCuerpo").innerHTML = `<div class="en-esquina">${k === "A" ? "EN ESTA ESQUINA…" : "Y EN ESTA OTRA ESQUINA…"}</div>
     <div class="en-nombre${nombre.length > 14 ? " largo" : ""}" id="enNombre">${escHtml(nombre)}</div>
-    <div class="en-sub" id="enSub">${sub ? `${escHtml(sub)} · ` : ""}<b>${k === "A" ? "A FAVOR" : "EN CONTRA"}</b></div>
+    <div class="en-sub" id="enSub">${FIJOS ? `${sub ? `${escHtml(sub)} · ` : ""}<b>${k === "A" ? "A FAVOR" : "EN CONTRA"}</b>` : escHtml(sub || "")}</div>
     <div class="en-caras" id="enCaras"></div>`;
   await esperar(900);
   if (!el.isConnected) return;

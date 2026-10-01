@@ -1,8 +1,10 @@
 /* =====================================================================
    TRIBUNA — la conversación y sus dos moderadores de IA.
 
-   El debate es UNA conversación, como un grupo de WhatsApp: A FAVOR a la izquierda, EN CONTRA
-   a la derecha, los moderadores al centro. Todos leen todo en vivo.
+   El debate es UNA conversación, como un grupo de WhatsApp: un grupo a la izquierda, el otro a
+   la derecha (con personajes, A FAVOR y EN CONTRA), los moderadores al centro. Todos leen todo
+   en vivo. Sin personajes el debate es libre: cada grupo defiende lo que de verdad piensa y la
+   moderadora busca dónde se separan.
 
    🎙 MODERADORA: interviene durante el tramo. Pide profundizar, verifica que el alumno sepa de
       dónde sale lo que dice, le pasa la palabra a quien no ha hablado, equilibra bancadas.
@@ -29,6 +31,17 @@ function postChat(m) {
   recibirChat([m]);
 }
 
+// Debate libre (rotacion.js): sin personajes nadie tiene lado asignado. Cada lado de un mensaje
+// se nombra por su grupo («Grupo 3»), no por A FAVOR / EN CONTRA.
+const debateLibre = () => !!S.debate && !FIJOS;
+function rotulosDe(m) {
+  const d = (S.clase && S.clase.debates || []).find(x => x.n === (m && m.debate)) || S.debate;
+  const nombre = k => (FIJOS || !d ? EQUIPOS[k].nombre : nombreG(d[k]));
+  return { A: { ...EQUIPOS.A, nombre: nombre("A") }, B: { ...EQUIPOS.B, nombre: nombre("B") } };
+}
+const rotuloMensaje = m => (m.equipo === "A" || m.equipo === "B") ? (FIJOS || !m.debate ? EQUIPOS[m.equipo].nombre
+  : m.grupo ? nombreG(m.grupo) : rotulosDe(m)[m.equipo].nombre) : m.equipo;
+
 // Llega uno o varios mensajes (local: al publicar; en línea: desde Firestore).
 function recibirChat(lista, inicial = false) {
   const nuevos = [];
@@ -49,8 +62,8 @@ function recibirChat(lista, inicial = false) {
     } else if (m.tipo === "mod") sonar("nota", 14);
     // el proyector habla: la moderadora y el relator, si la voz de la IA está encendida (vozia.js)
     if ((m.tipo === "mod" || m.tipo === "relator") && opcionActiva(S.clase.opciones, "vozIA") && typeof hablarIA === "function") {
-      if (m.tipo === "relator") { VOZ_ESPERA.length = 0; hablarIA(textoHablado(m, EQUIPOS)); }   // lo que esperaba ya no viene al caso
-      else hablarModeradora(textoHablado(m, EQUIPOS));
+      if (m.tipo === "relator") { VOZ_ESPERA.length = 0; hablarIA(textoHablado(m, rotulosDe(m))); }   // lo que esperaba ya no viene al caso
+      else hablarModeradora(textoHablado(m, rotulosDe(m)));
     }
   }
   if (typeof window.alCambiarChat === "function") window.alCambiarChat();
@@ -65,10 +78,10 @@ function burbuja(m) {
   if (m.tipo === "noticia") return `<div class="msg noticia"><div class="who">📰 Última hora<span class="hora">${hora}</span></div><div class="tx">${esc(m.texto)}</div></div>`;
   if (m.tipo === "mod") return `<div class="msg mod ${m.datos && m.datos.tribuna ? "trib" : ""}"><div class="who">🎙 ${MOD_NOMBRE}${m.datos && m.datos.tribuna ? " · ✋ la tribuna" : ""}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div></div>`;
   if (m.tipo === "relator") {
-    const d = m.datos || {};
+    const d = m.datos || {}, eq = rotulosDe(m);
     return `<div class="msg rel"><div class="who">📣 ${REL_NOMBRE} · llamado a votar<span class="hora">${hora}</span></div>
-      ${d.resumenA ? `<div class="tx"><b style="color:${EQUIPOS.A.color}">${EQUIPOS.A.nombre}:</b> ${esc(d.resumenA)}</div>` : ""}
-      ${d.resumenB ? `<div class="tx"><b style="color:${EQUIPOS.B.color}">${EQUIPOS.B.nombre}:</b> ${esc(d.resumenB)}</div>` : ""}
+      ${d.resumenA ? `<div class="tx"><b style="color:${eq.A.color}">${esc(eq.A.nombre)}:</b> ${esc(d.resumenA)}</div>` : ""}
+      ${d.resumenB ? `<div class="tx"><b style="color:${eq.B.color}">${esc(eq.B.nombre)}:</b> ${esc(d.resumenB)}</div>` : ""}
       ${d.disputa ? `<div class="tx"><b>En disputa:</b> ${esc(d.disputa)}</div>` : ""}
       ${d.revisar?.length ? `<div class="tx"><b>Antes de votar, revisen:</b><ul>${d.revisar.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
       ${d.criterios?.length ? `<div class="tx"><b>Criterios:</b><ul>${d.criterios.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
@@ -134,8 +147,8 @@ function transcripcionChat(filtro = () => true, max = 40) {
   return S.chat.filter(m => ["alumno", "mod", "relator"].includes(m.tipo) && filtro(m)).slice(-max).map(m =>
     m.tipo === "mod" ? `[🎙 ${MOD_NOMBRE}] ${m.texto}`
     : m.tipo === "relator" ? `[⚖ ${REL_NOMBRE}] ${m.texto}`
-    : m.voz ? `[${EQUIPOS[m.equipo]?.nombre || m.equipo} · ${m.nombre} · 🎤] ${m.texto}`
-    : `[${EQUIPOS[m.equipo]?.nombre || m.equipo} · ${m.nombre}] ${m.texto}`).join("\n");
+    : m.voz ? `[${rotuloMensaje(m)} · ${m.nombre} · 🎤] ${m.texto}`
+    : `[${rotuloMensaje(m)} · ${m.nombre}] ${m.texto}`).join("\n");
 }
 
 /* ---------- 🎙 la moderadora ---------- */
@@ -194,8 +207,8 @@ function abrirTramoChat() {
     return;
   }
   postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: d
-    ? `Debate ${d.n}: ${citaMocion(d.pregunta)} Grupo ${d.A} defiende ${EQUIPOS.A.nombre}; Grupo ${d.B}, ${EQUIPOS.B.nombre}. ` +
-      `@Grupo ${d.A} y @Grupo ${d.B}: su posición en una frase, cualquiera del grupo, y de ahí seguimos sueltos. ${textoTiempo(R.seg)}`
+    ? `Debate ${d.n}: ${citaMocion(d.pregunta)} @Grupo ${d.A} y @Grupo ${d.B}: ¿qué piensan ustedes, de verdad? ` +
+      `Su posición en una frase, cualquiera del grupo, y de ahí seguimos sueltos. ${textoTiempo(R.seg)}`
     : `${citaMocion(mocionActual())} ${ladoNombre("A")} y ${ladoNombre("B")}: su posición en una frase, y de ahí seguimos sueltos. ${textoTiempo(R.seg)}` });
 }
 
@@ -309,7 +322,8 @@ function promptModerador(est) {
   const lista = k => est.alumnos.filter(p => p.equipo === k).map(fila).join(", ") || "(nadie aún)";
   const d = S.debate;
   return `Eres la moderadora de un debate universitario en vivo, en un chat grupal. Curso: "${SESION.curso}", semana ${SESION.semana}: ${SESION.tema}.
-MOCIÓN: "${mocionActual()}". ${d ? nombreG(d.A) : ladoNombre("A")} la defiende (${EQUIPOS.A.nombre}); ${d ? nombreG(d.B) : ladoNombre("B")} la rechaza (${EQUIPOS.B.nombre}).
+${debateLibre() ? `PREGUNTA: "${mocionActual()}". Nadie tiene un lado asignado: ${nombreG(d.A)} y ${nombreG(d.B)} defienden cada uno lo que de verdad piensa. Se juntaron porque piensan distinto, pero pueden coincidir en más de lo que parece.`
+  : `MOCIÓN: "${mocionActual()}". ${d ? nombreG(d.A) : ladoNombre("A")} la defiende (${EQUIPOS.A.nombre}); ${d ? nombreG(d.B) : ladoNombre("B")} la rechaza (${EQUIPOS.B.nombre}).`}
 TRAMO: ${R.nombre}. Van ${minutos} de ${Math.round(R.seg / 60)} minutos. Pauta: ${R.pauta}
 
 QUIÉNES DEBATEN
@@ -338,7 +352,8 @@ Sigue el ritmo de la conversación, como una buena moderadora humana: responde a
 Le hablas a los GRUPOS, no a las personas: "${d ? grupoDe("A") : ladoNombre("A")}, ¿qué le ${PERS ? "responde" : "responden"} a…?". Cualquiera del grupo contesta.
 ${puedeNombrar.length ? `Solo a estas personas, que llevan rato sin escribir nada, puedes nombrarlas con @Nombre (una a la vez, la que tenga más sentido ahora): ${puedeNombrar.join(", ")}.` : "Ahora no nombres a ninguna persona con @: habla a los grupos."}${S.mod && S.mod.pregunta ? ` (Excepción: a ${S.mod.pregunta.nombre}, que te habló.)` : ""}
 Si un alumno dice que alguien no está, créele y no vuelvas a nombrar a esa persona.
-
+${debateLibre() ? `TU TRABAJO PRINCIPAL ES ENCONTRAR EL DESACUERDO REAL. Primero, que cada grupo diga qué piensa. Después, busca el punto exacto donde se separan: un caso concreto en que responderían distinto, una consecuencia, una prioridad, cuánto pesa algo. Si parecen estar de acuerdo, no lo dejes pasar: pregúntales qué parte de lo que dice el otro grupo NO suscribirían, o qué los haría cambiar de opinión. Si de verdad coinciden en algo, dilo en voz alta y lleva la conversación a lo que sigue abierto.
+` : ""}
 ${tribunaParaPrompt()}TUS INTERVENCIONES ANTERIORES EN ESTE DEBATE (no repitas ninguna, ni con otras palabras):
 ${est.ultimasMod.map(t => `- ${t}`).join("\n") || "(ninguna)"}
 
@@ -346,15 +361,16 @@ ELIGE UNA:
 - "esperar": la conversación avanza sola; no escribes nada.
 - "profundizar": pide a un grupo que desarrolle o haga concreta una afirmación gruesa que acaba de hacer.
 - "verificar": pregunta de qué lectura o dato sale una afirmación, o qué significa un concepto que usaron. Máximo una vez por persona y nunca dos veces seguidas: no conviertas cada mensaje en "¿de qué texto sale eso?".
-- "contrastar": pon a un grupo frente al argumento más fuerte del otro que todavía no ha respondido.
+- "contrastar": pon a un grupo frente al argumento más fuerte del otro que todavía no ha respondido.${debateLibre() ? `
+- "desacuerdo": nombra lo que los dos grupos parecen compartir y pregunta dónde exactamente se separan, o plantea un caso concreto en que sus posiciones darían respuestas distintas.` : ""}
 - "pasar_pelota": dale la palabra al grupo que ha hablado menos, o a una persona de la lista de arriba, idealmente sobre algo concreto que dijo el otro lado.
 - "examinar": hazle a un grupo una pregunta factual sobre lo que leyó —quién es una de esas personas, qué pide exactamente— para ver si de verdad lo leyó.${estadoTribuna().ofrecer ? `
 - "tribuna": lanza una de las PREGUNTAS DE LA TRIBUNA de arriba, tal cual (la escribió el público). En "elegida" pon su número; en "mensaje", solo a quién va dirigida (${PERS && d ? `"${grupoDe("A")}", "${grupoDe("B")}" o los dos` : `"@Grupo N" o "@Grupo N y @Grupo M"`}).` : ""}
-Reglas: eres neutral, no opinas sobre la moción ni dices quién tiene razón.
+Reglas: eres neutral, no opinas sobre la ${debateLibre() ? "pregunta" : "moción"} ni dices quién tiene razón.
 PUEDES nombrar a las personas de los documentos que ellos tienen impresos y preguntar qué dijo o qué pide cada una: lo tienen en la mano y preguntarlo no les regala nada. Pero SIEMPRE como pregunta, nunca afirmando el dato, y si contestan mal no los corrijas: pregúntales de dónde lo sacan.
 NO puedes entregarles la lectura: no digas a qué lado le sirve un argumento, no cruces los materiales por ellos, no les sugieras qué concepto usar ni les armes la refutación. Máximo 40 palabras; una sola pregunta o encargo; español de Chile, tono de profesora cercana pero exigente; sin groserías.
 
-Responde SOLO un JSON: {"tipo": "esperar"|"profundizar"|"verificar"|"contrastar"|"pasar_pelota"|"examinar"${estadoTribuna().ofrecer ? '|"tribuna"' : ""}, "mensaje": "tu intervención (vacío si esperas)"${estadoTribuna().ofrecer ? ', "elegida": número de la pregunta de la tribuna (solo si tipo es "tribuna")' : ""}}`;
+Responde SOLO un JSON: {"tipo": "esperar"|"profundizar"|"verificar"|"contrastar"|${debateLibre() ? '"desacuerdo"|' : ""}"pasar_pelota"|"examinar"${estadoTribuna().ofrecer ? '|"tribuna"' : ""}, "mensaje": "tu intervención (vacío si esperas)"${estadoTribuna().ofrecer ? ', "elegida": número de la pregunta de la tribuna (solo si tipo es "tribuna")' : ""}}`;
 }
 
 function tribunaParaPrompt() {
@@ -429,6 +445,7 @@ function moderadorSimple(est = estadoTramo(), pregunta = null) {
                     `${grupoDe(otro(ult.equipo))}, ¿en qué parte de eso no están de acuerdo?`,
                     `${grupoDe(ult.equipo)}, ¿qué ejemplo concreto tienen de lo que dice ${corto(ult.nombre)}?`);
   }
+  if (ult && debateLibre()) candidatos.push(`${grupoDe("A")} y ${grupoDe("B")}: ¿en qué punto concreto no están de acuerdo? Si coinciden, díganlo y busquemos dónde se separan.`);
   if (callado) candidatos.push(`@${callado.nombre}, todavía no te leemos. ¿Con qué parte de lo que se ha dicho no estás de acuerdo?`);
   candidatos.push(`${grupoDe(menos)}, ¿cuál es el argumento del otro lado que más les cuesta responder?`);
   return candidatos.find(t => !esRepetida(t, est.ultimasMod)) || null;
@@ -441,7 +458,8 @@ async function relatorPideVoto() {
   let d = null;
   if (S.motor.activo) {
     const prompt = `Eres el relator de un debate universitario en vivo. Curso: "${SESION.curso}", semana ${SESION.semana}.
-MOCIÓN: "${mocionActual()}". ${ladoNombre("A")} la defiende; ${ladoNombre("B")} la rechaza. Acaba de terminar el debate ${S.debate ? S.debate.n : ""}: «${mocionActual()}».
+${debateLibre() ? `PREGUNTA: "${mocionActual()}". No había lados asignados: ${ladoNombre("A")} y ${ladoNombre("B")} defendieron cada uno lo que de verdad piensa.`
+  : `MOCIÓN: "${mocionActual()}". ${ladoNombre("A")} la defiende; ${ladoNombre("B")} la rechaza.`} Acaba de terminar el debate ${S.debate ? S.debate.n : ""}: «${mocionActual()}».
 
 LO QUE SE DIJO EN ESTE TRAMO:
 ${transcripcionChat(delTramo, 60) || "(nadie escribió)"}
@@ -451,7 +469,7 @@ ${S.chat.filter(m => m.tipo === "relator" && m.ronda < S.ronda).map(m => m.texto
 ` : ""}
 RÚBRICA DEL JURADO: ${RUBRICA.map(r => r.nombre).join(", ")}.
 
-TU TAREA: antes de que voten los jueces —un público de estudiantes y un jurado—, resume con justicia la posición de cada bancada en este tramo, nombra el punto en disputa y diles qué revisar y con qué criterios antes de votar. Eres neutral: no digas quién va ganando. En "revisar" apunta a cosas concretas que se dijeron (por ejemplo, si una afirmación tuvo respaldo o si alguien respondió una objeción). En "criterios", cómo distinguir un buen argumento de uno que solo suena bien. Sin groserías.
+TU TAREA: antes de que voten los jueces —un público de estudiantes y un jurado—, resume con justicia la posición de cada ${debateLibre() ? "grupo" : "bancada"} en este tramo, nombra el punto en disputa${debateLibre() ? " (el punto exacto donde se separan; si coincidieron en casi todo, dilo y nombra lo que quedó abierto)" : ""} y diles qué revisar y con qué criterios antes de votar.${debateLibre() ? " Recuérdales en los criterios que se vota quién argumentó mejor, no con quién están de acuerdo." : ""} Eres neutral: no digas quién va ganando. En "revisar" apunta a cosas concretas que se dijeron (por ejemplo, si una afirmación tuvo respaldo o si alguien respondió una objeción). En "criterios", cómo distinguir un buen argumento de uno que solo suena bien. Sin groserías.
 
 Responde SOLO un JSON: {"resumenA": "máx. 35 palabras", "resumenB": "máx. 35 palabras", "disputa": "máx. 25 palabras", "revisar": ["2 o 3 cosas concretas"], "criterios": ["2 o 3 criterios"]}`;
     try {
@@ -468,9 +486,11 @@ Responde SOLO un JSON: {"resumenA": "máx. 35 palabras", "resumenB": "máx. 35 p
     const n = k => S.chat.filter(m => m.tipo === "alumno" && m.equipo === k && delTramo(m)).length;
     d = { resumenA: `${n("A")} mensajes en este tramo.`, resumenB: `${n("B")} mensajes en este tramo.`, disputa: mocionActual(),
           revisar: ["Si las afirmaciones empíricas citaron alguna lectura del curso.", "Si cada bancada respondió el argumento más fuerte del otro lado."],
-          criterios: ["Evidencia atribuida por sobre el tono.", "Reconocer lo válido del rival suma."] };
+          criterios: ["Evidencia atribuida por sobre el tono.", "Reconocer lo válido del rival suma.",
+            ...(debateLibre() ? ["Se vota quién argumentó mejor, no con quién están de acuerdo."] : [])] };
   }
-  const texto = `${EQUIPOS.A.nombre}: ${d.resumenA} | ${EQUIPOS.B.nombre}: ${d.resumenB} | En disputa: ${d.disputa} | Revisen: ${d.revisar.join("; ")} | Criterios: ${d.criterios.join("; ")}`;
+  const eq = rotulosDe({ debate: S.debate ? S.debate.n : 0 });
+  const texto = `${eq.A.nombre}: ${d.resumenA} | ${eq.B.nombre}: ${d.resumenB} | En disputa: ${d.disputa} | Revisen: ${d.revisar.join("; ")} | Criterios: ${d.criterios.join("; ")}`;
   postChat({ tipo: "relator", nombre: REL_NOMBRE, texto, datos: d });
   sonar("campana");
   return d;
@@ -517,7 +537,7 @@ function prepararMenciones(tx, caja) {
   const cerrar = () => { lista = []; token = null; caja.classList.remove("on"); caja.innerHTML = ""; };
   const pintar = () => {
     const d = S.debate;
-    const lado = g => d && g.grupo === d.A ? "A FAVOR" : d && g.grupo === d.B ? "EN CONTRA" : "";
+    const lado = g => !FIJOS ? (d && (g.grupo === d.A || g.grupo === d.B) ? "debate ahora" : "") : d && g.grupo === d.A ? "A FAVOR" : d && g.grupo === d.B ? "EN CONTRA" : "";
     caja.innerHTML = lista.length ? lista.map((g, i) => `<div class="sg ${i === elegida ? "on" : ""}" data-i="${i}">
         <span class="sg-n">${esc(g.nombre)}</span><span class="sg-g">${g.mod ? "🎙 moderadora de IA" : (g.grupo ? (PERS ? rotuloCorto(g.grupo, PERS) : "grupo " + g.grupo) : "") + (lado(g) ? " · " + lado(g) : "")}</span></div>`).join("")
       : `<div class="sg-vacio">Nadie se llama así en la sala.</div>`;
