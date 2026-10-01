@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Tribuna · prueba de micrófono</title>
+<style>
+/* Diagnóstico del mantener para hablar en un teléfono real: qué eventos entrega el reconocimiento
+   de voz del navegador, en modo continuo (el del juego) y no continuo. No toca Firebase. */
+:root{--bg:#0b0e14;--txt:#e8ecf3;--dim:#8a93a6;--ok:#22c55e;--mal:#f43f5e;--acc:#38bdf8}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.4 system-ui;padding:14px 16px 40px}
+h1{font-size:19px;margin:0 0 4px}
+p{margin:6px 0;color:var(--dim)}
+.fila{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+button{font:800 15px system-ui;border-radius:12px;border:0;padding:12px 14px;background:#1f2937;color:var(--txt)}
+.hablar{flex:1 1 40%;min-height:120px;border-radius:20px;background:var(--acc);color:#04121d;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.hablar.on{background:var(--ok)}
+.hablar *{pointer-events:none}
+#txt{min-height:44px;padding:10px;border-radius:12px;background:#111827;font-size:17px}
+#log{white-space:pre-wrap;font:12px/1.35 ui-monospace,monospace;background:#05070b;border:1px solid #1f2937;border-radius:10px;padding:10px;max-height:46vh;overflow:auto}
+.ok{color:var(--ok)}.mal{color:var(--mal)}
+</style>
+</head>
+<body>
+<h1>🎤 Prueba de micrófono</h1>
+<p>Mantén apretado un botón, di una frase de unas diez palabras y suelta. Prueba los dos. Después toca «Copiar registro» y mándalo.</p>
+<div id="info"></div>
+<div class="fila">
+  <button class="hablar" id="bCont" data-continuo="1">MANTÉN<br><small>continuo (el del juego)</small></button>
+  <button class="hablar" id="bUno" data-continuo="0">MANTÉN<br><small>no continuo</small></button>
+</div>
+<div id="txt"></div>
+<div class="fila">
+  <button id="bGum">Probar getUserMedia</button>
+  <button id="bCopiar">Copiar registro</button>
+  <button id="bBorrar">Borrar</button>
+</div>
+<div id="log"></div>
+<script>
+const $ = id => document.getElementById(id);
+const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+const t0 = Date.now();
+const lineas = [];
+function log(msg, cls = "") {
+  const l = `${String(Date.now() - t0).padStart(6)} ms  ${msg}`;
+  lineas.push(l);
+  const d = document.createElement("div"); d.textContent = l; if (cls) d.className = cls;
+  $("log").appendChild(d); $("log").scrollTop = 1e9;
+}
+log(`userAgent: ${navigator.userAgent}`);
+log(`SpeechRecognition: ${window.SpeechRecognition ? "sí" : "no"} · webkitSpeechRecognition: ${window.webkitSpeechRecognition ? "sí" : "no"} · contexto seguro: ${isSecureContext}`, Rec ? "ok" : "mal");
+$("info").innerHTML = Rec ? "" : `<p class="mal">Este navegador no tiene reconocimiento de voz: en el juego no aparece el botón de hablar.</p>`;
+navigator.permissions?.query({ name: "microphone" }).then(p => {
+  log(`permiso microphone: ${p.state}`); p.onchange = () => log(`permiso microphone cambió a: ${p.state}`);
+}).catch(e => log(`permissions.query(microphone) no disponible: ${e.name || e}`));
+
+// Igual que el juego: un reconocedor por apretón; si termina solo mientras sigue apretado, se abre otro.
+let actual = null;
+function abrir(toma) {
+  const r = new Rec();
+  r.lang = "es-CL"; r.continuous = toma.continuo; r.interimResults = true;
+  for (const ev of ["start", "audiostart", "soundstart", "speechstart", "speechend", "soundend", "audioend", "nomatch"])
+    r.addEventListener(ev, () => log(`#${toma.n}.${toma.recs} ${ev}`));
+  r.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const x = e.results[i];
+      log(`#${toma.n}.${toma.recs} result[${i}] ${x.isFinal ? "FINAL" : "interino"}: «${x[0].transcript}»`, x.isFinal ? "ok" : "");
+      if (x.isFinal) toma.final += (toma.final ? " " : "") + x[0].transcript.trim();
+    }
+    let inter = ""; for (let i = 0; i < e.results.length; i++) if (!e.results[i].isFinal) inter += e.results[i][0].transcript;
+    toma.inter = inter;
+    $("txt").textContent = (toma.final + " " + inter).trim();
+  };
+  r.onerror = e => log(`#${toma.n}.${toma.recs} ERROR ${e.error}${e.message ? " — " + e.message : ""}`, "mal");
+  r.onend = () => {
+    log(`#${toma.n}.${toma.recs} end`);
+    if (toma.inter) { toma.final += (toma.final ? " " : "") + toma.inter.trim(); toma.inter = ""; }
+    if (actual === toma && toma.apretado) { toma.recs++; try { toma.rec = abrir(toma); } catch (err) { log(`reabrir falló: ${err.name || err}`, "mal"); } }
+    else if (!toma.apretado && toma.rec === r) log(`#${toma.n} TEXTO FINAL: «${toma.final}»`, toma.final ? "ok" : "mal");
+  };
+  try { r.start(); log(`#${toma.n}.${toma.recs} start() llamado (continuous=${toma.continuo})`); }
+  catch (err) { log(`#${toma.n}.${toma.recs} start() lanzó ${err.name}: ${err.message}`, "mal"); }
+  return r;
+}
+let n = 0;
+function apretar(e) {
+  e.preventDefault();
+  if (!Rec) { log("sin reconocimiento de voz", "mal"); return; }
+  if (actual && actual.apretado) return;
+  const b = e.currentTarget;
+  const toma = { n: ++n, recs: 1, continuo: b.dataset.continuo === "1", final: "", inter: "", apretado: true, pointerId: e.pointerId, boton: b };
+  actual = toma;
+  log(`— apretón #${toma.n} (${e.pointerType}) —`);
+  $("txt").textContent = "";
+  toma.rec = abrir(toma);
+  try { b.setPointerCapture(e.pointerId); } catch {}
+  b.classList.add("on");
+}
+function soltar(e) {
+  const toma = actual;
+  if (!toma || !toma.apretado || e.pointerId !== toma.pointerId) return;
+  toma.apretado = false;
+  toma.boton.classList.remove("on");
+  log(`#${toma.n} soltó (${e.type}); stop()`);
+  try { toma.rec.stop(); } catch (err) { log(`stop() lanzó ${err.name}`, "mal"); }
+  setTimeout(() => { if (toma.rec) log(`#${toma.n} a los 1,2 s: «${(toma.final + " " + toma.inter).trim()}» (lo que el juego enviaría)`); }, 1200);
+}
+for (const b of [$("bCont"), $("bUno")]) {
+  b.addEventListener("pointerdown", apretar);
+  for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) b.addEventListener(ev, soltar);
+  b.addEventListener("contextmenu", e => e.preventDefault());
+}
+document.addEventListener("visibilitychange", () => log(`visibilitychange: ${document.visibilityState}`));
+$("bGum").onclick = async () => {
+  try { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach(t => t.stop()); log("getUserMedia: OK", "ok"); }
+  catch (e) { log(`getUserMedia: ${e.name} — ${e.message}`, "mal"); }
+};
+$("bCopiar").onclick = async () => {
+  const txt = lineas.join("\n");
+  try { await navigator.clipboard.writeText(txt); log("registro copiado", "ok"); }
+  catch { const a = document.createElement("textarea"); a.value = txt; document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove(); log("registro copiado (respaldo)", "ok"); }
+};
+$("bBorrar").onclick = () => { lineas.length = 0; $("log").textContent = ""; };
+</script>
+</body>
+</html>
