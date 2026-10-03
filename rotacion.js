@@ -284,7 +284,8 @@ function mejorIntervencion(historial) {
 /* --- El debate en vivo (spec 2026-09-25) -------------------------------
    Cada conducta nueva tiene un interruptor en S.clase.opciones; lo que falta cuenta como
    encendido, así las salas creadas antes siguen funcionando. Apagado = la clase de siempre. */
-const OPCIONES_DEFECTO = { revelacion: true, revancha: true, musica: true, voz: true, reloj: true, punto: true, vozIA: true };
+// modProfe parte apagado: es el único interruptor que cambia quién modera (el profesor, a viva voz)
+const OPCIONES_DEFECTO = { revelacion: true, revancha: true, musica: true, voz: true, reloj: true, punto: true, vozIA: true, modProfe: false };
 const opcionActiva = (ops, k) => (ops && typeof ops === "object" && k in ops ? ops[k] !== false : OPCIONES_DEFECTO[k] !== false);
 
 // Los duelos escritos que faltan, en números de grupo (con personajes). Mismo orden que PREGUNTAS.

@@ -279,7 +279,7 @@ test("opcionActiva: sin opciones, todo encendido; false apaga; claves desconocid
   assert.equal(R.opcionActiva({ voz: false }, "voz"), false);
   assert.equal(R.opcionActiva({ voz: false }, "musica"), true);
   assert.equal(R.opcionActiva({}, "otra"), true);
-  assert.deepEqual(Object.keys(R.OPCIONES_DEFECTO).sort(), ["musica", "punto", "reloj", "revancha", "revelacion", "voz", "vozIA"]);
+  assert.deepEqual(Object.keys(R.OPCIONES_DEFECTO).sort(), ["modProfe", "musica", "punto", "reloj", "revancha", "revelacion", "voz", "vozIA"]);
 });
 
 test("opcionActiva: ops que no es un objeto (dato corrupto) no revienta, cae al valor por defecto", () => {
