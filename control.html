@@ -99,6 +99,8 @@ select{min-height:48px;appearance:none;background-image:linear-gradient(45deg,tr
 /* el profesor modera (modProfe, con el debate abierto): HABLAR en el tercio de abajo, al pulgar;
    el botón principal (cerrar) se achica arriba, lejos del pulgar */
 body.modera main{padding-bottom:calc(36dvh + env(safe-area-inset-bottom))}
+body.modera:has(#sModera.sin-voz) main{padding-bottom:calc(130px + env(safe-area-inset-bottom))}
+body.modera #sModera.sin-voz{height:auto}
 body.modera .cp{min-height:46px;font-size:16px;width:auto;align-self:flex-end;padding:8px 16px}
 body.modera #sModera{position:fixed;left:0;right:0;bottom:0;z-index:6;height:34dvh;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
   background:#0c1319;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}

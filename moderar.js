@@ -13,8 +13,9 @@ import { doc, setDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-
 const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+const TOPE_APRETON = 5 * 60000;   // tope duro de un apretón: pasado, suelta (publicando lo dicho)
 const V = { db: null, codigo: "", dato: () => null, mandar: null, reloj: () => Date.now(), listo: false,
-  apretado: false, toma: null, pointerId: null, timer: null, ultimo: 0, colaFirma: "", enviando: false };
+  apretado: false, modera: false, desde: 0, toma: null, pointerId: null, timer: null, ultimo: 0, colaFirma: "", enviando: false };
 
 // El debate en el que se habla: abierto y con número (lo que publica el proyector en privado/control).
 function debateAbierto() {
@@ -24,7 +25,12 @@ function debateAbierto() {
 const vivoRef = () => doc(V.db, "salas", V.codigo, "vivo", "moderador");
 const callar = () => setDoc(vivoRef(), { habla: null }).catch(() => {});
 function aviso(t) { const m = $("profeHabla"); m.textContent = t; m.classList.toggle("aviso", !!t); }
-function lo(t) { const m = $("profeHabla"); m.textContent = t; m.classList.remove("aviso"); }
+// lo que se dice va en un <bdi>: el contenedor es rtl (así se ve el final del texto largo) pero la
+// puntuación («¿», «?», «.») queda del lado correcto
+function lo(t) {
+  const m = $("profeHabla"), b = document.createElement("bdi");
+  b.textContent = t; m.replaceChildren(b); m.classList.remove("aviso");
+}
 function rotular(on) {
   $("btnHablarProfe").classList.toggle("on", on);
   $("hablarProfeT").textContent = on ? "🎙 TE ESCUCHAN" : "🎙 HABLAR";
@@ -34,7 +40,7 @@ function rotular(on) {
 // Devuelve el aviso de error, o "".
 async function publicarMensaje(texto, { voz = true, debate } = {}) {
   const c = debateAbierto();
-  if (!c || c.debate.n !== debate) return "";
+  if (!c || c.debate.n !== debate) return String(texto || "").trim() ? "Se cerró el debate: no se publicó." : "";
   const m = mensajeProfe({ texto, voz, debate, ronda: c.ronda ?? 0, tramo: c.tramo ?? 0, ahora: V.reloj() });
   if (!m) return "";
   const { id, ...datos } = m;
@@ -49,7 +55,7 @@ function latido(forzar = false) {
   const ahora = Date.now();
   if (!forzar && ahora - V.ultimo < PROFE.CADA) return;
   V.ultimo = ahora;
-  setDoc(vivoRef(), { habla: { debate: h.debate, t0: h.t0, t: V.reloj(), texto: h.texto().slice(-PROFE.TEXTO) } }).catch(() => {});
+  setDoc(vivoRef(), { habla: { debate: h.debate, t0: h.t0 + (V.reloj() - Date.now()), t: V.reloj(), texto: h.texto().slice(-PROFE.TEXTO) } }).catch(() => {});
 }
 
 // Cada 200 ms mientras aprieta: si el debate se cerró se descarta; si no, el corte de 60 s y el latido.
@@ -58,6 +64,7 @@ function tick() {
   if (!V.apretado || !h) return;
   const c = debateAbierto();
   if (!c || c.debate.n !== h.debate) { soltar({ enviar: false, avisar: "Se cerró el debate: no se publicó." }); return; }
+  if (Date.now() - V.desde > TOPE_APRETON) { soltar({ avisar: "Pasaron 5 minutos: se soltó solo y se publicó lo dicho." }); return; }
   h.tick();
   latido();
 }
@@ -84,7 +91,7 @@ function empezar(e) {
   // si no abre, dictado.js deja la toma soltada (su reconocedor no reabre otro por su cuenta)
   try { h.empezar(); } catch { aviso("🎤 No se pudo abrir el micrófono. Vuelve a apretar."); return; }
   try { e && e.currentTarget && e.currentTarget.setPointerCapture(e.pointerId); } catch {}
-  Object.assign(V, { apretado: true, toma: h, ultimo: 0, pointerId: e ? e.pointerId : null });
+  Object.assign(V, { apretado: true, toma: h, ultimo: 0, desde: Date.now(), pointerId: e ? e.pointerId : null });
   navigator.vibrate?.(20);
   rotular(true);
   lo("");
@@ -126,10 +133,12 @@ function pintarCola(c) {
 
 // Lo llama control.js en cada foto del proyector.
 export function pintarModerar(c, modera) {
+  if (modera && !V.modera && !V.apretado) aviso("");   // un aviso viejo no pasa al próximo debate
+  V.modera = modera;
   document.body.classList.toggle("modera", modera);
   $("sModera").classList.toggle("oculto", !modera);
   $("sCola").classList.toggle("oculto", !modera);
-  if (!modera && V.apretado) soltar({ enviar: false, avisar: "Se apagó «Moderas tú»: no se publicó." });
+  if (!modera && V.apretado) soltar({ enviar: false, avisar: c && c.fase === "abierta" ? "Se apagó «Moderas tú»: no se publicó." : "Se cerró el debate: no se publicó." });
   if (modera) pintarCola(c);
 }
 
@@ -142,6 +151,7 @@ export function prepararModerar({ db, codigo, dato, mandar, reloj }) {
   const b = $("btnHablarProfe");
   if (!Rec) {
     b.classList.add("oculto");
+    $("sModera").classList.add("sin-voz");
     $("profeEscribe").classList.remove("oculto");
     const enviar = async () => {
       const t = $("profeTx").value.trim(), c = debateAbierto();
