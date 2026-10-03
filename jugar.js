@@ -776,7 +776,7 @@ function empezarDictado() {
 // frase se abre otra hasta que el alumno aprieta de nuevo; si se cierra sin haber oído nada, termina.
 function dictarFrase() {
   const rec = new Reconocedor();
-  rec.lang = "es-CL"; rec.continuous = DICTADO.CONTINUO; rec.interimResults = true;
+  rec.lang = DICTADO.LANG; rec.continuous = DICTADO.CONTINUO; rec.interimResults = true;
   let interino = "", oyo = false;
   rec.onresult = e => {
     interino = "";

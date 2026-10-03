@@ -163,3 +163,63 @@ test("si no se puede abrir el siguiente reconocedor, alFallo('cortado')", () => 
   romper = true; t = 2000; recs[0].onend();
   assert.deepEqual(fallos, ["cortado"]);
 });
+
+test("empezar() que lanza no deja un micrófono abierto: un onend tardío no abre otro", async () => {
+  const { Rec, recs } = falso();
+  class Roto extends Rec { start() { super.start(); throw new Error("no se pudo"); } }
+  const h = crearToma(Roto, { reloj: () => 0 });
+  assert.throws(() => h.empezar(), /no se pudo/);
+  assert.equal(recs.length, 1);
+  assert.equal(recs[0].abortado, true, "el reconocedor queda abortado");
+  assert.equal(recs[0].onend, null, "y desenganchado");
+  assert.equal(h.rec, null);
+  const r = await h.soltar();
+  assert.equal(r.texto, "");
+  assert.equal(recs.length, 1, "no se abrió otro");
+});
+
+test("fallas vuelve a 0 si un reconocedor duró lo bastante: no hay 'mudo'", () => {
+  const { Rec, recs } = falso();
+  let t = 0;
+  const fallos = [];
+  const h = crearToma(Rec, { reloj: () => t, alFallo: c => fallos.push(c) });
+  h.empezar();
+  const cerrar = (i, dur) => { t += dur; recs[i].onend(); };
+  let i = 0;
+  for (let k = 0; k < 3; k++) cerrar(i++, 10);
+  cerrar(i++, DICTADO.RAPIDO);
+  for (let k = 0; k < 3; k++) cerrar(i++, 10);
+  assert.deepEqual(fallos, []);
+  assert.equal(h.fallas, 3);
+  assert.equal(recs.length, 8, "sigue abriendo reconocedores");
+});
+
+test("soltar mientras el corte de 60 s espera su final: alCorte con lo dicho, y soltar sale con el trozo nuevo vacío", async () => {
+  const { Rec, recs, oir } = falso();
+  let t = 0;
+  const cortes = [];
+  const h = crearToma(Rec, { max: 1000, espera: 5000, reloj: () => t, alCorte: (texto, desde) => cortes.push([texto, desde]) });
+  h.empezar();
+  oir(recs[0], [["largo", true]]);
+  t = 1000; h.tick();
+  assert.equal(recs[0].parado, true);
+  const p = h.soltar();
+  t = 1010; recs[0].onend();
+  const r = await p;
+  assert.deepEqual(cortes, [["largo", 0]]);
+  assert.equal(r.texto, "");
+  assert.equal(r.desde, 1010);
+  assert.equal(recs.length, 1, "no abre otro reconocedor");
+});
+
+test("stop() que lanza dentro de soltar(): sale de inmediato con lo que había y deja el reconocedor abortado", async () => {
+  const { Rec, recs, oir } = falso();
+  class Terco extends Rec { stop() { throw new Error("ya cerrado"); } }
+  const h = crearToma(Terco, { espera: 60000 });
+  h.empezar();
+  oir(recs[0], [["algo", false]]);
+  const r = await h.soltar();
+  assert.equal(r.texto, "algo");
+  assert.equal(recs[0].abortado, true);
+  assert.equal(recs[0].onend, null);
+});

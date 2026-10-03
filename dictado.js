@@ -69,7 +69,10 @@ function crearToma(Rec, { debate = null, alTexto = () => {}, alFallo = () => {},
     rec.start();
   }
 
-  h.empezar = () => escuchar();
+  h.empezar = () => {
+    try { escuchar(); }
+    catch (e) { h.soltada = true; if (h.rec) desenganchar(h.rec); h.rec = null; throw e; }
+  };
   // Cada ~200 ms mientras se aprieta: el corte de los 60 s.
   h.tick = () => {
     if (h.soltada) return;
