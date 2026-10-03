@@ -199,6 +199,15 @@ async function entrarAlJuego() {
     ESCR.primera = false;
     pintarBarraTel(); pintarEscribiendo(); pintarVivoParcial();
   }));
+  // el profesor modera a viva voz (vozprofe.js): su subtítulo y, mientras habla, nadie más habla.
+  // Sin el documento (o sin la regla desplegada) J.profe queda callado y todo sigue como siempre.
+  let profePrimera = true;
+  J.profe = null;
+  subs.push(onSnapshot(doc(db, "salas", J.codigo, "vivo", "moderador"), snap => {
+    J.profe = notarProfe(J.profe, snap.exists() ? snap.data() : null, Date.now(), profePrimera);
+    profePrimera = false;
+    pintarVivoParcial();
+  }, () => {}));
   // el profesor puede moverme de grupo: el rol y lo que escribo dependen de mi grupo actual
   subs.push(onSnapshot(doc(db, "salas", J.codigo, "jugadores", J.uid), snap => {
     // lo que todavía no confirma el servidor no cuenta: al elegir personaje, el lote puede volver
@@ -240,7 +249,7 @@ function avisarNuevos(nuevos) {
   for (const m of nuevos) {
     if (m.tipo === "mod" && meNombran(m.texto) && (rolEn(J.sala) === "A" || rolEn(J.sala) === "B")) {
       navigator.vibrate?.([120, 60, 120]);
-      $("notaCaja").textContent = "🎙 La moderadora te pregunta a ti. Responde abajo.";
+      $("notaCaja").textContent = `🎙 ${m.datos && m.datos.profe ? "El moderador" : "La moderadora"} te pregunta a ti. Responde abajo.`;
       $("notaCaja").classList.add("ati");
     }
     // otro alumno me nombró con @
@@ -855,10 +864,14 @@ const hablaPorPunto = s => !!(s && s.punto && s.punto.estado === "aceptado" && s
 // los 15 s de quien lo pidió. Devuelve el punto, o null.
 const cedoPorPunto = s => (s && s.punto && s.punto.estado === "aceptado" && s.punto.para === miLado(s) && s.punto.de !== J.uid ? s.punto : null);
 const quienPunto = p => corto(p.nombre) || "el otro lado";
+// ¿El moderador (el profesor) tiene la palabra? Mientras habla, el botón se apaga y quien hablaba
+// suelta: se envía lo que llevaba.
+const modera = s => !!(s && s.debate && profeHabla(J.profe, s.debate.n, Date.now(), AJ.LATIDO));
 
 function puedoHablar(s) {
   if (!s || !Reconocedor || !opcionActiva(s.opciones, "voz") || s.fase !== "abierta" || !s.debate || !miLado(s)) return false;
   if (cedoPorPunto(s)) return false;
+  if (modera(s)) return false;
   return !sinTiempo(s) || hablaPorPunto(s);
 }
 // Mi banco (contado aquí) está por llegar a cero: el proyector, que lo ve un poco antes, puede estar
@@ -900,8 +913,9 @@ function tickHabla() {
   // su lado: lo dicho hasta ahí sale. Sin tiempo o cediendo, sale ya con lo que hay (sin esperar el
   // final): antes de que el proyector cierre el tramo, o mientras el otro hace su punto.
   if (!puedoHablar(s)) {
-    const agotado = sinTiempo(s), cede = cedoPorPunto(s);
-    soltarHablar({ aviso: cede ? `✋ Punto de ${quienPunto(cede)}: escucha.` : agotado ? "⏱ Tu lado se quedó sin tiempo: solo puedes escribir." : "", inmediato: agotado || !!cede });
+    const agotado = sinTiempo(s), cede = cedoPorPunto(s), mod = modera(s);
+    soltarHablar({ aviso: mod ? "🎙 El moderador tomó la palabra." : cede ? `✋ Punto de ${quienPunto(cede)}: escucha.` : agotado ? "⏱ Tu lado se quedó sin tiempo: solo puedes escribir." : "",
+      inmediato: mod || agotado || !!cede });
     return;
   }
   h.tick();                                         // el corte de los 60 s (dictado.js)
@@ -914,7 +928,8 @@ function empezarHablar(e) {
   const s = J.sala;
   if (!puedoHablar(s)) {
     const cede = cedoPorPunto(s);
-    avisoHabla(cede ? `✋ Punto de ${quienPunto(cede)}: escucha. Hablas cuando termine.`
+    avisoHabla(modera(s) ? "🎙 Habla el moderador: espera a que termine."
+      : cede ? `✋ Punto de ${quienPunto(cede)}: escucha. Hablas cuando termine.`
       : s && sinTiempo(s) ? "⏱ Tu lado se quedó sin tiempo: solo puedes escribir." : "Podrás hablar cuando se abra el tramo.");
     return;
   }
@@ -1019,16 +1034,18 @@ function pintarBotonHablar(s) {
   const b = $("btnHablar");
   if (!b || !s) return;
   const puede = puedoHablar(s), agotado = s.fase === "abierta" && sinTiempo(s), cede = !HABLA.apretado && s.fase === "abierta" && cedoPorPunto(s);
-  const estado = HABLA.apretado ? "apretado" : puede ? (agotado ? "punto" : "listo") : cede ? "cede" : agotado ? "agotado" : "cerrado";
+  const mod = !HABLA.apretado && s.fase === "abierta" && modera(s);
+  const estado = HABLA.apretado ? "apretado" : mod ? "modera" : puede ? (agotado ? "punto" : "listo") : cede ? "cede" : agotado ? "agotado" : "cerrado";
   const quien = cede ? quienPunto(cede) : "";
   if (b.dataset.estado === estado && b.dataset.quien === quien) return;
   b.dataset.estado = estado; b.dataset.quien = quien;
   b.disabled = !HABLA.apretado && !puede;
   b.classList.toggle("on", HABLA.apretado);
   b.innerHTML = { apretado: "TE ESCUCHO<br><small>suelta para enviar</small>", punto: "TIENES LA PALABRA<br><small>mantén para hablar</small>",
+    modera: "🎙 HABLA EL MODERADOR<br><small>espera</small>",
     cede: `✋ Punto de ${esc(quien)}<br><small>escucha</small>`,
     agotado: "SIN TIEMPO<br><small>solo puedes escribir</small>" }[estado] || "MANTÉN<br>PARA HABLAR";
-  b.setAttribute("aria-label", { apretado: "Te escucho: suelta para enviar", cede: `Punto de ${quien}: escucha`, agotado: "Sin tiempo: solo puedes escribir" }[estado] || "Mantén apretado para hablar");
+  b.setAttribute("aria-label", { apretado: "Te escucho: suelta para enviar", modera: "Habla el moderador: espera", cede: `Punto de ${quien}: escucha`, agotado: "Sin tiempo: solo puedes escribir" }[estado] || "Mantén apretado para hablar");
 }
 
 /* ---------- la vista en vivo (viva voz, con el debate abierto) ----------
@@ -1158,6 +1175,7 @@ function modParaMi(s, ahora) {
 function parcialDebate(s, lado) {
   const d = s.debate, ahora = Date.now(), el = $("pVivo");
   if (!HABLA.apretado && $("vvBoton") && (!$("btnHablar") || $("btnHablar").parentNode !== $("vvBoton"))) montarBotonHablar($("vvBoton"));
+  pintarBotonHablar(s);                             // el moderador empezó o calló (no siempre llega una foto)
   // mi reloj: el banco de mi lado, o el tramo si no hay reloj de ajedrez
   const { banco, corre, tramo } = relojVivo(s);
   const ms = banco ? banco[lado] : tramo;
@@ -1174,9 +1192,12 @@ function parcialDebate(s, lado) {
   el.classList.toggle("agotado", agotado && !porPunto);
   // la moderadora me habla (mientras me piden un punto, la tarjeta manda: tiene 10 s)
   const pide = !!(s.punto && s.punto.estado === "pedido" && s.punto.para === lado);
-  const m = pide ? null : modParaMi(s, ahora), mod = $("vvMod");
-  mod.classList.toggle("oculto", !m);
-  poner(mod, m ? `<b class="q">🎙 La moderadora te pregunta</b><span class="vv-mod-tx">${menciones(m.texto)}</span>` : "");
+  // el moderador hablando ahora manda sobre su línea anterior
+  const mh = profeHabla(J.profe, d.n, ahora, AJ.LATIDO);
+  const m = pide || mh ? null : modParaMi(s, ahora), mod = $("vvMod");
+  mod.classList.toggle("oculto", !m && !mh);
+  poner(mod, mh ? `<b class="q">🎙 Habla el moderador · en vivo</b><span class="vv-mod-tx">${esc(cola(mh.texto, 220)) || "…"}</span>`
+    : m ? `<b class="q">🎙 ${m.datos && m.datos.profe ? "El moderador" : "La moderadora"} te pregunta</b><span class="vv-mod-tx">${menciones(m.texto)}</span>` : "");
   // quién de mi lado está hablando (para no pisarse) y quién del otro lado
   const hablan = quienesHablan(s);
   const mios = hablan.filter(g => ladoDe(g.grupo, d) === lado), otros = hablan.filter(g => ladoDe(g.grupo, d) !== lado);
@@ -1269,14 +1290,19 @@ function parcialPublico(s) {
   const msgs = J.chat.filter(m => m.tipo === "alumno" && m.debate === d.n);
   const k0 = hablan.length ? ladoDe(hablan[0].grupo, d) : null;
   const obj = [...msgs].reverse().find(m => !k0 || m.equipo === k0);          // al que se reacciona
+  // el moderador (el profesor) hablando: va primero en la escena
+  const mh = profeHabla(J.profe, d.n, Date.now(), AJ.LATIDO);
+  const bloqueMod = mh ? `<div class="vv-hab mod"><div class="vv-en"><i></i>Habla el moderador</div>
+      <div class="vv-nom">🎙 ${esc(PROFE.NOMBRE)}</div><div class="vv-tx"><span>${mh.texto ? esc(cola(mh.texto, 280)) : `<i class="vv-pts">…</i>`}</span></div></div>` : "";
   let escena;
   if (hablan.length) {
     // los dos lados a la vez (una interrupción): cada uno en su mitad, más compactos
-    escena = (hablan.length > 1 ? `<div class="vv-en vv-dos"><i></i>Hablan los dos lados</div>` : "") + hablan.map(g => { const k = ladoDe(g.grupo, d);
+    escena = bloqueMod + (hablan.length > 1 ? `<div class="vv-en vv-dos"><i></i>Hablan los dos lados</div>` : "") + hablan.map(g => { const k = ladoDe(g.grupo, d);
       return `<div class="vv-hab" style="--l:${colorLado(k, s)}"><div class="vv-en"><i></i>Habla ahora</div>
         <div class="vv-nom">${esc(g.nombre)}</div><div class="vv-gr">${puntoPj(g.grupo)}${esc(conLado(k, nomG(g.grupo), FIJ()))}</div>
         <div class="vv-tx"><span>${g.habla.texto ? esc(cola(g.habla.texto, hablan.length > 1 ? 140 : 280)) : `<i class="vv-pts">…</i>`}</span></div></div>`; }).join("");
-  } else if (msgs.length) {
+  } else if (mh) escena = bloqueMod;
+  else if (msgs.length) {
     const m = msgs[msgs.length - 1], g = grupoDeMensaje(m);
     escena = `<div class="vv-hab quieto" style="--l:${colorLado(m.equipo, s)}"><div class="vv-en">${m.voz ? "🎤 " : ""}Lo último que se dijo</div>
       <div class="vv-nom">${esc(m.nombre)}</div><div class="vv-gr">${g ? puntoPj(g) + esc(nomG(g)) : ""}${m.equipo && ladoTel(s, m.equipo) ? " · " + esc(ladoTel(s, m.equipo)) : ""}</div>
