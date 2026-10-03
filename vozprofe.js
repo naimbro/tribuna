@@ -8,7 +8,7 @@
    Como con los alumnos, cuenta cuándo llegó cada latido a ESTE aparato (los relojes no coinciden):
    sin latido hace más de AJ.LATIDO (2,5 s), el moderador está callado (su celular se apagó a mitad).
    ===================================================================== */
-const PROFE = { NOMBRE: "Moderador", CADA: 800, TEXTO: 300, LATIDO: 2500 };
+const PROFE = { NOMBRE: "Moderador", CADA: 800, TEXTO: 300 };
 
 // Cada foto de vivo/moderador. antes: lo anotado con la foto anterior. primera: la primera foto
 // trae un latido viejo (de antes de abrir esta página): no cuenta como «ahora».
@@ -20,7 +20,7 @@ function notarProfe(antes, doc, ahora, primera = false) {
 }
 
 // { texto, t0 } si el moderador está hablando en el debate `debate`, o null.
-function profeHabla(estado, debate, ahora, latido = PROFE.LATIDO) {
+function profeHabla(estado, debate, ahora, latido = (typeof AJ !== "undefined" ? AJ.LATIDO : 2500)) {
   const h = estado && estado.habla;
   if (!h || !debate || h.debate !== debate || !estado.visto || ahora - estado.visto > latido) return null;
   return { texto: String(h.texto || "").slice(-PROFE.TEXTO), t0: h.t0 || 0 };

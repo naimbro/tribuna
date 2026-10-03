@@ -141,7 +141,7 @@ Expected: FAIL — `Cannot find module '../vozprofe.js'` y la lista de claves di
    Como con los alumnos, cuenta cuándo llegó cada latido a ESTE aparato (los relojes no coinciden):
    sin latido hace más de AJ.LATIDO (2,5 s), el moderador está callado (su celular se apagó a mitad).
    ===================================================================== */
-const PROFE = { NOMBRE: "Moderador", CADA: 800, TEXTO: 300, LATIDO: 2500 };
+const PROFE = { NOMBRE: "Moderador", CADA: 800, TEXTO: 300 };
 
 // Cada foto de vivo/moderador. antes: lo anotado con la foto anterior. primera: la primera foto
 // trae un latido viejo (de antes de abrir esta página): no cuenta como «ahora».
@@ -153,7 +153,7 @@ function notarProfe(antes, doc, ahora, primera = false) {
 }
 
 // { texto, t0 } si el moderador está hablando en el debate `debate`, o null.
-function profeHabla(estado, debate, ahora, latido = PROFE.LATIDO) {
+function profeHabla(estado, debate, ahora, latido = (typeof AJ !== "undefined" ? AJ.LATIDO : 2500)) {
   const h = estado && estado.habla;
   if (!h || !debate || h.debate !== debate || !estado.visto || ahora - estado.visto > latido) return null;
   return { texto: String(h.texto || "").slice(-PROFE.TEXTO), t0: h.t0 || 0 };
@@ -257,21 +257,27 @@ test("colaTribuna: preguntas pendientes, 🤔 y menciones al moderador, en ese o
     { id: "m1", tipo: "alumno", nombre: "Luis", grupo: 3, debate: 2, t: 100, texto: "El 80% de las pymes quiebra" },
     { id: "m2", tipo: "alumno", nombre: "Sofía", grupo: 1, debate: 2, t: 110, texto: "@Moderador ¿podemos ver el dato?" },
     { id: "m3", tipo: "alumno", nombre: "Sofía", grupo: 1, debate: 1, t: 50, texto: "@moderadora hola" },          // otro debate
-    { id: "m4", tipo: "alumno", nombre: "Sofía", grupo: 1, debate: 2, t: 40, texto: "@moderadora antes de abrir" },  // antes del tramo
     { id: "m5", tipo: "mod", nombre: "Moderador", debate: 2, t: 120, texto: "@Moderador no se cuenta a sí mismo" }
   ];
-  const cola = colaTribuna({ preguntas, emitidas: [], fuentes: ["m1"], chat, debate: 2, desde: 60, fuera: [] });
+  const cola = colaTribuna({ preguntas, emitidas: [], fuentes: ["m1"], chat, debate: 2, fuera: [] });
   assert.deepEqual(cola.map(x => x.id), ["p:u1", "p:u2", "f:m1", "m:m2"]);
   assert.deepEqual(cola[0], { id: "p:u1", tipo: "pregunta", nombre: "Ana", grupo: 5, texto: "¿Quién paga?" });
   assert.deepEqual(cola[2], { id: "f:m1", tipo: "fuente", nombre: "Luis", grupo: 3, texto: "El 80% de las pymes quiebra" });
   assert.equal(cola[3].tipo, "mencion");
 });
 
+test("colaTribuna: un mensaje con 🤔 y @Moderador sale una sola vez, como fuente; ids repetidos no se duplican", () => {
+  const { colaTribuna } = require("../publico.js");
+  const chat = [{ id: "m1", tipo: "alumno", nombre: "Luis", grupo: 3, debate: 2, t: 100, texto: "@Moderador mira este dato" }];
+  const cola = colaTribuna({ fuentes: ["m1", "m1"], chat, debate: 2 });
+  assert.deepEqual(cola.map(x => x.id), ["f:m1"]);
+});
+
 test("colaTribuna: lo ya emitido o lanzado/descartado (fuera) no vuelve", () => {
   const { colaTribuna } = require("../publico.js");
   const preguntas = [{ uid: "u1", nombre: "Ana", grupo: 5, texto: "¿Quién paga?", t: 10 }, { uid: "u2", nombre: "Pedro", grupo: 4, texto: "¿Y?", t: 20 }];
   const chat = [{ id: "m1", tipo: "alumno", nombre: "Luis", grupo: 3, debate: 2, t: 100, texto: "dato" }];
-  const cola = colaTribuna({ preguntas, emitidas: [{ uid: "u1" }], fuentes: ["m1", "mX"], chat, debate: 2, desde: 0, fuera: ["p:u2"] });
+  const cola = colaTribuna({ preguntas, emitidas: [{ uid: "u1" }], fuentes: ["m1", "mX"], chat, debate: 2, fuera: ["p:u2"] });
   assert.deepEqual(cola.map(x => x.id), ["f:m1"], "u1 ya salió, u2 descartada, mX no está en el chat");
 });
 ```
@@ -286,18 +292,19 @@ test("colaTribuna: lo ya emitido o lanzado/descartado (fuera) no vuelve", () => 
 // Cada ítem: { id, tipo: "pregunta" | "fuente" | "mencion", nombre, grupo, texto }; el id es
 // "p:uid" (la pregunta de esa persona), "f:msgId" (el mensaje que juntó 🤔) o "m:msgId" (un
 // mensaje de alumno que le habla al moderador). fuera: los ids ya lanzados o descartados.
-// desde: cuándo abrió el tramo (las menciones de antes no cuentan).
+// Un mensaje que juntó 🤔 y además le habla al moderador sale una sola vez, como "f:"; ids repetidos
+// en fuentes cuentan una vez. Las menciones son las del debate en curso (hay un tramo por debate).
 const MENCION_MOD = /@moderador(a)?\b/i;
-function colaTribuna({ preguntas = [], emitidas = [], fuentes = [], chat = [], debate, desde = 0, fuera = [] }) {
-  const no = new Set(fuera), xs = [];
+function colaTribuna({ preguntas = [], emitidas = [], fuentes = [], chat = [], debate, fuera = [] }) {
+  const no = new Set(fuera), enFuente = new Set(fuentes), xs = [];
   for (const p of preguntasPendientes(preguntas, emitidas))
     xs.push({ id: "p:" + p.uid, tipo: "pregunta", nombre: p.nombre || "", grupo: p.grupo || 0, texto: String(p.texto).trim().slice(0, PUB.PREGUNTA_MAX) });
-  for (const id of fuentes) {
+  for (const id of enFuente) {
     const m = chat.find(x => x.id === id);
     if (m) xs.push({ id: "f:" + id, tipo: "fuente", nombre: m.nombre || "", grupo: m.grupo || 0, texto: String(m.texto || "").trim().slice(0, 200) });
   }
   for (const m of chat)
-    if (m.tipo === "alumno" && m.debate === debate && (m.t || 0) >= desde && MENCION_MOD.test(m.texto || ""))
+    if (m.tipo === "alumno" && m.debate === debate && !enFuente.has(m.id) && MENCION_MOD.test(m.texto || ""))
       xs.push({ id: "m:" + m.id, tipo: "mencion", nombre: m.nombre || "", grupo: m.grupo || 0, texto: String(m.texto).trim().slice(0, 200) });
   return xs.filter(x => !no.has(x.id));
 }
@@ -858,7 +865,7 @@ function colaControl() {
   const reg = S.debate && S.clase.debates[S.debate.n - 1];
   if (!reg || !S.mod || S.fase !== "abierta" || !moderaProfe()) return [];
   return colaTribuna({ preguntas: (S.preguntasPub || []).filter(p => limpiaFrase(p.texto)), emitidas: reg.tribuna,
-    fuentes: S.mod.fuentesPendientes || [], chat: S.chat, debate: S.debate.n, desde: S.mod.abre, fuera: S.mod.fuera || [] });
+    fuentes: S.mod.fuentesPendientes || [], chat: S.chat, debate: S.debate.n, fuera: S.mod.fuera || [] });
 }
 // Orden del control: sale en el proyector como la lanzaría la moderadora (foto, nombre, oráculo).
 function lanzarDeCola(id) {

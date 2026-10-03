@@ -112,18 +112,19 @@ function textoTribuna(p, destino, ps) {
 // Cada ítem: { id, tipo: "pregunta" | "fuente" | "mencion", nombre, grupo, texto }; el id es
 // "p:uid" (la pregunta de esa persona), "f:msgId" (el mensaje que juntó 🤔) o "m:msgId" (un
 // mensaje de alumno que le habla al moderador). fuera: los ids ya lanzados o descartados.
-// desde: cuándo abrió el tramo (las menciones de antes no cuentan).
+// Un mensaje que juntó 🤔 y además le habla al moderador sale una sola vez, como "f:"; ids repetidos
+// en fuentes cuentan una vez. Las menciones son las del debate en curso (hay un tramo por debate).
 const MENCION_MOD = /@moderador(a)?\b/i;
-function colaTribuna({ preguntas = [], emitidas = [], fuentes = [], chat = [], debate, desde = 0, fuera = [] }) {
-  const no = new Set(fuera), xs = [];
+function colaTribuna({ preguntas = [], emitidas = [], fuentes = [], chat = [], debate, fuera = [] }) {
+  const no = new Set(fuera), enFuente = new Set(fuentes), xs = [];
   for (const p of preguntasPendientes(preguntas, emitidas))
     xs.push({ id: "p:" + p.uid, tipo: "pregunta", nombre: p.nombre || "", grupo: p.grupo || 0, texto: String(p.texto).trim().slice(0, PUB.PREGUNTA_MAX) });
-  for (const id of fuentes) {
+  for (const id of enFuente) {
     const m = chat.find(x => x.id === id);
     if (m) xs.push({ id: "f:" + id, tipo: "fuente", nombre: m.nombre || "", grupo: m.grupo || 0, texto: String(m.texto || "").trim().slice(0, 200) });
   }
   for (const m of chat)
-    if (m.tipo === "alumno" && m.debate === debate && (m.t || 0) >= desde && MENCION_MOD.test(m.texto || ""))
+    if (m.tipo === "alumno" && m.debate === debate && !enFuente.has(m.id) && MENCION_MOD.test(m.texto || ""))
       xs.push({ id: "m:" + m.id, tipo: "mencion", nombre: m.nombre || "", grupo: m.grupo || 0, texto: String(m.texto).trim().slice(0, 200) });
   return xs.filter(x => !no.has(x.id));
 }

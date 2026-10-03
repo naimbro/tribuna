@@ -273,7 +273,7 @@ test("gruposEscribiendo: los grupos del debate con alguien tecleando hace poco, 
 /* ---- El debate en vivo: opciones, sorteo de duelo, revancha ---- */
 const seq = xs => () => (xs.length ? xs.shift() : 0);
 
-test("opcionActiva: sin opciones, todo encendido; false apaga; claves desconocidas, encendidas", () => {
+test("opcionActiva: sin opciones, el valor por defecto (encendido salvo modProfe); false apaga; claves desconocidas, encendidas", () => {
   assert.equal(R.opcionActiva(null, "voz"), true);
   assert.equal(R.opcionActiva({}, "revelacion"), true);
   assert.equal(R.opcionActiva({ voz: false }, "voz"), false);
@@ -285,6 +285,11 @@ test("opcionActiva: sin opciones, todo encendido; false apaga; claves desconocid
 test("opcionActiva: ops que no es un objeto (dato corrupto) no revienta, cae al valor por defecto", () => {
   assert.equal(R.opcionActiva(5, "voz"), true);
   assert.equal(R.opcionActiva("x", "voz"), true);
+});
+
+test("opcionActiva: un valor que no es booleano toma el defecto (no enciende modProfe)", () => {
+  assert.equal(R.opcionActiva({ modProfe: null }, "modProfe"), false);
+  assert.equal(R.opcionActiva({ voz: null }, "voz"), true);
 });
 
 const PS = R.numerarPersonajes([

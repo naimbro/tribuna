@@ -76,20 +76,26 @@ test("colaTribuna: preguntas pendientes, 🤔 y menciones al moderador, en ese o
     { id: "m1", tipo: "alumno", nombre: "Luis", grupo: 3, debate: 2, t: 100, texto: "El 80% de las pymes quiebra" },
     { id: "m2", tipo: "alumno", nombre: "Sofía", grupo: 1, debate: 2, t: 110, texto: "@Moderador ¿podemos ver el dato?" },
     { id: "m3", tipo: "alumno", nombre: "Sofía", grupo: 1, debate: 1, t: 50, texto: "@moderadora hola" },          // otro debate
-    { id: "m4", tipo: "alumno", nombre: "Sofía", grupo: 1, debate: 2, t: 40, texto: "@moderadora antes de abrir" },  // antes del tramo
     { id: "m5", tipo: "mod", nombre: "Moderador", debate: 2, t: 120, texto: "@Moderador no se cuenta a sí mismo" }
   ];
-  const cola = colaTribuna({ preguntas, emitidas: [], fuentes: ["m1"], chat, debate: 2, desde: 60, fuera: [] });
+  const cola = colaTribuna({ preguntas, emitidas: [], fuentes: ["m1"], chat, debate: 2, fuera: [] });
   assert.deepEqual(cola.map(x => x.id), ["p:u1", "p:u2", "f:m1", "m:m2"]);
   assert.deepEqual(cola[0], { id: "p:u1", tipo: "pregunta", nombre: "Ana", grupo: 5, texto: "¿Quién paga?" });
   assert.deepEqual(cola[2], { id: "f:m1", tipo: "fuente", nombre: "Luis", grupo: 3, texto: "El 80% de las pymes quiebra" });
   assert.equal(cola[3].tipo, "mencion");
 });
 
+test("colaTribuna: un mensaje con 🤔 y @Moderador sale una sola vez, como fuente; ids repetidos no se duplican", () => {
+  const { colaTribuna } = require("../publico.js");
+  const chat = [{ id: "m1", tipo: "alumno", nombre: "Luis", grupo: 3, debate: 2, t: 100, texto: "@Moderador mira este dato" }];
+  const cola = colaTribuna({ fuentes: ["m1", "m1"], chat, debate: 2 });
+  assert.deepEqual(cola.map(x => x.id), ["f:m1"]);
+});
+
 test("colaTribuna: lo ya emitido o lanzado/descartado (fuera) no vuelve", () => {
   const { colaTribuna } = require("../publico.js");
   const preguntas = [{ uid: "u1", nombre: "Ana", grupo: 5, texto: "¿Quién paga?", t: 10 }, { uid: "u2", nombre: "Pedro", grupo: 4, texto: "¿Y?", t: 20 }];
   const chat = [{ id: "m1", tipo: "alumno", nombre: "Luis", grupo: 3, debate: 2, t: 100, texto: "dato" }];
-  const cola = colaTribuna({ preguntas, emitidas: [{ uid: "u1" }], fuentes: ["m1", "mX"], chat, debate: 2, desde: 0, fuera: ["p:u2"] });
+  const cola = colaTribuna({ preguntas, emitidas: [{ uid: "u1" }], fuentes: ["m1", "mX"], chat, debate: 2, fuera: ["p:u2"] });
   assert.deepEqual(cola.map(x => x.id), ["f:m1"], "u1 ya salió, u2 descartada, mX no está en el chat");
 });
