@@ -399,6 +399,8 @@ function fijarOpcion(k, v) {
   if (k === "vozIA" && !v && typeof callarIA === "function") callarIA();
   // el profesor toma la moderación: lo que la IA tenía por decir ya no viene al caso
   if (k === "modProfe" && v) { if (typeof VOZ_ESPERA !== "undefined") VOZ_ESPERA.length = 0; if (S.mod) S.mod.forzarPendiente = false; }
+  // devolver la moderación a la IA: de los 🤔 acumulados queda solo el más reciente, para que no salgan de golpe con voz
+  if (k === "modProfe" && !v && S.mod) S.mod.fuentesPendientes = (S.mod.fuentesPendientes || []).slice(-1);
   // apagar la voz o el reloj a mitad de tramo: sin banco desde ya, y el tramo sigue hasta su límite
   // de pared (o hasta que el profesor lo cierre). Encenderlos a mitad de tramo vale desde el próximo.
   if ((k === "voz" || k === "reloj") && !v && S.fase === "abierta" && S.banco) {

@@ -922,19 +922,20 @@ const tipoGuia = () => (moderaProfe() ? "sistema" : "mod");
 - [ ] **Step 11: la cola** — en `moderacion.js`, después de `lanzarPreguntaTribuna`:
 
 ```js
-// La cola del profesor que modera (publico.js, colaTribuna): la ve en su control. S.mod.fuera
-// guarda lo que ya lanzó o descartó en este tramo.
+// La cola del profesor que modera (publico.js, colaTribuna): la ve en su control. reg.fueraCola
+// (en el registro del debate, que sobrevive a recargar el proyector) guarda lo ya lanzado o descartado.
 function colaControl() {
   const reg = S.debate && S.clase.debates[S.debate.n - 1];
   if (!reg || !S.mod || S.fase !== "abierta" || !moderaProfe()) return [];
   return colaTribuna({ preguntas: (S.preguntasPub || []).filter(p => limpiaFrase(p.texto)), emitidas: reg.tribuna,
-    fuentes: S.mod.fuentesPendientes || [], chat: S.chat, debate: S.debate.n, fuera: S.mod.fuera || [] });
+    fuentes: S.mod.fuentesPendientes || [], chat: S.chat, debate: S.debate.n, fuera: reg.fueraCola || [] });
 }
 // Orden del control: sale en el proyector como la lanzaría la moderadora (foto, nombre, oráculo).
 function lanzarDeCola(id) {
   const M = S.mod, x = colaControl().find(i => i.id === id);
   if (!x) { tick("Eso ya no está en la cola de la tribuna."); return; }
-  (M.fuera = M.fuera || []).push(id);
+  const reg = S.debate && S.clase.debates[S.debate.n - 1];
+  (reg.fueraCola = reg.fueraCola || []).push(id);
   if (x.tipo === "pregunta") {
     const p = (S.preguntasPub || []).find(q => "p:" + q.uid === id);
     lanzarPreguntaTribuna(p, PERS ? `${grupoDe("A")} y ${grupoDe("B")}` : `@Grupo ${S.debate.A} y @Grupo ${S.debate.B}`);
@@ -946,8 +947,9 @@ function lanzarDeCola(id) {
 }
 function descartarDeCola(id) {
   const M = S.mod;
-  if (!M) return;
-  (M.fuera = M.fuera || []).push(id);
+  const reg = S.debate && S.clase.debates[S.debate.n - 1];
+  if (!M || !reg || S.fase !== "abierta" || typeof id !== "string") return;   // la orden llega del control por Firestore
+  (reg.fueraCola = reg.fueraCola || []).push(id);
   if (id.startsWith("f:")) M.fuentesPendientes = (M.fuentesPendientes || []).filter(i => i !== id.slice(2));
 }
 ```
@@ -966,6 +968,15 @@ En `fijarOpcion` (`clase.js:395`), después de la línea de `vozIA`:
 ```
 
 y en el mapa de nombres agrega `modProfe: "Moderas tú"`.
+
+Al apagar `modProfe` a mitad del debate, de los 🤔 acumulados queda solo el más reciente (si no, saldrían casi de golpe con voz). Justo después del bloque anterior:
+
+```js
+  // devolver la moderación a la IA: de los 🤔 acumulados queda solo el más reciente, para que no salgan de golpe con voz
+  if (k === "modProfe" && !v && S.mod) S.mod.fuentesPendientes = (S.mod.fuentesPendientes || []).slice(-1);
+```
+
+- [ ] **Step 12b: carrera con el LLM y menciones** — en `intervenirModerador`, justo después de `const j = jsonDe(await pedirLLM(promptModerador(est), "jurado"));` agrega `if (moderaProfe()) return;   // el profesor tomó la moderación mientras la IA pensaba`, y la condición final pasa a `if (espera || S.fase !== "abierta" || moderaProfe()) return;`. En `genteParaMencionar`, la sugerencia es `{ nombre: moderaProfe() ? PROFE.NOMBRE : MOD_NOMBRE, grupo: 0, mod: true }`; en `prepararMenciones`, la etiqueta pasa a `g.mod ? (moderaProfe() ? "🎙 moderador (tú)" : "🎙 moderadora de IA")`.
 
 - [ ] **Step 13: Verificar** — `node --check moderacion.js && node --check clase.js && node --test pruebas/` → 188 pasan.
 

@@ -275,19 +275,20 @@ function lanzarPreguntaTribuna(p, destino) {
   if (typeof pintarColumna === "function") pintarColumna();
   if (typeof window.publicarEstado === "function") window.publicarEstado();
 }
-// La cola del profesor que modera (publico.js, colaTribuna): la ve en su control. S.mod.fuera
-// guarda lo que ya lanzó o descartó en este tramo.
+// La cola del profesor que modera (publico.js, colaTribuna): la ve en su control. reg.fueraCola
+// (en el registro del debate, que sobrevive a recargar el proyector) guarda lo ya lanzado o descartado.
 function colaControl() {
   const reg = S.debate && S.clase.debates[S.debate.n - 1];
   if (!reg || !S.mod || S.fase !== "abierta" || !moderaProfe()) return [];
   return colaTribuna({ preguntas: (S.preguntasPub || []).filter(p => limpiaFrase(p.texto)), emitidas: reg.tribuna,
-    fuentes: S.mod.fuentesPendientes || [], chat: S.chat, debate: S.debate.n, fuera: S.mod.fuera || [] });
+    fuentes: S.mod.fuentesPendientes || [], chat: S.chat, debate: S.debate.n, fuera: reg.fueraCola || [] });
 }
 // Orden del control: sale en el proyector como la lanzaría la moderadora (foto, nombre, oráculo).
 function lanzarDeCola(id) {
   const M = S.mod, x = colaControl().find(i => i.id === id);
   if (!x) { tick("Eso ya no está en la cola de la tribuna."); return; }
-  (M.fuera = M.fuera || []).push(id);
+  const reg = S.debate && S.clase.debates[S.debate.n - 1];
+  (reg.fueraCola = reg.fueraCola || []).push(id);
   if (x.tipo === "pregunta") {
     const p = (S.preguntasPub || []).find(q => "p:" + q.uid === id);
     lanzarPreguntaTribuna(p, PERS ? `${grupoDe("A")} y ${grupoDe("B")}` : `@Grupo ${S.debate.A} y @Grupo ${S.debate.B}`);
@@ -299,8 +300,9 @@ function lanzarDeCola(id) {
 }
 function descartarDeCola(id) {
   const M = S.mod;
-  if (!M || typeof id !== "string") return;   // la orden llega del control por Firestore
-  (M.fuera = M.fuera || []).push(id);
+  const reg = S.debate && S.clase.debates[S.debate.n - 1];
+  if (!M || !reg || S.fase !== "abierta" || typeof id !== "string") return;   // la orden llega del control por Firestore
+  (reg.fueraCola = reg.fueraCola || []).push(id);
   if (id.startsWith("f:")) M.fuentesPendientes = (M.fuentesPendientes || []).filter(i => i !== id.slice(2));
 }
 // ¿Tiene alguien la palabra en la sala? El botón apretado (window.hablaSala, online.js), un punto de
@@ -432,6 +434,7 @@ async function intervenirModerador(forzar = false) {
   if (S.motor.activo) {
     try {
       const j = jsonDe(await pedirLLM(promptModerador(est), "jurado"));
+      if (moderaProfe()) return;   // el profesor tomó la moderación mientras la IA pensaba
       const elegida = j.tipo === "tribuna" && T.ofrecer ? T.pendientes[(+j.elegida || 0) - 1] : null;
       if (elegida && S.fase === "abierta") {
         if (S.mod && S.mod.pregunta === pregunta) S.mod.pregunta = null;
@@ -453,7 +456,7 @@ async function intervenirModerador(forzar = false) {
     return;
   }
   if (S.mod && S.mod.pregunta === pregunta) S.mod.pregunta = null;   // si llegó otra mientras pensaba, queda para la próxima
-  if (espera || S.fase !== "abierta") return;
+  if (espera || S.fase !== "abierta" || moderaProfe()) return;
   if (texto && esRepetida(texto, est.ultimasMod)) texto = null;
   if (!texto) texto = moderadorSimple(est, pregunta);
   if (texto) postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto });
@@ -570,7 +573,7 @@ function genteParaMencionar() {
   const js = typeof window.jugadoresSala === "function" ? window.jugadoresSala() : {};
   for (const j of Object.values(js)) if (j.nombre) por.set(norm(j.nombre), { nombre: j.nombre, grupo: j.grupo || 0 });
   for (const x of S.chat) if (x.tipo === "alumno" && x.nombre && !por.has(norm(x.nombre))) por.set(norm(x.nombre), { nombre: x.nombre, grupo: grupoDeMensaje(x) });
-  return [{ nombre: MOD_NOMBRE, grupo: 0, mod: true }, ...por.values()];
+  return [{ nombre: moderaProfe() ? PROFE.NOMBRE : MOD_NOMBRE, grupo: 0, mod: true }, ...por.values()];
 }
 function prepararMenciones(tx, caja) {
   let lista = [], elegida = 0, token = null;
@@ -580,7 +583,7 @@ function prepararMenciones(tx, caja) {
     const d = S.debate;
     const lado = g => !FIJOS ? (d && (g.grupo === d.A || g.grupo === d.B) ? "debate ahora" : "") : d && g.grupo === d.A ? "A FAVOR" : d && g.grupo === d.B ? "EN CONTRA" : "";
     caja.innerHTML = lista.length ? lista.map((g, i) => `<div class="sg ${i === elegida ? "on" : ""}" data-i="${i}">
-        <span class="sg-n">${esc(g.nombre)}</span><span class="sg-g">${g.mod ? "🎙 moderadora de IA" : (g.grupo ? (PERS ? rotuloCorto(g.grupo, PERS) : "grupo " + g.grupo) : "") + (lado(g) ? " · " + lado(g) : "")}</span></div>`).join("")
+        <span class="sg-n">${esc(g.nombre)}</span><span class="sg-g">${g.mod ? (moderaProfe() ? "🎙 moderador (tú)" : "🎙 moderadora de IA") : (g.grupo ? (PERS ? rotuloCorto(g.grupo, PERS) : "grupo " + g.grupo) : "") + (lado(g) ? " · " + lado(g) : "")}</span></div>`).join("")
       : `<div class="sg-vacio">Nadie se llama así en la sala.</div>`;
     caja.classList.add("on");
   };
