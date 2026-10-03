@@ -131,6 +131,14 @@ await env.withSecurityRulesDisabled(async c => {
 await caso("modo clásico: el id del teléfono entra", () => assertSucceeds(setDoc(doc(ctx("a"), "salas", "M002", "mensajes", idTel()), { ...msg("hola a todos"), equipo: "A" })));
 await caso("modo clásico: un id con comillas no entra", () => assertFails(setDoc(doc(ctx("a"), "salas", "M002", "mensajes", "a'><img src=x>"), { ...msg("hola"), equipo: "A" })));
 
+console.log("El moderador en vivo (vivo/moderador): escribe el profesor, leen todos");
+await sembrar("V001", { personajes: false, etapa: null });
+const vivo = { habla: { debate: 1, t0: 1, t: 2, texto: "Grupo 3, ¿de dónde sale ese dato?" } };
+await caso("el profesor escribe su latido", () => assertSucceeds(setDoc(doc(profe(), "salas", "V001", "vivo", "moderador"), vivo)));
+await caso("un alumno lo lee", () => assertSucceeds(getDoc(doc(ctx("a"), "salas", "V001", "vivo", "moderador"))));
+await caso("un alumno no lo escribe", () => assertFails(setDoc(doc(ctx("a"), "salas", "V001", "vivo", "moderador"), vivo)));
+await caso("sin sesión no se lee", () => assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "salas", "V001", "vivo", "moderador"))));
+
 await env.cleanup();
 console.log(`\n${ok} ok, ${mal} mal`);
 process.exit(mal ? 1 : 0);

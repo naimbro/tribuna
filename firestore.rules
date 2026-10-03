@@ -55,6 +55,13 @@ service cloud.firestore {
         allow read, write: if esProfe(codigo);
       }
 
+      // El profesor modera a viva voz (vozprofe.js): su latido con lo que va diciendo. Lo escribe
+      // su control; lo leen el proyector y los teléfonos para el subtítulo y para cederle la palabra.
+      match /vivo/{doc} {
+        allow read: if conSesion();
+        allow write: if esProfe(codigo);
+      }
+
       match /jugadores/{uid} {
         allow read: if conSesion();
         // El alumno escribe su propio documento. Su grupo (rotación) solo cambia mientras la
