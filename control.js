@@ -12,6 +12,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js?v=20260918a";
+import { prepararModerar, pintarModerar } from "./moderar.js?v=20261003a";
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -28,6 +29,7 @@ const FASES = { propuesta: "Próximo debate", listo: "Preparación", revelando: 
   resultado: "Resultado", fin: "Clase terminada" };
 // los interruptores (rotacion.js, OPCIONES_DEFECTO): apagado = la clase como antes
 const INTERRUPTORES = [
+  ["modProfe", "Moderas tú", "la IA se calla y moderas a viva voz desde aquí"],
   ["revelacion", "Revelación dramática", "todos preparan y al final se revela quién pasa"],
   ["revancha", "Revancha", "a veces vuelve un grupo que ya debatió"],
   ["musica", "Música", "pulso, redoble y música de entrada"],
@@ -102,8 +104,10 @@ function soltar() {
   habilitar(); pintarConexion();
 }
 // Mientras una orden está en camino todo queda quieto; la pregunta se puede seguir escribiendo.
+// HABLAR y escribir como Moderador no pasan por mandar(): nunca se deshabilitan (un botón
+// deshabilitado bajo el dedo pierde la captura y cortaría la toma).
 function habilitar() {
-  for (const el of document.querySelectorAll("#vPanel button, #vPanel select, #vPanel input")) el.disabled = !!P.t;
+  for (const el of document.querySelectorAll("#vPanel button:not(.hablar-profe):not(#profeEnviar), #vPanel select, #vPanel input:not(#profeTx)")) el.disabled = !!P.t;
   $("btnShock").disabled = !!P.t || !$("selShock").value;
 }
 
@@ -134,6 +138,7 @@ function pintar() {
   if (!antes && f === "propuesta") pintarPropuesta(c);
   mostrar("sDebate", f === "abierta");
   if (f === "abierta") pintarDebate(c);
+  pintarModerar(c, f === "abierta" && opcionActiva(c.opciones || {}, "modProfe"));
   mostrar("sVoto", f === "votando");
   if (f === "votando") {
     const v = c.votos || { n: 0, elegibles: 0 };
@@ -191,6 +196,7 @@ function pintarDebate(c) {
   mostrar("habla", conVoz);
   mostrar("bancos", !!c.banco);
   opciones($("selShock"), [["", "⚡ Shock: elige una noticia…"], ...(c.eventos || []).map(e => [e.id, e.titular.length > 70 ? e.titular.slice(0, 68) + "…" : e.titular])]);
+  mostrar("btnModera", !opcionActiva(ops, "modProfe"));   // moderas tú: la moderadora de IA no se llama
 }
 
 // Cada 250 ms: el reloj de la fase, la cuenta de la propuesta y los dos bancos.
@@ -367,6 +373,8 @@ async function conectar(user) {
     $("btnGoogle").onclick = () => signOut(auth).then(() => signInWithPopup(auth, google)).catch(e => error("No se pudo entrar: " + e.code));
     return;
   }
+  // el reloj del proyector, para las horas que el control publica (el t de los mensajes del moderador)
+  prepararModerar({ db, codigo: CODIGO, dato: () => C.dato, mandar, reloj: () => C.dato ? Date.now() + (C.dato.t - C.recibido) : Date.now() });
   espera("Conectando con la pantalla…");
   onSnapshot(doc(db, "salas", CODIGO, "privado", "control"), { includeMetadataChanges: true }, snap => {
     C.cache = snap.metadata.fromCache;

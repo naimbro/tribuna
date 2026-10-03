@@ -96,6 +96,27 @@ select{min-height:48px;appearance:none;background-image:linear-gradient(45deg,tr
 .sw input::after{content:"";position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;background:#cfd8e0;transition:transform .15s}
 .sw input:checked{background:var(--neon)}
 .sw input:checked::after{transform:translateX(24px);background:#062a17}
+/* el profesor modera (modProfe, con el debate abierto): HABLAR en el tercio de abajo, al pulgar;
+   el botón principal (cerrar) se achica arriba, lejos del pulgar */
+body.modera main{padding-bottom:calc(36dvh + env(safe-area-inset-bottom))}
+body.modera .cp{min-height:46px;font-size:16px;width:auto;align-self:flex-end;padding:8px 16px}
+body.modera #sModera{position:fixed;left:0;right:0;bottom:0;z-index:6;height:34dvh;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  background:#0c1319;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.hablar-profe{flex:1 1 auto;width:100%;border:0;border-radius:20px;background:#1b1830;color:var(--mod);border:2px solid #4c3fa0;
+  font:800 26px/1.1 system-ui,-apple-system,sans-serif;letter-spacing:.04em;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:pointer}
+.hablar-profe small{display:block;font-size:13px;font-weight:600;color:var(--dim);margin-top:6px;letter-spacing:0}
+.hablar-profe *{pointer-events:none}
+.hablar-profe.on{background:var(--mod);color:#130f2b;border-color:var(--mod);box-shadow:0 0 30px #b4a6ff66}
+.mi-habla{min-height:20px;font-size:14px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:left}
+.mi-habla.aviso{color:var(--amber);direction:ltr;white-space:normal}
+.cola-i{display:flex;gap:8px;align-items:stretch;border-top:1px solid var(--line);padding:8px 0}
+.cola-i:first-child{border-top:0}
+.cola-i button.lanzar{flex:1 1 auto;text-align:left;background:none;border:0;color:var(--txt);font:15px/1.35 system-ui,-apple-system,sans-serif;padding:0;cursor:pointer}
+.cola-i button.lanzar b{color:var(--amber)}
+.cola-i button.lanzar small{display:block;color:var(--dim);font-size:12.5px}
+.cola-i button.lanzar:disabled{opacity:.45}
+.cola-i button.x{flex:0 0 44px;min-height:44px}
+.cola-vacia{color:var(--dim2);font-size:14px}
 </style>
 </head>
 <body>
@@ -159,6 +180,20 @@ select{min-height:48px;appearance:none;background-image:linear-gradient(45deg,tr
       </div>
     </section>
 
+    <section class="cc oculto" id="sCola">
+      <div class="k" id="colaK">✋ Tribuna</div>
+      <div id="cola"></div>
+    </section>
+
+    <section class="oculto" id="sModera">
+      <button type="button" class="hablar-profe" id="btnHablarProfe"><span id="hablarProfeT">🎙 HABLAR</span><small>mantén apretado</small></button>
+      <div class="mi-habla" id="profeHabla" aria-live="polite"></div>
+      <div class="ca oculto" id="profeEscribe">
+        <input type="text" id="profeTx" maxlength="400" placeholder="Escribir como Moderador" autocomplete="off">
+        <button class="b pri" id="profeEnviar" style="flex:0 0 auto">Enviar</button>
+      </div>
+    </section>
+
     <section class="cc oculto" id="sVoto">
       <div class="k">Votación</div>
       <div class="votos" id="votos"></div>
@@ -176,6 +211,8 @@ select{min-height:48px;appearance:none;background-image:linear-gradient(45deg,tr
 </main>
 <script src="rotacion.js?v=20261001c"></script>
 <script src="ajedrez.js?v=20260929b"></script>
+<script src="dictado.js?v=20261003a"></script>
+<script src="vozprofe.js?v=20261003a"></script>
 <script type="module" src="control.js?v=20261001c"></script>
 </body>
 </html>
