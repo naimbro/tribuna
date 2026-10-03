@@ -107,4 +107,25 @@ function textoTribuna(p, destino, ps) {
   return `✋ La tribuna pregunta — ${quien}: «${String(p.texto).trim().slice(0, PUB.PREGUNTA_MAX)}»${a ? ` ${a}, ¿qué responden?` : " ¿Qué responden?"}`;
 }
 
-if (typeof module !== "undefined") module.exports = { PUB, resumenTermometro, muestraCurva, contarReacciones, umbralFuente, pedidosDeFuente, fraseDelDebate, preguntasPendientes, turnoTribuna, textoTribuna };
+// La cola del moderador humano (interruptor modProfe): lo que la tribuna pide y que la moderadora
+// de IA lanzaría sola. El profesor la ve en su control y elige qué sale en el proyector.
+// Cada ítem: { id, tipo: "pregunta" | "fuente" | "mencion", nombre, grupo, texto }; el id es
+// "p:uid" (la pregunta de esa persona), "f:msgId" (el mensaje que juntó 🤔) o "m:msgId" (un
+// mensaje de alumno que le habla al moderador). fuera: los ids ya lanzados o descartados.
+// desde: cuándo abrió el tramo (las menciones de antes no cuentan).
+const MENCION_MOD = /@moderador(a)?\b/i;
+function colaTribuna({ preguntas = [], emitidas = [], fuentes = [], chat = [], debate, desde = 0, fuera = [] }) {
+  const no = new Set(fuera), xs = [];
+  for (const p of preguntasPendientes(preguntas, emitidas))
+    xs.push({ id: "p:" + p.uid, tipo: "pregunta", nombre: p.nombre || "", grupo: p.grupo || 0, texto: String(p.texto).trim().slice(0, PUB.PREGUNTA_MAX) });
+  for (const id of fuentes) {
+    const m = chat.find(x => x.id === id);
+    if (m) xs.push({ id: "f:" + id, tipo: "fuente", nombre: m.nombre || "", grupo: m.grupo || 0, texto: String(m.texto || "").trim().slice(0, 200) });
+  }
+  for (const m of chat)
+    if (m.tipo === "alumno" && m.debate === debate && (m.t || 0) >= desde && MENCION_MOD.test(m.texto || ""))
+      xs.push({ id: "m:" + m.id, tipo: "mencion", nombre: m.nombre || "", grupo: m.grupo || 0, texto: String(m.texto).trim().slice(0, 200) });
+  return xs.filter(x => !no.has(x.id));
+}
+
+if (typeof module !== "undefined") module.exports = { PUB, resumenTermometro, muestraCurva, contarReacciones, umbralFuente, pedidosDeFuente, fraseDelDebate, preguntasPendientes, turnoTribuna, textoTribuna, colaTribuna };
