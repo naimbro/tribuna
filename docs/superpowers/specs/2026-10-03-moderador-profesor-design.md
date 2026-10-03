@@ -1,6 +1,6 @@
 # El profesor modera: la voz del moderador desde el control
 
-Fecha: 2026-10-03. Estado: aprobado por el profesor en la conversación; falta revisar este texto.
+Fecha: 2026-10-03. Estado: aprobado por el profesor; implementado en la rama moderador-profesor.
 
 ## Por qué
 
@@ -63,7 +63,7 @@ transcripciones automáticas.
 El control escribe en un documento nuevo, `salas/{codigo}/vivo/moderador`:
 
 ```
-habla: { debate, t0, t, texto }   // cada ~800 ms mientras el botón está apretado
+habla: { debate, t0, t, texto }   // cada ~1 s (PROFE.CADA = 1000, el límite sostenido de Firestore por documento; el latido vence a los 2,5 s) mientras el botón está apretado
 habla: null                       // al soltar
 ```
 
@@ -118,18 +118,22 @@ Si el navegador del control no tiene `SpeechRecognition`, el botón HABLAR se re
 
 ### `dictado.js`
 
-El reconocimiento de voz de `jugar.js` (líneas ~747–1070: `Reconocedor`, el reinicio en `onend`
-pasando lo provisional a final, el corte de 60 s, el `not-allowed` tras un reinicio, la repetición del
-texto final en Android, `cortarDictado`) sale a un módulo nuevo `dictado.js` con una interfaz chica:
+El reconocimiento de voz del control sale a un módulo compartido `dictado.js` (el dictado 🎤 de la caja
+de texto sigue en `jugar.js`; el botón de hablar de los alumnos y el HABLAR del control usan el módulo).
+Interfaz real:
 
 ```
-const d = crearDictado({ lang: "es-CL", maxMs: 60000,
-  alParcial(texto), alCorte(textoFinal), alError(codigo) });
-d.empezar(); d.soltar() → Promise<textoFinal>; d.abortar(); Dictado.disponible
+const toma = crearToma(Rec, { debate, alTexto, alFallo, alCorte, max, espera, reloj });
+toma.texto()                  // lo dicho hasta ahora (final + provisional)
+toma.empezar(); toma.tick();
+toma.soltar({ inmediato });   // espera el resultado final hasta DICTADO.ESPERA ms, salvo inmediato
+DICTADO                       // { LANG, MAX: 60000, ESPERA: 1200, CONTINUO, RAPIDO, FALLAS }
+unirTrozos(a, b)              // une trozos de texto sin repetir espacios
 ```
 
-`jugar.js` y `control.js` lo usan; el latido a Firestore, el botón y los avisos quedan en cada página.
-`jugar.js` no cambia de comportamiento (lo comprueban las pruebas de punta a punta existentes).
+El reinicio en `onend` (pasando lo provisional a final), el corte de 60 s (`alCorte` con lo dicho) y el
+fallo tras reinicios rápidos viven en la toma. El latido a Firestore, el botón y los avisos quedan en
+cada página.
 
 ## 3. Dónde se ve
 
@@ -151,6 +155,11 @@ Escuchan `vivo/moderador` (un documento chico) además de lo de hoy.
 - **Público:** en la zona de «lo que se dice ahora», el subtítulo del moderador mientras habla.
 - **Quienes debaten:** en la línea de la moderadora (la última que le habló a su grupo), el subtítulo
   del moderador mientras habla; el botón de hablar apagado mientras dure.
+- **Limitación aceptada:** el subtítulo en vivo del moderador se ve en la vista en vivo del teléfono,
+  que exige el interruptor `voz` y, para quien debate, reconocimiento de voz. Con `voz` apagado (o en
+  el teléfono de quien debate sin reconocimiento) solo llega su mensaje al soltar. El proyector
+  siempre lo muestra.
+- Si el tramo se cierra mientras el profesor habla, lo dicho se descarta (como con los alumnos).
 
 ### El control (`control.html`, `control.js`)
 
@@ -199,7 +208,8 @@ lanzado o descartado sale de la cola y no vuelve.
   - Latido del moderador: vigente, vencido a los 2,5 s, `null`.
   - `dictado.js` con un `SpeechRecognition` simulado: parciales, final al soltar, reinicio en
     `onend`, corte de 60 s, sin repetición del final (el caso de Android).
-  - `transcripcionChat` rotula con `m.nombre` y marca 🎤 los del moderador.
+  - `transcripcionChat` rotula con `m.nombre` y marca 🎤 los del moderador: se verificó en la prueba
+    de punta a punta (no hay prueba de node: depende de `S`).
 - **Reglas:** `pruebas/reglas-emulador.cjs` con los casos de `vivo/`.
 - **De punta a punta,** con emuladores y Playwright (ver la nota de la memoria sobre el arnés): un
   debate de la semana 307 moderado desde el control, con `SpeechRecognition` simulado en el control y

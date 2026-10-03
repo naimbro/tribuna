@@ -8,7 +8,7 @@
    Como con los alumnos, cuenta cuándo llegó cada latido a ESTE aparato (los relojes no coinciden):
    sin latido hace más de AJ.LATIDO (2,5 s), el moderador está callado (su celular se apagó a mitad).
    ===================================================================== */
-const PROFE = { NOMBRE: "Moderador", CADA: 800, TEXTO: 300 };
+const PROFE = { NOMBRE: "Moderador", CADA: 1000, TEXTO: 300 };
 
 // Cada foto de vivo/moderador. antes: lo anotado con la foto anterior. primera: la primera foto
 // trae un latido viejo (de antes de abrir esta página): no cuenta como «ahora».

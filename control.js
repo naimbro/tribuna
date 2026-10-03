@@ -374,7 +374,7 @@ async function conectar(user) {
     return;
   }
   // el reloj del proyector, para las horas que el control publica (el t de los mensajes del moderador)
-  prepararModerar({ db, codigo: CODIGO, dato: () => C.dato, mandar, reloj: () => C.dato ? Date.now() + (C.dato.t - C.recibido) : Date.now() });
+  prepararModerar({ db, codigo: CODIGO, dato: () => C.dato, mandar, reloj: () => C.dato && !C.fotoCache ? Date.now() + (C.dato.t - C.recibido) : Date.now() });
   espera("Conectando con la pantalla…");
   onSnapshot(doc(db, "salas", CODIGO, "privado", "control"), { includeMetadataChanges: true }, snap => {
     C.cache = snap.metadata.fromCache;
@@ -384,7 +384,7 @@ async function conectar(user) {
     }
     const d = snap.data();
     if (C.dato && d.t === C.dato.t) { pintarConexion(); return; }         // solo cambió la conexión
-    C.dato = d; C.recibido = Date.now();
+    C.dato = d; C.recibido = Date.now(); C.fotoCache = C.cache;   // ¿esta foto vino del caché?
     // bancoRestante (ajedrez.js) mide desde que ESTE aparato recibió la foto, no desde el reloj del proyector
     C.foto = d.banco ? { ...d.banco, t: C.recibido } : null;
     if (!C.cache && C.noResponde) { C.noResponde = false; nota(""); }

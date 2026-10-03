@@ -333,7 +333,7 @@ async function descargarConversacion(codigo) {
     if (m.ronda !== ronda) { ronda = m.ronda; lineas.push("", `=== Tramo ${ronda + 1} ===`); }
     const h = new Date(m.t).toTimeString().slice(0, 5);
     if (m.tipo === "alumno") lineas.push(`[${h}] ${m.nombre} (${nom(m.equipo)}): ${m.texto}`);
-    else if (m.tipo === "mod") lineas.push(`[${h}] 🎙 Moderadora: ${m.texto}`);
+    else if (m.tipo === "mod") lineas.push(`[${h}] 🎙 ${m.nombre || "Moderadora"}: ${m.texto}`);
     else if (m.tipo === "relator") lineas.push(`[${h}] ⚖ Relator: ${m.texto}`);
     else if (m.tipo === "resultado") {
       const x = m.datos || {};

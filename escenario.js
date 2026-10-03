@@ -30,7 +30,7 @@ const ESCN = {
   sucio: true, centroFirma: "",   // ¿hay que volver a mirar si la tarjeta de arriba cabe entera?
   vozOk: false, desbloqueo: 0,
   errores: 0,
-  vivoT0: 0, vivoHasta: 0   // gracia del rótulo en vivo entre soltar y el mensaje final
+  vivoT0: 0, vivoHasta: 0, vivoSuelta: 0   // gracia del rótulo en vivo entre soltar y el mensaje final
 };
 const ESCN_ROTULO_MS = 12000;   // cuánto dura en pantalla el rótulo de la moderadora
 const ESCN_MENSAJES = 4;        // tarjetas al centro
@@ -137,7 +137,7 @@ function escnNuevoDebate(d) {
   ESCN.deb = `${d.n}|${d.A}|${d.B}`;
   ESCN.tarjetas.forEach(el => el.remove()); ESCN.tarjetas.clear();
   ESCN.rx = {}; ESCN.caras = { A: "", B: "" }; ESCN.rotulo = ""; ESCN.rotuloId = null; ESCN.punto = ""; ESCN.gusano = "";
-  ESCN.vivoT0 = 0; ESCN.vivoHasta = 0;
+  ESCN.vivoT0 = 0; ESCN.vivoHasta = 0; ESCN.vivoSuelta = 0;
   escnOlvidarMedidas();
   const v = $("escenarioVista");
   v.style.setProperty("--cA", escnColor("A")); v.style.setProperty("--cB", escnColor("B"));
@@ -386,17 +386,20 @@ function escnRotulo(d, reg, ahora, hablan) {
       el.className = "escn-rotulo";
       void el.offsetWidth;
       el.className = "escn-rotulo on vivo";
+    } else if (!el.querySelector(".escn-cursor")) {
+      // volvió a apretar dentro de la gracia: el cursor quitado vuelve, sin re-animar
+      el.querySelector(".escn-rot-t")?.insertAdjacentHTML("beforeend", '<i class="escn-cursor"></i>');
     }
     escnTexto(el.querySelector(".escn-rot-t span"), escnCola(mh.texto));
     return;
   }
   // soltó: el mensaje final llega 0,5-1,5 s después; mientras, el rótulo se queda como estaba
   if (ESCN.rotulo === "vivo" && !ESCN.vivoHasta) {
-    ESCN.vivoHasta = ahora + 2500;
+    ESCN.vivoHasta = ahora + 2500; ESCN.vivoSuelta = ahora;
     el.querySelector(".escn-cursor")?.remove();
   }
   if (ahora < ESCN.vivoHasta && ESCN.rotulo === "vivo" &&
-      !S.chat.some(x => x.tipo === "mod" && x.datos && x.datos.profe && x.debate === d.n && (x.t || 0) >= ESCN.vivoT0 - 5000)) return;
+      !S.chat.some(x => x.tipo === "mod" && x.datos && x.datos.profe && x.debate === d.n && (x.t || 0) >= ESCN.vivoSuelta - 5000 && (x.t || 0) >= ESCN.vivoT0 - 5000)) return;
   ESCN.vivoHasta = 0;
   let m = null;
   if (!hablan.length) for (let i = S.chat.length - 1; i >= 0; i--) {
