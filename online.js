@@ -153,6 +153,8 @@ function estadoControl() {
     // en la portada y la intro, el botón que manda es el de la escena
     principal: (S.etapa === "portada" ? $("poEmpezar") : S.etapa === "intro" ? $("inSig") : $("btnPrincipal"))?.textContent || "",
     debate: S.debate ? { n: S.debate.n, pregunta: S.debate.pregunta, A: S.debate.A, B: S.debate.B } : null,
+    ronda: S.ronda, tramo: S.tramo,      // el control los pone en los mensajes del moderador
+    cola: typeof colaControl === "function" ? colaControl() : [],
     ladosFijos: FIJOS,                   // con personajes: A FAVOR / EN CONTRA; sin ellos, debate libre
     propuesta: p ? { estado: p.estado, pregunta: p.pregunta || "", porQue: p.porQue || "", A: p.A, B: p.B, aviso: p.aviso || "",
       favor: p.favor || "", contra: p.contra || "", cuentaHasta: S.cuentaHasta || null } : null,
@@ -321,6 +323,15 @@ function activarOnline() {
     publicar();
     tick("La partida se terminó desde el panel.");
   }, () => {});
+  // El profesor modera a viva voz desde el control (vozprofe.js): su latido. La primera foto trae
+  // un latido viejo; al soltar (habla: null) cuenta como la última voz (el respiro de la moderadora).
+  let profePrimera = true;
+  onSnapshot(doc(db, "salas", ON.codigo, "vivo", "moderador"), snap => {
+    const antes = ON.profe;
+    ON.profe = notarProfe(antes, snap.exists() ? snap.data() : null, Date.now(), profePrimera);
+    profePrimera = false;
+    if (antes && antes.habla && !ON.profe.habla) ON.ultimaVoz = Date.now();
+  }, () => {});
   // quien llegó tarde y no responde la brújula en 90 s queda en el grupo más chico
   setInterval(asignarRezagados, 10000);
   // con personajes: quien llega con la inscripción cerrada entra al personaje más chico
@@ -373,6 +384,9 @@ const ORDENES = {
     if (S.fase !== "abierta") { tick("La noticia se lanza con el tramo abierto."); return; }
     $("selEvento").value = a; lanzarEvento();
   },
+  // la cola de la tribuna del profesor que modera (moderacion.js)
+  tribuna: a => { if (S.fase === "abierta") lanzarDeCola(String(a || "")); },
+  descartar: a => descartarDeCola(String(a || "")),
   opcion: a => { if (a) fijarOpcion(a.k, a.v); },
   escenario: a => window.modoEscenario?.(!!a),
   // en la portada y la intro, el control pulsa el botón de la escena (EMPEZAR ▶, SIGUIENTE ›): así
@@ -390,7 +404,7 @@ const ORDENES = {
 // Las órdenes que dependen del momento: el control las manda con la fase y la etapa que veía. Si
 // la pantalla ya pasó a otra (la cuenta publicó sola, la entrada terminó), no se hacen: un toque
 // pensado para «▶ EMPEZAR DEBATE» no puede cerrar el debate recién abierto.
-const SEGUN_FASE = new Set(["principal", "etapa", "publicar", "mas30", "moderadora", "shock"]);
+const SEGUN_FASE = new Set(["principal", "etapa", "publicar", "mas30", "moderadora", "shock", "tribuna"]);
 const ordenVieja = data => SEGUN_FASE.has(data.cmd) && data.fase !== undefined
   && (data.fase !== S.fase || (data.etapa ?? null) !== (S.etapa ?? null));
 function atenderOrden(data) {
@@ -462,9 +476,11 @@ function hablaSala() {
   }).map(([uid, h]) => ({ uid, nombre: ON.jugadores[uid].nombre || "", grupo: ON.jugadores[uid].grupo, texto: h.texto, t0: h.t0, desde: h.desde }));
 }
 window.hablaSala = hablaSala;
+// { texto, t0 } mientras el profesor habla desde el control en el debate en curso, o null.
+window.moderadorHabla = () => profeHabla(ON.profe, S.debate && S.debate.n, Date.now(), typeof AJ !== "undefined" ? AJ.LATIDO : 2500);
 // Cuándo dejó de hablar el último (la moderadora espera un respiro corto desde ahí): al soltar, o
 // el último latido de una ficha que se quedó callada sin soltar.
-window.ultimaVoz = () => Math.max(ON.ultimaVoz || 0, ...Object.values(HABLA).map(h => h.visto || 0));
+window.ultimaVoz = () => Math.max(ON.ultimaVoz || 0, (ON.profe && ON.profe.visto) || 0, ...Object.values(HABLA).map(h => h.visto || 0));
 // Quién habla cambió (alguien empezó o soltó): el control y los teléfonos lo ven en la próxima
 // publicación liviana. Un latido que solo trae más texto no publica nada (los subtítulos del
 // proyector salen de aquí mismo, y los teléfonos leen las fichas).
@@ -476,6 +492,16 @@ function avisarHabla() {
   publicar({ ligera: true });
 }
 setInterval(avisarHabla, 1000);          // una ficha que calló sin soltar deja de contar sin foto nueva
+// La cola de la tribuna (preguntas, 🤔, menciones) cambia sin que nada más publique: si cambió,
+// el control la ve en la próxima publicación liviana.
+let firmaCola = "";
+setInterval(() => {
+  if (typeof colaControl !== "function") return;
+  const f = JSON.stringify(colaControl());
+  if (f === firmaCola) return;
+  firmaCola = f;
+  publicar({ ligera: true });
+}, 1000);
 
 /* ---------- el punto de información (punto.js) ----------
    El teléfono pide con punto: { debate, t } en su ficha; el lado que habla responde con
