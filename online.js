@@ -331,7 +331,7 @@ function activarOnline() {
     ON.profe = notarProfe(antes, snap.exists() ? snap.data() : null, Date.now(), profePrimera);
     profePrimera = false;
     if (antes && antes.habla && !ON.profe.habla) ON.ultimaVoz = Date.now();
-  }, () => {});
+  }, e => console.warn("TRIBUNA: vivo/moderador", e));
   // quien llegó tarde y no responde la brújula en 90 s queda en el grupo más chico
   setInterval(asignarRezagados, 10000);
   // con personajes: quien llega con la inscripción cerrada entra al personaje más chico
@@ -404,7 +404,7 @@ const ORDENES = {
 // Las órdenes que dependen del momento: el control las manda con la fase y la etapa que veía. Si
 // la pantalla ya pasó a otra (la cuenta publicó sola, la entrada terminó), no se hacen: un toque
 // pensado para «▶ EMPEZAR DEBATE» no puede cerrar el debate recién abierto.
-const SEGUN_FASE = new Set(["principal", "etapa", "publicar", "mas30", "moderadora", "shock", "tribuna"]);
+const SEGUN_FASE = new Set(["principal", "etapa", "publicar", "mas30", "moderadora", "shock", "tribuna", "descartar"]);
 const ordenVieja = data => SEGUN_FASE.has(data.cmd) && data.fase !== undefined
   && (data.fase !== S.fase || (data.etapa ?? null) !== (S.etapa ?? null));
 function atenderOrden(data) {
@@ -480,7 +480,7 @@ window.hablaSala = hablaSala;
 window.moderadorHabla = () => profeHabla(ON.profe, S.debate && S.debate.n, Date.now(), typeof AJ !== "undefined" ? AJ.LATIDO : 2500);
 // Cuándo dejó de hablar el último (la moderadora espera un respiro corto desde ahí): al soltar, o
 // el último latido de una ficha que se quedó callada sin soltar.
-window.ultimaVoz = () => Math.max(ON.ultimaVoz || 0, (ON.profe && ON.profe.visto) || 0, ...Object.values(HABLA).map(h => h.visto || 0));
+window.ultimaVoz = () => Math.max(ON.ultimaVoz || 0, (ON.profe && ON.profe.habla && ON.profe.habla.debate === (S.debate && S.debate.n) ? ON.profe.visto || 0 : 0), ...Object.values(HABLA).map(h => h.visto || 0));
 // Quién habla cambió (alguien empezó o soltó): el control y los teléfonos lo ven en la próxima
 // publicación liviana. Un latido que solo trae más texto no publica nada (los subtítulos del
 // proyector salen de aquí mismo, y los teléfonos leen las fichas).
@@ -494,13 +494,15 @@ function avisarHabla() {
 setInterval(avisarHabla, 1000);          // una ficha que calló sin soltar deja de contar sin foto nueva
 // La cola de la tribuna (preguntas, 🤔, menciones) cambia sin que nada más publique: si cambió,
 // el control la ve en la próxima publicación liviana.
-let firmaCola = "";
+let firmaCola = "[]";
 setInterval(() => {
   if (typeof colaControl !== "function") return;
   const f = JSON.stringify(colaControl());
   if (f === firmaCola) return;
   firmaCola = f;
-  publicar({ ligera: true });
+  if (!ON.codigo || !ON.uid) return;
+  const control = estadoControl();    // solo el resumen del control: la sala no se reescribe
+  if (control) escribirControl(control);
 }, 1000);
 
 /* ---------- el punto de información (punto.js) ----------
