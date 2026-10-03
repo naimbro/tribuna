@@ -289,7 +289,7 @@ function escnTarjeta(m, reg) {
     el.classList.add(m.tipo === "alumno" ? lado || "A" : m.tipo);
     if (m.tipo === "mod" && m.datos && m.datos.tribuna) el.classList.add("trib");
     el.style.setProperty("--c", lado ? escnColor(lado) : "");
-    const quien = m.tipo === "mod" ? `🎙 ${MOD_NOMBRE.toUpperCase()}${m.datos && m.datos.tribuna ? " · ✋ LA TRIBUNA" : ""}`
+    const quien = m.tipo === "mod" ? `🎙 ${escHtml(String(m.nombre || MOD_NOMBRE).toUpperCase())}${m.datos && m.datos.tribuna ? " · ✋ LA TRIBUNA" : ""}`
       : m.tipo === "noticia" ? "📰 ÚLTIMA HORA" : "";
     const grupo = m.tipo === "alumno" ? grupoDeMensaje(m) : 0;
     el.innerHTML = `<div class="escn-tj-q">${quien ? `<b>${quien}</b>` : `<b>${escHtml(m.nombre || "?")}</b>${grupo ? `<span>${escHtml(nombreG(grupo))}</span>` : ""}`}${m.voz ? `<em title="dicho en voz alta">🎤</em>` : ""}</div>
@@ -371,6 +371,22 @@ function escnCola(texto) {
 // tal cual. Si alguien del podio empieza a hablar, el rótulo se retira: manda el subtítulo.
 function escnRotulo(d, reg, ahora, hablan) {
   const el = $("escnRotulo");
+  // el profesor modera y está hablando (vozprofe.js): su subtítulo en vivo manda sobre todo.
+  // Cada 300 ms solo cambia el texto; la entrada se anima una vez, al empezar.
+  const mh = typeof window.moderadorHabla === "function" ? window.moderadorHabla() : null;
+  if (mh) {
+    ESCN.rotuloId = null;
+    if (ESCN.rotulo !== "vivo") {
+      ESCN.rotulo = "vivo";
+      el.innerHTML = `<div class="escn-rot-c"><div class="escn-rot-k"><i class="escn-envivo">● EN VIVO</i> 🎙 ${escHtml(PROFE.NOMBRE.toUpperCase())}</div>
+        <div class="escn-rot-t"><span></span><i class="escn-cursor"></i></div></div>`;
+      el.className = "escn-rotulo";
+      void el.offsetWidth;
+      el.className = "escn-rotulo on vivo";
+    }
+    escnTexto(el.querySelector(".escn-rot-t span"), escnCola(mh.texto));
+    return;
+  }
   let m = null;
   if (!hablan.length) for (let i = S.chat.length - 1; i >= 0; i--) {
     const x = S.chat[i];
@@ -392,7 +408,7 @@ function escnRotulo(d, reg, ahora, hablan) {
       <div class="escn-rot-c"><div class="escn-rot-k">✋ PREGUNTA DE LA TRIBUNA · <b>${escHtml(nombre)}</b><span>${escHtml(grupo)}</span></div>
       <div class="escn-rot-q">«${escHtml(String(q).trim())}»</div></div>`;
   } else {
-    const k = dt.tribuna === "fuente" ? "🤔 LA TRIBUNA PIDE LA FUENTE" : `🎙 ${MOD_NOMBRE.toUpperCase()}`;
+    const k = dt.tribuna === "fuente" ? "🤔 LA TRIBUNA PIDE LA FUENTE" : `🎙 ${escHtml(String(m.nombre || MOD_NOMBRE).toUpperCase())}`;
     el.innerHTML = `<div class="escn-rot-c"><div class="escn-rot-k">${k}</div>
       <div class="escn-rot-t">${typeof conMenciones === "function" ? conMenciones(m.texto || "") : escHtml(m.texto || "")}</div></div>`;
   }
