@@ -235,7 +235,7 @@ function mostrarResultado() {
   const seguir = () => {
     if (S.fase !== "resultado") return;
     S.fase = "propuesta";
-    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: `Gracias, ${nombreG(d.A)} y ${nombreG(d.B)}. Viene el próximo debate.` });
+    postChat({ tipo: tipoGuia(), nombre: MOD_NOMBRE, texto: `Gracias, ${nombreG(d.A)} y ${nombreG(d.B)}. Viene el próximo debate.` });
     mostrarPropuesta();
     publicarEstado();
   };
@@ -397,13 +397,15 @@ function fijarOpcion(k, v) {
   S.clase.opciones = { ...OPCIONES_DEFECTO, ...(S.clase.opciones || {}), [k]: !!v };
   if (k === "musica" && !v && typeof pararMusica === "function") pararMusica();
   if (k === "vozIA" && !v && typeof callarIA === "function") callarIA();
+  // el profesor toma la moderación: lo que la IA tenía por decir ya no viene al caso
+  if (k === "modProfe" && v) { if (typeof VOZ_ESPERA !== "undefined") VOZ_ESPERA.length = 0; if (S.mod) S.mod.forzarPendiente = false; }
   // apagar la voz o el reloj a mitad de tramo: sin banco desde ya, y el tramo sigue hasta su límite
   // de pared (o hasta que el profesor lo cierre). Encenderlos a mitad de tramo vale desde el próximo.
   if ((k === "voz" || k === "reloj") && !v && S.fase === "abierta" && S.banco) {
     S.banco = null; S.bancoCorre = { A: false, B: false }; S.cierreBanco = null;
   }
   const nombre = { revelacion: "Revelación", revancha: "Revancha", musica: "Música", voz: "Debate en voz alta",
-    reloj: "Reloj de ajedrez", punto: "Punto de información", vozIA: "La IA en voz alta" }[k];
+    reloj: "Reloj de ajedrez", punto: "Punto de información", vozIA: "La IA en voz alta", modProfe: "Moderas tú" }[k];
   tick(`${nombre}: ${v ? "encendido" : "apagado"} desde el control.`);
   publicarEstado();
 }

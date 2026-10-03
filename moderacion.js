@@ -18,6 +18,11 @@
    ===================================================================== */
 
 const MOD_NOMBRE = "Moderadora", REL_NOMBRE = "Relator";
+// Interruptor «Moderas tú» (modProfe, vozprofe.js): el profesor modera a viva voz desde su control
+// y la IA se calla. Lo que el proyector todavía escribe en nombre del moderador (las preguntas de
+// la tribuna que el profesor elige) va firmado con su nombre.
+const moderaProfe = () => !!(S.clase && opcionActiva(S.clase.opciones, "modProfe"));
+const nombreMod = () => (moderaProfe() ? PROFE.NOMBRE : MOD_NOMBRE);
 
 /* ---------- mensajes ---------- */
 // m = { tipo: "alumno"|"mod"|"relator"|"sistema"|"resultado", nombre, equipo?, uid?, email?, texto, datos? }
@@ -55,13 +60,15 @@ function recibirChat(lista, inicial = false) {
   for (const m of nuevos) {
     if (m.tipo === "alumno") {
       sonar("pop");
-      if (m.ronda === S.ronda && S.fase === "abierta" && S.mod) {
+      if (m.ronda === S.ronda && S.fase === "abierta" && S.mod && !moderaProfe()) {
         // le escribieron a ella con @Moderadora: responde de inmediato a esa persona
         if (/@moderadora\b/i.test(norm(m.texto))) { S.mod.pregunta = m; moderadorTalvez(true); }
       }
     } else if (m.tipo === "mod") sonar("nota", 14);
-    // el proyector habla: la moderadora y el relator, si la voz de la IA está encendida (vozia.js)
-    if ((m.tipo === "mod" || m.tipo === "relator") && opcionActiva(S.clase.opciones, "vozIA") && typeof hablarIA === "function") {
+    // el proyector habla: la moderadora y el relator, si la voz de la IA está encendida (vozia.js).
+    // Lo del moderador humano no se lee: el profesor ya lo dijo, o lo dice él (modProfe).
+    const callado = m.tipo === "mod" && ((m.datos && m.datos.profe) || moderaProfe());
+    if ((m.tipo === "mod" || m.tipo === "relator") && !callado && opcionActiva(S.clase.opciones, "vozIA") && typeof hablarIA === "function") {
       if (m.tipo === "relator") { VOZ_ESPERA.length = 0; hablarIA(textoHablado(m, rotulosDe(m))); }   // lo que esperaba ya no viene al caso
       else hablarModeradora(textoHablado(m, rotulosDe(m)));
     }
@@ -76,7 +83,7 @@ function burbuja(m) {
   const hora = new Date(m.t).toTimeString().slice(0, 5);
   if (m.tipo === "sistema") return `<div class="msg sys">${esc(m.texto)}</div>`;
   if (m.tipo === "noticia") return `<div class="msg noticia"><div class="who">📰 Última hora<span class="hora">${hora}</span></div><div class="tx">${esc(m.texto)}</div></div>`;
-  if (m.tipo === "mod") return `<div class="msg mod ${m.datos && m.datos.tribuna ? "trib" : ""}"><div class="who">🎙 ${MOD_NOMBRE}${m.datos && m.datos.tribuna ? " · ✋ la tribuna" : ""}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div></div>`;
+  if (m.tipo === "mod") return `<div class="msg mod ${m.datos && m.datos.tribuna ? "trib" : ""}"><div class="who">🎙 ${esc(m.nombre || MOD_NOMBRE)}${m.voz ? " 🎤" : ""}${m.datos && m.datos.tribuna ? " · ✋ la tribuna" : ""}<span class="hora">${hora}</span></div><div class="tx">${conMenciones(m.texto)}</div></div>`;
   if (m.tipo === "relator") {
     const d = m.datos || {}, eq = rotulosDe(m);
     return `<div class="msg rel"><div class="who">📣 ${REL_NOMBRE} · llamado a votar<span class="hora">${hora}</span></div>
@@ -143,9 +150,10 @@ function participantes() {
 // La conversación como texto para los prompts. Sin los mensajes de resultado (son del juego).
 // Los alumnos con m.voz (Task 14: mantener para hablar) llevan la marca 🎤: es una transcripción
 // automática, no lo que escribieron, y así lo saben moderadora y jueces (promptModerador, promptJuez).
+// Los del moderador humano (modProfe) también llevan 🎤: los dijo en voz alta.
 function transcripcionChat(filtro = () => true, max = 40) {
   return S.chat.filter(m => ["alumno", "mod", "relator"].includes(m.tipo) && filtro(m)).slice(-max).map(m =>
-    m.tipo === "mod" ? `[🎙 ${MOD_NOMBRE}] ${m.texto}`
+    m.tipo === "mod" ? `[🎙 ${m.nombre || MOD_NOMBRE}${m.voz ? " · 🎤" : ""}] ${m.texto}`
     : m.tipo === "relator" ? `[⚖ ${REL_NOMBRE}] ${m.texto}`
     : m.voz ? `[${rotuloMensaje(m)} · ${m.nombre} · 🎤] ${m.texto}`
     : `[${rotuloMensaje(m)} · ${m.nombre}] ${m.texto}`).join("\n");
@@ -193,6 +201,9 @@ function textoTiempo(seg) {
     : `Tienen ${Math.round(seg / 60)} minutos.`;
 }
 
+// Con el profesor moderando, las líneas fijas (apertura del debate, cierre) quedan escritas como
+// guía del sistema: nadie las lee en voz alta y no cuentan como intervención de la moderadora.
+const tipoGuia = () => (moderaProfe() ? "sistema" : "mod");
 function abrirTramoChat() {
   const R = tramoActual();
   // fuentesPendientes: los 🤔 de la tribuna que esperan un silencio (pedirFuenteTribuna)
@@ -202,11 +213,11 @@ function abrirTramoChat() {
   // grupos, no a una persona: quien quiera responde por su grupo.
   const d = S.debate;
   if (d && PERS) {
-    postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: `Duelo ${d.n}: ${citaMocion(d.pregunta)} ${nombreG(d.A)} defiende ${EQUIPOS.A.nombre}; ${nombreG(d.B)}, ${EQUIPOS.B.nombre}. ` +
+    postChat({ tipo: tipoGuia(), nombre: MOD_NOMBRE, texto: `Duelo ${d.n}: ${citaMocion(d.pregunta)} ${nombreG(d.A)} defiende ${EQUIPOS.A.nombre}; ${nombreG(d.B)}, ${EQUIPOS.B.nombre}. ` +
       `${grupoDe("A")}, ${grupoDe("B")}: ${tratoDe("A")}, ${tratoDe("B")}, su posición en una frase y en primera persona. ${textoTiempo(R.seg)}` });
     return;
   }
-  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: d
+  postChat({ tipo: tipoGuia(), nombre: MOD_NOMBRE, texto: d
     ? `Debate ${d.n}: ${citaMocion(d.pregunta)} @Grupo ${d.A} y @Grupo ${d.B}: ¿qué piensan ustedes, de verdad? ` +
       `Su posición en una frase, cualquiera del grupo, y de ahí seguimos sueltos. ${textoTiempo(R.seg)}`
     : `${citaMocion(mocionActual())} ${ladoNombre("A")} y ${ladoNombre("B")}: su posición en una frase, y de ahí seguimos sueltos. ${textoTiempo(R.seg)}` });
@@ -230,8 +241,9 @@ function moderadorTalvez(forzar = false) {
   const hablando = voz && ((typeof window.hablaSala === "function" && window.hablaSala().length > 0)
     || (typeof puntoActivo === "function" && puntoActivo(S.punto)));
   const ultimaVoz = typeof window.ultimaVoz === "function" ? window.ultimaVoz() || 0 : 0;
-  const r = debeIntervenir(estadoTramo(), { ahora: Date.now(), abre: M.abre, forzar: forzar || !!M.forzarPendiente, hablando, ultimaVoz, voz });
+  const r = debeIntervenir(estadoTramo(), { ahora: Date.now(), abre: M.abre, forzar: forzar || !!M.forzarPendiente, hablando, ultimaVoz, voz, profe: moderaProfe() });
   if (!r.toca) {
+    if (pedida && r.motivo === "profe") tick("🎙 Moderas tú: la moderadora de IA no interviene.");
     if (forzar && r.motivo === "hablan") {
       if (pedida && !M.forzarPendiente) tick("🎙 La moderadora entra cuando terminen de hablar.");
       M.forzarPendiente = true;
@@ -259,9 +271,37 @@ function lanzarPreguntaTribuna(p, destino) {
   if (!reg || !p) return;
   (reg.tribuna = reg.tribuna || []).push({ uid: p.uid, nombre: p.nombre || "", grupo: p.grupo || 0, texto: String(p.texto).slice(0, PUB.PREGUNTA_MAX) });
   S.clase.oraculos = sumarPuntoPregunta(S.clase.oraculos, p);
-  postChat({ tipo: "mod", nombre: MOD_NOMBRE, texto: textoTribuna(p, destino, PERS), datos: { tribuna: "pregunta", uid: p.uid, nombre: p.nombre || "" } });
+  postChat({ tipo: "mod", nombre: nombreMod(), texto: textoTribuna(p, destino, PERS), datos: { tribuna: "pregunta", uid: p.uid, nombre: p.nombre || "" } });
   if (typeof pintarColumna === "function") pintarColumna();
   if (typeof window.publicarEstado === "function") window.publicarEstado();
+}
+// La cola del profesor que modera (publico.js, colaTribuna): la ve en su control. S.mod.fuera
+// guarda lo que ya lanzó o descartó en este tramo.
+function colaControl() {
+  const reg = S.debate && S.clase.debates[S.debate.n - 1];
+  if (!reg || !S.mod || S.fase !== "abierta" || !moderaProfe()) return [];
+  return colaTribuna({ preguntas: (S.preguntasPub || []).filter(p => limpiaFrase(p.texto)), emitidas: reg.tribuna,
+    fuentes: S.mod.fuentesPendientes || [], chat: S.chat, debate: S.debate.n, fuera: S.mod.fuera || [] });
+}
+// Orden del control: sale en el proyector como la lanzaría la moderadora (foto, nombre, oráculo).
+function lanzarDeCola(id) {
+  const M = S.mod, x = colaControl().find(i => i.id === id);
+  if (!x) { tick("Eso ya no está en la cola de la tribuna."); return; }
+  (M.fuera = M.fuera || []).push(id);
+  if (x.tipo === "pregunta") {
+    const p = (S.preguntasPub || []).find(q => "p:" + q.uid === id);
+    lanzarPreguntaTribuna(p, PERS ? `${grupoDe("A")} y ${grupoDe("B")}` : `@Grupo ${S.debate.A} y @Grupo ${S.debate.B}`);
+  } else if (x.tipo === "fuente") {
+    const msgId = id.slice(2);
+    M.fuentesPendientes = (M.fuentesPendientes || []).filter(i => i !== msgId);
+    pedirFuenteTribuna(msgId);
+  }
+}
+function descartarDeCola(id) {
+  const M = S.mod;
+  if (!M || typeof id !== "string") return;   // la orden llega del control por Firestore
+  (M.fuera = M.fuera || []).push(id);
+  if (id.startsWith("f:")) M.fuentesPendientes = (M.fuentesPendientes || []).filter(i => i !== id.slice(2));
 }
 // ¿Tiene alguien la palabra en la sala? El botón apretado (window.hablaSala, online.js), un punto de
 // información en curso o las últimas palabras del reloj de ajedrez; y, recién soltado el botón, un
@@ -270,7 +310,8 @@ const RESPIRO_MOD = 1200;
 function salaOcupada(ahora = Date.now()) {
   let hs = [];
   try { hs = typeof window.hablaSala === "function" ? window.hablaSala() || [] : []; } catch (e) { hs = []; }
-  if (hs.length || S.cierreBanco || (typeof puntoActivo === "function" && puntoActivo(S.punto))) return true;
+  const profe = typeof window.moderadorHabla === "function" && !!window.moderadorHabla();
+  if (hs.length || profe || S.cierreBanco || (typeof puntoActivo === "function" && puntoActivo(S.punto))) return true;
   const ultima = typeof window.ultimaVoz === "function" ? +window.ultimaVoz() || 0 : 0;
   return ahora - ultima < RESPIRO_MOD;
 }
@@ -283,7 +324,7 @@ function encolarFuenteTribuna(msgId) {
 }
 function fuentesTalvez() {
   const M = S.mod;
-  if (!M || S.fase !== "abierta" || !(M.fuentesPendientes || []).length || salaOcupada()) return;
+  if (!M || S.fase !== "abierta" || moderaProfe() || !(M.fuentesPendientes || []).length || salaOcupada()) return;
   pedirFuenteTribuna(M.fuentesPendientes.shift());
 }
 // Red de seguridad para la voz de la IA: lo que diga la moderadora mientras alguien habla (por el
@@ -308,7 +349,7 @@ function pedirFuenteTribuna(msgId) {
   if (!m || S.fase !== "abierta" || !S.mod) return;
   const cita = String(m.texto || "").replace(/\s+/g, " ").trim();
   const corta = cita.length > 70 ? cita.slice(0, 70).replace(/\s+\S*$/, "") + "…" : cita;
-  postChat({ tipo: "mod", nombre: MOD_NOMBRE, datos: { tribuna: "fuente", msg: msgId },
+  postChat({ tipo: "mod", nombre: nombreMod(), datos: { tribuna: "fuente", msg: msgId },
     texto: `🤔 @${String(m.nombre || "").split(" ")[0]}, la tribuna pregunta de dónde sale esto: «${corta}». Un autor o un documento basta.` });
 }
 
