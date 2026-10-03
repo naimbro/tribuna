@@ -261,7 +261,7 @@ function avisarNuevos(nuevos) {
     }
     if (m.tipo === "mod" && m.datos && m.datos.tribuna === "pregunta" && m.datos.uid === J.uid) {
       navigator.vibrate?.([80, 50, 80, 50, 200]);
-      $("avisoVoto").textContent = "✋ ¡La moderadora eligió tu pregunta! +1 🔮";
+      $("avisoVoto").textContent = `✋ ¡${m.datos.profe || m.nombre === PROFE.NOMBRE ? "El moderador" : "La moderadora"} eligió tu pregunta! +1 🔮`;
       confeti(["#f5b301", "#ffffff", "#a78bfa"], 2500);
     }
     if (m.tipo === "relator" && rolEn(J.sala) === "P") {
@@ -380,7 +380,7 @@ function burbuja(m, s) {
   const hora = new Date(m.t).toTimeString().slice(0, 5);
   if (m.tipo === "sistema") return `<div class="msg sys">${esc(m.texto)}</div>`;
   if (m.tipo === "noticia") return `<div class="msg mod" style="--c:var(--amber);border-color:var(--amber);background:#1f1508"><div class="who">📰 Última hora<span class="hora">${hora}</span></div><div class="tx">${esc(m.texto)}</div></div>`;
-  if (m.tipo === "mod") return `<div class="msg mod ${meNombran(m.texto) && rolEn(J.sala) !== "P" ? "ati" : ""} ${m.datos && m.datos.tribuna ? "trib" : ""}"><div class="who">🎙 Moderadora${m.datos && m.datos.tribuna ? " · ✋ la tribuna" : ""}<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
+  if (m.tipo === "mod") return `<div class="msg mod ${meNombran(m.texto) && rolEn(J.sala) !== "P" ? "ati" : ""} ${m.datos && m.datos.tribuna ? "trib" : ""}"><div class="who">🎙 ${esc(m.nombre || "Moderadora")}${m.datos && m.datos.tribuna ? " · ✋ la tribuna" : ""}<span class="hora">${hora}</span></div><div class="tx">${menciones(m.texto)}</div></div>`;
   if (m.tipo === "relator") {
     const d = m.datos || {};
     // debate libre: cada resumen lleva el nombre del grupo (el del debate de ese mensaje)
@@ -674,14 +674,16 @@ function sugerir() {
   const lado = g => !d ? "" : !FIJ() ? (enDebate(g) ? "debate ahora" : "") : g.grupo === d.A ? "A FAVOR" : g.grupo === d.B ? "EN CONTRA" : "";
   const color = g => !d ? "#6b7a8a" : g.grupo === d.A ? J.sala.equipos.A.color : g.grupo === d.B ? J.sala.equipos.B.color : "#6b7a8a";
   // la moderadora siempre se puede mencionar: si le escribes, te responde
-  const lista = [{ nombre: "Moderadora", grupo: 0, mod: true }, ...por.values()]
+  // con «Moderas tú» el que responde es el profesor, no la IA
+  const modP = !!(J.sala && opcionActiva(J.sala.opciones, "modProfe"));
+  const lista = [{ nombre: modP ? PROFE.NOMBRE : "Moderadora", grupo: 0, mod: true }, ...por.values()]
     .filter(g => !q || norm(g.nombre).split(/\s+/).some(w => w.startsWith(q)))
     .sort((a, b) => ((b.mod ? 2 : 0) + enDebate(b)) - ((a.mod ? 2 : 0) + enDebate(a)) || a.nombre.localeCompare(b.nombre))
     .slice(0, 8);
   caja.classList.add("on");
   caja.innerHTML = lista.length ? lista.map(g => `<button type="button" class="sg" data-n="${esc(corto(g.nombre))}">
       <span class="sg-av" style="--c:${g.mod ? "#b4a6ff" : color(g)}">${g.mod ? "🎙" : iniciales(g.nombre)}</span>
-      <span class="sg-n">${esc(g.nombre)}<small>${g.mod ? "moderadora de IA · te responde" : (g.grupo ? (PJ() ? rotuloCorto(g.grupo, PJ()) : "grupo " + g.grupo) : "") + (lado(g) ? " · " + lado(g) : "")}</small></span></button>`).join("")
+      <span class="sg-n">${esc(g.nombre)}<small>${g.mod ? (modP ? "Moderador · el profesor" : "moderadora de IA · te responde") : (g.grupo ? (PJ() ? rotuloCorto(g.grupo, PJ()) : "grupo " + g.grupo) : "") + (lado(g) ? " · " + lado(g) : "")}</small></span></button>`).join("")
     : `<div class="sg-vacio">Nadie se llama así en la sala.</div>`;
   // pointerdown (no click): así el teclado no se cierra antes de elegir
   caja.onpointerdown = e => {
@@ -1192,11 +1194,12 @@ function parcialDebate(s, lado) {
   el.classList.toggle("agotado", agotado && !porPunto);
   // la moderadora me habla (mientras me piden un punto, la tarjeta manda: tiene 10 s)
   const pide = !!(s.punto && s.punto.estado === "pedido" && s.punto.para === lado);
-  // el moderador hablando ahora manda sobre su línea anterior
+  // el moderador hablando ahora manda sobre su línea anterior, salvo mientras me piden un punto:
+  // ahí la tarjeta Aceptar/Rechazar manda y su línea en vivo no se muestra
   const mh = profeHabla(J.profe, d.n, ahora, AJ.LATIDO);
   const m = pide || mh ? null : modParaMi(s, ahora), mod = $("vvMod");
-  mod.classList.toggle("oculto", !m && !mh);
-  poner(mod, mh ? `<b class="q">🎙 Habla el moderador · en vivo</b><span class="vv-mod-tx">${esc(cola(mh.texto, 220)) || "…"}</span>`
+  mod.classList.toggle("oculto", !m && !(mh && !pide));
+  poner(mod, mh && !pide ? `<b class="q">🎙 Habla el moderador · en vivo</b><span class="vv-mod-tx">${esc(cola(mh.texto, 220)) || "…"}</span>`
     : m ? `<b class="q">🎙 ${m.datos && m.datos.profe ? "El moderador" : "La moderadora"} te pregunta</b><span class="vv-mod-tx">${menciones(m.texto)}</span>` : "");
   // quién de mi lado está hablando (para no pisarse) y quién del otro lado
   const hablan = quienesHablan(s);
