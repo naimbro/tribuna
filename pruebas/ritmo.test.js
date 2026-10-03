@@ -84,3 +84,11 @@ test("debeIntervenir: con voz, el respiro se mide desde que terminó de hablar y
   assert.equal(R.debeIntervenir(est, { ahora: 104000, abre: 0, voz: true, ultimaVoz: 102000 }).toca, false);
   assert.equal(R.debeIntervenir(est, { ahora: 105000, abre: 0, voz: true, ultimaVoz: 102000 }).toca, true);
 });
+
+test("moderas tú: la IA no interviene, ni llamada ni con tres mensajes nuevos", () => {
+  const msgs = [mod(0, "Debate 1: ¿qué piensan?"), alu(10, "consuelo vera", "uno"), alu(20, "consuelo vera", "dos"), alu(30, "Pablo Sandoval", "tres", "B", 5)];
+  const e = R.leerTramo(msgs, roster, T0 + 200000);
+  assert.equal(R.debeIntervenir(e, { ahora: T0 + 200000, abre: T0 }).toca, true, "sin el interruptor, entra");
+  assert.deepEqual(R.debeIntervenir(e, { ahora: T0 + 200000, abre: T0, profe: true }), { toca: false, motivo: "profe" });
+  assert.deepEqual(R.debeIntervenir(e, { ahora: T0 + 200000, abre: T0, profe: true, forzar: true }), { toca: false, motivo: "profe" });
+});

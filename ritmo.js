@@ -96,7 +96,9 @@ function leerTramo(msgs, roster, ahora) {
 // Debate a viva voz: hablando = alguien tiene el botón apretado (o hay un punto de información en
 // curso); ultimaVoz = cuándo terminó de hablar el último. Nunca le quita la palabra a nadie, ni
 // pedida: quien la llama espera a que se haga silencio.
-function debeIntervenir(estado, { ahora, abre, forzar = false, hablando = false, ultimaVoz = 0, voz = false }) {
+// profe: el profesor modera a viva voz (interruptor modProfe): la IA no entra, ni llamada.
+function debeIntervenir(estado, { ahora, abre, forzar = false, hablando = false, ultimaVoz = 0, voz = false, profe = false }) {
+  if (profe) return { toca: false, motivo: "profe" };
   if (hablando) return { toca: false, motivo: "hablan" };
   if (forzar) return { toca: true, motivo: "pedido" };
   const desdeMod = ahora - (estado.ultimaMod || abre);
