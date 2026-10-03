@@ -772,11 +772,11 @@ function empezarDictado() {
   $("btnMic").classList.add("on");
   $("notaCaja").textContent = "🎤 Te escucho… aprieta de nuevo para terminar. Revisa el texto antes de enviar.";
 }
-// Una frase del dictado (no continuo, como el mantener para hablar: ver escuchar). Al terminar la
+// Una frase del dictado (no continuo, como el mantener para hablar: ver dictado.js). Al terminar la
 // frase se abre otra hasta que el alumno aprieta de nuevo; si se cierra sin haber oído nada, termina.
 function dictarFrase() {
   const rec = new Reconocedor();
-  rec.lang = "es-CL"; rec.continuous = CONTINUO; rec.interimResults = true;
+  rec.lang = "es-CL"; rec.continuous = DICTADO.CONTINUO; rec.interimResults = true;
   let interino = "", oyo = false;
   rec.onresult = e => {
     interino = "";
@@ -827,11 +827,9 @@ function cortarDictado(abortar = true) {
    reloj de ajedrez de su lado. Al soltar, habla: null. Cada apretón es una «toma» con su propio
    reconocedor y su propio texto: si vuelve a apretar mientras la anterior todavía espera el
    resultado final, las dos no se mezclan. */
-const HABLA = { apretado: false, toma: null, pointerId: null, ultimoLatido: 0, timer: null, CADA: 1000, MAX: 60000, ESPERA: 1200 };
+const HABLA = { apretado: false, toma: null, pointerId: null, ultimoLatido: 0, timer: null, CADA: 1000 };
 const palabras = t => (String(t || "").match(/\S+/g) || []).length;
-// junta dos trozos reconocidos: después de reiniciar el reconocedor, el primer trozo no trae espacio
-const unir = (a, b) => !a ? b || "" : !b ? a : /\s$/.test(a) || /^\s/.test(b) ? a + b : a + " " + b;
-const textoToma = h => unir(h.final, h.interino).replace(/\s+/g, " ").trim();
+const unir = unirTrozos;                       // dictado.js
 const miLado = s => { const r = s && rolEn(s); return r === "A" || r === "B" ? r : null; };
 
 // El banco que publica el proyector, contado hacia atrás aquí. La hora de la foto es cuando ESTE
@@ -875,61 +873,6 @@ function alBorde(s) {
 function avisoHabla(txt) { const m = $("miHabla"); if (m) { m.textContent = txt; m.classList.toggle("aviso", !!txt); } }
 function pintarMiHabla(txt) { const m = $("miHabla"); if (m) { m.textContent = txt; m.classList.remove("aviso"); } }
 
-// Un reconocedor para la toma h, de una frase a la vez: al terminar la frase se cierra y, si el
-// botón sigue apretado, se abre otro y el texto sigue sumando en la misma toma. No continuo: en
-// Chrome de Android (probado el 1-oct-2026 en un teléfono real) el modo continuo entrega cada
-// pedazo como un resultado final nuevo con todo el texto acumulado, y la toma salía «Aló Aló
-// estoy Aló estoy probando…»; en iPhone el modo continuo tiene fallas conocidas.
-const CONTINUO = false;
-function escuchar(h) {
-  const rec = new Reconocedor();
-  rec.lang = "es-CL"; rec.continuous = CONTINUO; rec.interimResults = true;
-  rec.onresult = e => {
-    let interino = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) h.final = unir(h.final, e.results[i][0].transcript);
-      else interino += e.results[i][0].transcript;
-    }
-    h.interino = interino;
-    if (HABLA.toma === h) { pintarMiHabla(textoToma(h)); latido(); }
-  };
-  rec.onerror = e => {
-    if (HABLA.toma !== h) return;
-    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-      // si ya había oído algo (el rechazo llegó al reabrir el reconocedor), lo dicho no se pierde
-      const primera = !h.final && !h.interino;
-      if (primera) {
-        J.micListo = false;
-        try { localStorage.removeItem("tribuna_mic_ok"); } catch {}
-      }
-      soltarHablar({ enviar: !primera, aviso: "🎤 Permite el micrófono para este sitio (candado de la barra de direcciones) y vuelve a apretar." });
-    } else if (e.error === "audio-capture") soltarHablar({ aviso: "🎤 No encontramos el micrófono de este teléfono: escribe tu mensaje abajo." });
-    else if (e.error === "network") soltarHablar({ aviso: "🎤 Sin conexión para reconocer la voz: escribe tu mensaje abajo." });
-    // no-speech y aborted no son fallas: si sigue apretado, onend abre otro reconocedor
-  };
-  rec.onend = () => {
-    if (h.rec !== rec) return;                      // un reconocedor ya reemplazado o soltado
-    // lo que quedó como interino es lo último que se oyó: pasa a firme, o el próximo reconocedor lo pisa
-    if (h.interino) { h.final = unir(h.final, h.interino); h.interino = ""; }
-    if (h.corte) cortarToma(h);                     // el corte de los 60 s esperaba este final
-    if (h.alTerminar) { h.alTerminar(); return; }   // soltó: la toma esperaba este final para enviar
-    if (!HABLA.apretado || HABLA.toma !== h) return;
-    // un micrófono que se cierra apenas se abre no se reintenta sin fin
-    h.fallas = Date.now() - h.inicio < 500 ? h.fallas + 1 : 0;
-    if (h.fallas >= 4) { soltarHablar({ aviso: "🎤 El micrófono no responde: escribe tu mensaje abajo." }); return; }
-    try { escuchar(h); } catch { soltarHablar({ aviso: "🎤 Se cortó el micrófono. Vuelve a apretar." }); }
-  };
-  h.rec = rec; h.inicio = Date.now();
-  rec.start();
-  return rec;
-}
-
-// A los 60 s de una toma, lo dicho se envía y se sigue escuchando si el botón sigue apretado.
-function cortarToma(h) {
-  const texto = textoToma(h), desde = h.t0;
-  Object.assign(h, { final: "", interino: "", t0: Date.now(), corte: 0 });
-  if (palabras(texto) >= 2) mandarVoz(texto, desde).then(err => err && avisoHabla(err));
-}
 // Devuelve el aviso de error, o "" si salió.
 async function mandarVoz(texto, desde) {
   try { await enviarTexto(texto, { voz: true, desde }); return ""; }
@@ -943,7 +886,7 @@ function latido(forzar = false) {
   if (!forzar && ahora - HABLA.ultimoLatido < HABLA.CADA) return;
   HABLA.ultimoLatido = ahora;
   setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid),
-    { habla: { debate: h.debate, t0: h.t0, t: ahora, texto: textoToma(h).slice(-300) } }, { merge: true }).catch(() => {});
+    { habla: { debate: h.debate, t0: h.t0, t: ahora, texto: h.texto().slice(-300) } }, { merge: true }).catch(() => {});
 }
 
 // Cada 200 ms mientras aprieta: el latido aunque no llegue texto (así el proyector sabe que sigue
@@ -961,17 +904,7 @@ function tickHabla() {
     soltarHablar({ aviso: cede ? `✋ Punto de ${quienPunto(cede)}: escucha.` : agotado ? "⏱ Tu lado se quedó sin tiempo: solo puedes escribir." : "", inmediato: agotado || !!cede });
     return;
   }
-  const ahora = Date.now();
-  if (!h.corte && ahora - h.t0 >= HABLA.MAX) {
-    h.corte = ahora;
-    try { h.rec.stop(); } catch { cortarToma(h); }
-  } else if (h.corte && ahora - h.corte > HABLA.ESPERA) {
-    // el reconocedor no terminó a tiempo: se corta igual con lo que hay y se abre otro
-    const viejo = h.rec; h.rec = null;
-    if (viejo) { viejo.onresult = viejo.onend = viejo.onerror = null; try { viejo.abort(); } catch {} }
-    cortarToma(h);
-    try { escuchar(h); } catch { soltarHablar({ aviso: "🎤 Se cortó el micrófono. Vuelve a apretar." }); return; }
-  }
+  h.tick();                                         // el corte de los 60 s (dictado.js)
   latido();
 }
 
@@ -986,8 +919,24 @@ function empezarHablar(e) {
     return;
   }
   cortarDictado();                                  // un solo micrófono: el dictado de la caja termina
-  const h = { rec: null, final: "", interino: "", t0: Date.now(), debate: s.debate.n, corte: 0, fallas: 0, inicio: 0, alTerminar: null };
-  try { escuchar(h); } catch { avisoHabla("🎤 No se pudo abrir el micrófono. Vuelve a apretar."); return; }
+  const h = crearToma(Reconocedor, {
+    debate: s.debate.n,
+    alTexto: t => { if (HABLA.toma === h) { pintarMiHabla(t); latido(); } },
+    alCorte: (texto, desde) => { if (palabras(texto) >= 2) mandarVoz(texto, desde).then(err => err && avisoHabla(err)); },
+    alFallo: (codigo, oyo) => {
+      if (HABLA.toma !== h) return;
+      if (codigo === "not-allowed" || codigo === "service-not-allowed") {
+        // si ya había oído algo (el rechazo llegó al reabrir el reconocedor), lo dicho no se pierde
+        if (!oyo) { J.micListo = false; try { localStorage.removeItem("tribuna_mic_ok"); } catch {} }
+        soltarHablar({ enviar: oyo, aviso: "🎤 Permite el micrófono para este sitio (candado de la barra de direcciones) y vuelve a apretar." });
+      } else if (codigo === "audio-capture") soltarHablar({ aviso: "🎤 No encontramos el micrófono de este teléfono: escribe tu mensaje abajo." });
+      else if (codigo === "network") soltarHablar({ aviso: "🎤 Sin conexión para reconocer la voz: escribe tu mensaje abajo." });
+      else if (codigo === "mudo") soltarHablar({ aviso: "🎤 El micrófono no responde: escribe tu mensaje abajo." });
+      else if (codigo === "cortado") soltarHablar({ aviso: "🎤 Se cortó el micrófono. Vuelve a apretar." });
+    }
+  });
+  // si no abre, la toma se suelta en el acto: así su reconocedor no reabre otro por su cuenta
+  try { h.empezar(); } catch { h.soltar({ inmediato: true }); avisoHabla("🎤 No se pudo abrir el micrófono. Vuelve a apretar."); return; }
   try { e && e.currentTarget && e.currentTarget.setPointerCapture(e.pointerId); } catch {}
   Object.assign(HABLA, { apretado: true, toma: h, ultimoLatido: 0, pointerId: e ? e.pointerId : null });
   navigator.vibrate?.(20);
@@ -1005,24 +954,23 @@ function empezarHablar(e) {
 // null; por eso, con el banco al borde, tampoco se espera el final.
 async function soltarHablar({ enviar = true, aviso = "", inmediato = false } = {}) {
   if (!HABLA.apretado) return;
-  const h = HABLA.toma, rec = h.rec;
+  const h = HABLA.toma;
   HABLA.apretado = false;
   clearInterval(HABLA.timer); HABLA.timer = null;
   if (J.codigo && J.uid) setDoc(doc(db, "salas", J.codigo, "jugadores", J.uid), { habla: null }, { merge: true }).catch(() => {});
   pintarBotonHablar(J.sala);
   if (enviar && J.sala && alBorde(J.sala)) inmediato = true;
-  if (enviar && rec && !inmediato) {
-    await new Promise(listo => {
-      const plazo = setTimeout(listo, HABLA.ESPERA);
-      h.alTerminar = () => { clearTimeout(plazo); listo(); };
-      try { rec.stop(); } catch { h.alTerminar(); }
-    });
+  // Sin esperar el final, h.soltar termina en el acto y lo que sigue pasa en este mismo turno, como
+  // antes: armarVivo suelta y enseguida saca #miHabla del documento, y el aviso tiene que alcanzarlo.
+  const fin = h.soltar({ inmediato: !enviar || inmediato });
+  if (enviar && !inmediato) {
+    await fin;
+    // lo que llegó mientras esperaba el final se ve mientras se envía (la toma soltada ya no avisa)
+    if (HABLA.toma === h) pintarMiHabla(h.texto());
   }
-  h.rec = null;
-  if (rec) { rec.onresult = rec.onend = rec.onerror = null; try { rec.abort(); } catch {} }
   let error = "";
   if (enviar) {
-    const s = J.sala, texto = textoToma(h);
+    const s = J.sala, texto = h.texto();
     const vigente = s && s.fase === "abierta" && s.debate && s.debate.n === h.debate;
     if (vigente && palabras(texto) >= 2) error = await mandarVoz(texto, h.t0);
     else if (vigente && !aviso && !texto) aviso = "🎤 No te escuché: mantén apretado mientras hablas.";
