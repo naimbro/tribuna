@@ -75,7 +75,7 @@ function cargarSesion(archivo) {
   return ctx.S;
 }
 
-const SEMANAS = ["contenido/semana5.js", "contenido/semana7.js", "contenido/semana307.js", "contenido/semana308.js", "contenido/semana402.js"];
+const SEMANAS = ["contenido/semana5.js", "contenido/semana7.js", "contenido/semana14.js", "contenido/semana307.js", "contenido/semana308.js", "contenido/semana402.js"];
 
 test("toda semana: los pesos `mueve` y los `efecto` apuntan a ids que existen", () => {
   for (const archivo of SEMANAS) {
@@ -295,4 +295,34 @@ test("clase 8 de MGT300: conceptos anclados a un dossier o a una lámina, y juec
   const fuentesEn = t => s.FUENTES.filter(f => norm(t).includes(f));
   assert.equal(fuentesEn(s.EJEMPLOS_SESION.apertura.A).join(), "", "la arenga no debería citar a nadie");
   assert.ok(fuentesEn(s.EJEMPLOS_SESION.apertura.B).length >= 3, "la apertura en personaje debería citar");
+});
+
+test("semana 14: brújula corta, cinco jueces, preguntas con campo y los estudios de la semana", () => {
+  const s = cargarSesion("contenido/semana14.js");
+  const b = s.BRUJULA;
+  assert.equal(b.preguntas.length, 6);
+  for (const p of b.preguntas) {
+    assert.equal(p.opciones.length, 4, p.id);
+    assert.ok(p.texto.length <= 120, `${p.id}: enunciado de ${p.texto.length} caracteres`);
+    for (const o of p.opciones) assert.ok(o.texto.length <= 50, `${p.id}: opción de ${o.texto.length} caracteres: ${o.texto}`);
+    const eje = typeof p.opciones[0].x === "number" ? "x" : "y";
+    const vs = p.opciones.map(o => o[eje]);
+    assert.ok(vs.every(v => typeof v === "number"), `${p.id}: opciones en ejes distintos`);
+    assert.ok(vs.every((v, i) => i === 0 || v > vs[i - 1]), `${p.id}: opciones desordenadas`);
+    assert.ok(vs[0] < 0 && vs[3] > 0, `${p.id}: no cubre los dos extremos`);
+  }
+  const ejes = b.preguntas.map(p => typeof p.opciones[0].x === "number" ? "x" : "y");
+  assert.equal(ejes.filter(e => e === "x").length, 3);
+  const extremos = [0, 3].flatMap(i => [0, 3].map(j => Object.fromEntries(b.preguntas.map(p => [p.id, typeof p.opciones[0].x === "number" ? i : j]))));
+  assert.equal(new Set(extremos.map(r => B.campoDe(B.posicion(r, b.preguntas), b.campos))).size, 4);
+  for (const n of ["hidalgo", "innerarity", "abeliuk", "schneier"]) assert.ok(s.FUENTES.includes(n), n);
+  assert.equal(s.JUECES.length, 5);
+  for (const j of s.JUECES) assert.ok(!j.valora.includes(s.JUECES_COMUN.slice(0, 40)), `${j.id} repite el piso común`);
+  assert.equal(new Set(s.JUECES.map(j => j.valora.split(/\s+/).slice(0, 4).join(" "))).size, 5, "dos jueces parten igual");
+  const campos = new Set(b.campos.map(c => c.id));
+  assert.ok(s.PREGUNTAS.length >= 4);
+  for (const p of s.PREGUNTAS) assert.ok(campos.has(p.afirma), p.texto);
+  for (const p of s.PREGUNTAS) for (const k of ["favor", "contra"])
+    assert.ok(p[k] && p[k].length >= 30 && p[k].length <= 200, `${k} de «${p.texto.slice(0, 30)}…»`);
+  assert.equal(s.SESION.mocion, s.PREGUNTAS[0].texto, "la moción del syllabus es la primera pregunta");
 });

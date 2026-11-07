@@ -12,6 +12,7 @@ const DOCTORADO_IA = "Doctorado — Usos de la IA en Investigación Académica";
 const SESIONES = [
   { semana: 5, tema: "Populismo y oligarquía de la IA", curso: CSC00155 },
   { semana: 7, tema: "¿Quién debe gobernar la IA?", curso: CSC00155 },
+  { semana: 14, tema: "¿Puede un avatar representarte?", curso: CSC00155 },
   { semana: 307, tema: "Clase 7 · ¿Quién debe gobernar la IA? La ley chilena", curso: MGT300 },
   { semana: 308, tema: "Clase 8 · ¿Quién frena, quién paga? Seis personajes, tres duelos", curso: MGT300 },
   { semana: 402, tema: "Clase 2 · ¿Los agentes mejoran la ciencia o solo a los científicos?", curso: DOCTORADO_IA }
