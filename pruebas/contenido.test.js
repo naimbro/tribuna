@@ -75,7 +75,7 @@ function cargarSesion(archivo) {
   return ctx.S;
 }
 
-const SEMANAS = ["contenido/semana5.js", "contenido/semana7.js", "contenido/semana14.js", "contenido/semana307.js", "contenido/semana308.js", "contenido/semana402.js"];
+const SEMANAS = ["contenido/semana5.js", "contenido/semana7.js", "contenido/semana14.js", "contenido/semana307.js", "contenido/semana308.js", "contenido/semana312.js", "contenido/semana402.js"];
 
 test("toda semana: los pesos `mueve` y los `efecto` apuntan a ids que existen", () => {
   for (const archivo of SEMANAS) {
@@ -289,6 +289,73 @@ test("clase 8 de MGT300: conceptos anclados a un dossier o a una lámina, y juec
   // cinco titulares de última hora
   assert.equal(s.EVENTOS.length, 5);
   // los ejemplos separan los marcadores: la arenga no nombra a nadie del dossier, la apertura en personaje sí
+  for (const r of ["apertura", "refutacion", "cierre"])
+    for (const k of ["A", "B"]) assert.ok(s.EJEMPLOS_SESION[r][k].length > 200, `${r}.${k}`);
+  const norm = t => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const fuentesEn = t => s.FUENTES.filter(f => norm(t).includes(f));
+  assert.equal(fuentesEn(s.EJEMPLOS_SESION.apertura.A).join(), "", "la arenga no debería citar a nadie");
+  assert.ok(fuentesEn(s.EJEMPLOS_SESION.apertura.B).length >= 3, "la apertura en personaje debería citar");
+});
+
+/* --- MGT300, clase 12 (semana312.js): revolución o burbuja, tres duelos ---- */
+
+test("clase 12 de MGT300: seis personajes y tres duelos que calzan, uno por pregunta de la exposición", () => {
+  const s = cargarSesion("contenido/semana312.js");
+  assert.equal(s.SESION.semana, 312);
+  assert.match(s.SESION.curso, /^MGT300/);
+  assert.equal(s.BRUJULA, null, "la clase 12 se agrupa por personaje, no por brújula");
+  const man = {};
+  vm.createContext(man);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "contenido/sesiones.js"), "utf8") + "\n;this.SESIONES = SESIONES;", man);
+  const fila = man.SESIONES.find(x => x.semana === 312);
+  assert.ok(fila, "semana 312 no está en contenido/sesiones.js");
+  assert.equal(fila.curso, s.SESION.curso);
+  const P = s.PERSONAJES;
+  assert.equal(P.map(p => p.id).join(), "aghion,acemoglu,thiel,khan,huang,burry");
+  assert.equal(new Set(P.map(p => p.corto.toLowerCase())).size, 6);
+  for (const p of P) assert.ok(p.id && p.nombre && p.corto && p.trato && p.cargo && /^#[0-9a-f]{6}$/i.test(p.color), p.id);
+  assert.equal(s.PREGUNTAS.length, 3);
+  const vistos = [];
+  s.PREGUNTAS.forEach((q, i) => {
+    assert.ok(q.texto && q.favor && q.contra, `duelo ${i + 1}`);
+    for (const k of ["favor", "contra"]) assert.ok(q[k].length >= 30 && q[k].length <= 200, `${k} del duelo ${i + 1}`);
+    for (const k of ["A", "B"]) {
+      const p = P.find(x => x.id === q.duelo[k]);
+      assert.ok(p, `duelo ${i + 1}: ${q.duelo[k]} no es un personaje`);
+      assert.equal(p.duelo, i + 1, `${p.id}: duelo`);
+      assert.equal(p.lado, k, `${p.id}: lado`);
+      vistos.push(p.id);
+    }
+  });
+  assert.equal(vistos.sort().join(), [...P.map(p => p.id)].sort().join());
+  assert.equal(s.SESION.mocion, s.PREGUNTAS[0].texto, "la moción de portada es la del primer duelo");
+});
+
+test("clase 12 de MGT300: conceptos anclados a un dossier o a una lámina, y jueces de fidelidad", () => {
+  const s = cargarSesion("contenido/semana312.js");
+  assert.equal(new Set(s.CONCEPTOS.map(c => c.id)).size, s.CONCEPTOS.length, "ids repetidos");
+  for (const c of s.CONCEPTOS) {
+    assert.ok(c.id && c.etiqueta && c.fuente && c.claves.length, c.id);
+    assert.ok([-1, 0, 1].includes(c.lado), `${c.id}: lado ${c.lado}`);
+    assert.match(c.fuente, /[Dd]ossier|Exposición, lámina/, `${c.id}: fuente sin dossier ni lámina`);
+  }
+  // lo evaluable en la Prueba 3 tiene su concepto, anclado a su lámina
+  for (const id of ["gpt", "solow", "desfase", "rentas", "carro"])
+    assert.match(s.CONCEPTOS.find(c => c.id === id).fuente, /^Exposición, lámina/, id);
+  // las contradicciones que más sirven en sala
+  for (const id of ["aghion_gafam", "thiel_gobierno", "thiel_nvidia", "huang_circular", "burry_rentas", "burry_historial", "khan_tribunales"])
+    assert.ok(s.CONCEPTOS.some(c => c.id === id), id);
+  // claves cortas que se cuelan dentro de otras palabras («arm» en «alarma», «vance» en «avance»)
+  for (const c of s.CONCEPTOS) for (const k of c.claves) assert.ok(!["arm", "vance", "vias", "burbuja"].includes(k), `${c.id}: clave ${k}`);
+  for (const f of ["aghion", "acemoglu", "thiel", "khan", "huang", "burry", "bunel", "johnson", "solow", "ferguson", "jd vance",
+                   "poder y progreso", "wall street journal", "the economist"])
+    assert.ok(s.FUENTES.includes(f), f);
+  assert.match(s.JUECES_COMUN, /fidelidad al personaje/);
+  assert.match(s.JUECES_COMUN, /inventar una cita/);
+  assert.equal(s.JUECES.length, 5);
+  for (const j of s.JUECES) assert.ok(!j.valora.includes(s.JUECES_COMUN.slice(0, 40)), `${j.id} repite el piso común`);
+  assert.equal(new Set(s.JUECES.map(j => j.valora.split(/\s+/).slice(0, 4).join(" "))).size, 5, "dos jueces parten igual");
+  assert.equal(s.EVENTOS.length, 5);
   for (const r of ["apertura", "refutacion", "cierre"])
     for (const k of ["A", "B"]) assert.ok(s.EJEMPLOS_SESION[r][k].length > 200, `${r}.${k}`);
   const norm = t => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
