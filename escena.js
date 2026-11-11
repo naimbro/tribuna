@@ -5,7 +5,7 @@
    al elegir una clase en la portada.
    Todo texto que viene de la voz o de la IA entra con textContent: nunca como HTML.
    ===================================================================== */
-import { abrirCanal } from "./canal.js?v=20261111a";
+import { abrirCanal } from "./canal.js?v=20261111b";
 
 const P = new URLSearchParams(location.search);
 const LOCAL = P.has("local");
@@ -146,123 +146,6 @@ function cambio(vista, datos) {
   if (E.firma[vista] === f) return false;
   E.firma[vista] = f;
   return true;
-}
-
-/* ------------------------------ la galería ------------------------------ */
-// El escenario es quien cuenta al público: escucha los documentos de todos (solo la cuenta del
-// profesor puede), publica los agregados y guarda la foto de cada cierre. No decide nada: todo
-// lo que publica se recalcula de lo guardado, así que se puede recargar.
-function contar() {
-  const s = E.sala, d = s && Duelo.dueloDe(s), antes = E.agg;
-  if (!s) return;
-  E.agg = Galeria.agregados(E.publicos, d, s.fase === "quiz" && s.quiz ? s.quiz.i : null);
-  // el eco: si un párrafo ganó un aplauso, la luz de su lado respira
-  if (antes && d && antes.duelo === E.agg.duelo && s.fase === "debate")
-    for (const [id, n] of Object.entries(E.agg.aplausos)) {
-      if (n <= (antes.aplausos[id] || 0)) continue;
-      const p = E.parrafos.find(x => x.id === id);
-      if (p && (p.quien === "A" || p.quien === "B")) eco(p.quien);
-    }
-  pintarGaleria();
-}
-function eco(k) {
-  const e = $("eco" + k);
-  e.classList.remove("late");
-  void e.offsetWidth;                          // reinicia la animación
-  e.classList.add("late");
-}
-// cada 1,5 s como mucho, y solo lo que cambió
-function publicar() {
-  const s = E.sala;
-  if (!s || !E.agg) return;
-  const f = JSON.stringify(E.agg);
-  if (f !== E.aggEnviado) { E.aggEnviado = f; E.canal.publicarGaleria(E.codigo, { ...E.agg, t: Date.now() }).catch(() => {}); }
-  const d = Duelo.dueloDe(s);
-  if (!d || s.fase !== "debate") return;
-  // las preguntas para el profesor van a privado: solo las ve su teléfono, nunca el proyector
-  const lista = Galeria.preguntasDe(E.publicos, d, s.grupos), fp = JSON.stringify([d.n, lista]);
-  if (fp !== E.pregEnviadas) { E.pregEnviadas = fp; E.canal.guardarPrivado(E.codigo, "preguntas", { duelo: d.n, lista }).catch(() => {}); }
-}
-// Al cerrarse cada ventana se guarda lo que cada uno tenía: los puntos salen de esa foto, así
-// que cambiar la apuesta o la respuesta después no sirve.
-function cierres(antes, s) {
-  if (!antes) return;
-  const d = Duelo.dueloDe(antes) || Duelo.dueloDe(s);
-  if (!d) return;
-  const n = d.n, f = E.fotos[n] || (E.fotos[n] = {});
-  let hubo = false;
-  if (antes.fase === "debate" && s.fase === "manos") { f.aplausos = Galeria.fotoAplausos(E.publicos, d); hubo = true; }
-  if (antes.fase === "manos" && s.fase === "debate") { delete f.aplausos; hubo = true; }          // se volvió al debate
-  if (antes.fase === "manos" && (s.fase === "quiz" || s.fase === "jueces")) { f.apuestas = Galeria.fotoApuestas(E.publicos, d); hubo = true; }
-  const q = s.fase === "quiz" ? s.quiz : null;
-  if (q && q.estado === "revelada" && !(antes.quiz && antes.quiz.i === q.i && antes.quiz.estado === "revelada")) {
-    f.quiz = { ...(f.quiz || {}), [q.i]: Galeria.fotoQuiz(E.publicos, d, q.i) };
-    hubo = true;
-  }
-  if (hubo) E.canal.guardarPrivado(E.codigo, "galeria" + n, f).catch(() => {});
-  const ahora = s.duelos.find(x => x.n === n), previo = antes.duelos.find(x => x.n === n);
-  if (ahora && ahora.jugado && !(previo && previo.jugado)) puntuar(n).then(publicarTabla);
-  contar();
-}
-// los puntos del duelo n: con su resultado, su foto y lo que el teléfono del profesor guardó aparte
-async function puntuar(n) {
-  const d = E.sala.duelos.find(x => x.n === n), x = await E.canal.leerPrivado(E.codigo, "duelo" + n).catch(() => null);
-  if (!d || !d.jugado || !x) return;
-  const datos = { ganador: d.ganador, mejores: x.sintesis ? { A: x.sintesis.mejorA, B: x.sintesis.mejorB } : null,
-    usadas: E.sala.usadas || [], claves: (x.quiz || []).map(q => (q ? q.correcta : null)) };
-  E.porDuelo[n] = Galeria.puntosDeTodos(E.publicos, d, E.fotos[n], datos);
-}
-function publicarTabla() {
-  if (!Object.keys(E.porDuelo).length) return;
-  E.tabla = Galeria.tabla(E.publicos, E.porDuelo, E.sala.grupos);
-  E.canal.publicarPuntos(E.codigo, { ...E.tabla, t: Date.now() }).catch(() => {});
-  if (E.sala.fase === "espera" || E.sala.fase === "fin") pintar();
-}
-// al abrir o recargar el escenario: las fotos ya guardadas y los puntos de los duelos jugados
-async function recuperar() {
-  for (const d of E.sala.duelos) {
-    if (!d.jugado && d.n !== E.sala.duelo) continue;
-    const f = await E.canal.leerPrivado(E.codigo, "galeria" + d.n).catch(() => null);
-    if (f) E.fotos[d.n] = { ...f, ...(E.fotos[d.n] || {}) };
-    if (d.jugado) await puntuar(d.n);
-  }
-  publicarTabla();
-}
-// lo de la galería que se ve sin rearmar la vista entera
-function pintarGaleria() {
-  const s = E.sala, a = E.agg;
-  if (!s || !a) return;
-  if (s.fase !== "debate") { if (s.fase === "espera" || s.fase === "manos" || s.fase === "quiz") pintar(); return; }
-  $("gente").textContent = a.n ? `la galería, ${a.n} ${a.n === 1 ? "persona" : "personas"}` : "";
-  $("pulso").hidden = a.pulso === null;
-  if (a.pulso !== null) {
-    $("pulsoPunto").style.left = (50 + a.pulso / 2) + "%";         // −100 es el lado A, a la izquierda
-    $("pulsoPunto").dataset.lado = a.pulso < -8 ? "A" : a.pulso > 8 ? "B" : "";
-  }
-  pintarActa();
-}
-function tablasEl() {
-  const t = E.tabla;
-  if (!t || (!t.top.length && !t.grupos.length)) return null;
-  const caja = el("div", "tablas");
-  const una = (titulo, filas) => {
-    if (!filas.length) return;
-    const sec = el("section", "tabla");
-    sec.append(el("h2", "", titulo));
-    for (const [a, b] of filas) { const p = el("p"); p.append(el("span", "", a), el("b", "", b)); sec.append(p); }
-    caja.append(sec);
-  };
-  una("Mejores ojos", t.top.map((x, i) => [`${i + 1}. ${x.nombre}${x.grupo ? ` (${x.grupo})` : ""}`, String(x.total)]));
-  una("Mejor grupo en la galería", t.grupos.map((g, i) => [`${i + 1}. ${g.nombre}`, coma(g.promedio)]));
-  return caja;
-}
-function qrDe(url) {
-  if (typeof qrcode !== "function") return null;
-  const q = qrcode(0, "M");
-  q.addData(url); q.make();
-  const caja = el("div", "qr");
-  caja.innerHTML = q.createSvgTag({ cellSize: 6, margin: 0, scalable: true });   // SVG generado aquí, no texto ajeno
-  return caja;
 }
 
 /* ------------------------------ la galería ------------------------------ */

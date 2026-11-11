@@ -6,7 +6,7 @@
    para responder.
    Parámetros: sala, semana; local (ensayo), simular (reconocedor de mentira), ia (IA en el ensayo).
    ===================================================================== */
-import { abrirCanal } from "./canal.js?v=20261111a";
+import { abrirCanal } from "./canal.js?v=20261111b";
 
 const P = new URLSearchParams(location.search);
 const LOCAL = P.has("local"), SIMULAR = P.has("simular");
@@ -442,7 +442,6 @@ function seguir() {
   E.listos = new Promise(r => { listo = r; });
   E.canal.escucharParrafos(CODIGO, l => { E.remotos = l; listo(); });
   E.canal.escucharPrivado(CODIGO, "preguntas", x => { E.pregs = x; recibirPreguntas(x); });
-  E.canal.escucharPrivado(CODIGO, "preguntas", x => { E.pregs = x; recibirPreguntas(x); });
   let primera = true;
   E.canal.escucharSala(CODIGO, s => {
     if (!s) return mensaje(`La sala ${CODIGO} no existe, o esta cuenta no puede verla.`, !E.canal.local);
@@ -455,7 +454,6 @@ function seguir() {
       primera = false;
       if (s.turno) aplicar(Duelo.pausar(s, s.t0turno));          // al recargar, el micrófono vuelve en pausa
       if (s.fase === "manos" && s.veredicto && s.veredicto.estado === "deliberando") deliberar();
-      if ((s.fase === "manos" || s.fase === "quiz") && s.veredicto && s.veredicto.estado === "listo") recuperarSecreto(s.duelo);
       if ((s.fase === "manos" || s.fase === "quiz") && s.veredicto && s.veredicto.estado === "listo") recuperarSecreto(s.duelo);
       if (s.fase !== "espera" && s.fase !== "fin") pedirCandado();
     }

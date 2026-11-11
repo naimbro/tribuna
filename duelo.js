@@ -188,11 +188,6 @@ const Duelo = (() => {
     if (s.fase !== "debate" || !id || (s.usadas || []).includes(id)) return null;
     return { usadas: [...(s.usadas || []), id] };
   }
-  // el profesor usó una pregunta de la galería (id = "<uid>_<duelo>"): le da puntos a quien la mandó
-  function usarPregunta(s, id) {
-    if (s.fase !== "debate" || !id || (s.usadas || []).includes(id)) return null;
-    return { usadas: [...(s.usadas || []), id] };
-  }
 
   /* ---------------- párrafos y transcripción ---------------- */
   const delDuelo = (parrafos, n) => (parrafos || []).filter(x => x.duelo === n).sort((a, b) => (a.t0 || 0) - (b.t0 || 0));
@@ -419,21 +414,11 @@ Responde SOLO un JSON: {"para": "A" | "B" | "ambos", "pregunta": "…"}`;
         const r = resultadoDe(v.panel);
         L.push(`Total: ${d.A.corto} ${r.totalA ?? "—"} / 30 · ${d.B.corto} ${r.totalB ?? "—"} / 30 · ${r.ganador === "empate" ? "Empate" : "Gana " + d[r.ganador].corto}`);
         for (const q of v.quiz || []) if (q) L.push(`Ronda relámpago: ${q.texto} Respuesta: ${q.opciones[q.correcta]}`);
-        for (const q of v.quiz || []) if (q) L.push(`Ronda relámpago: ${q.texto} Respuesta: ${q.opciones[q.correcta]}`);
         if (v.sintesis) {
           L.push(`Lo que quedó en disputa: ${v.sintesis.disputa}`);
           if (v.sintesis.fraseA) L.push(`Mejor frase de ${d.A.corto}: «${v.sintesis.fraseA}»`);
           if (v.sintesis.fraseB) L.push(`Mejor frase de ${d.B.corto}: «${v.sintesis.fraseB}»`);
         }
-      }
-      L.push("");
-    }
-    if (galeria && ((galeria.top || []).length || (galeria.grupos || []).length)) {
-      L.push("=== La galería ===");
-      (galeria.top || []).forEach((x, i) => L.push(`${i + 1}. ${x.nombre}${x.grupo ? ` (${x.grupo})` : ""}: ${x.total}`));
-      if ((galeria.grupos || []).length) {
-        L.push("", "Por grupo (promedio):");
-        for (const g of galeria.grupos) L.push(`${g.nombre}: ${String(g.promedio).replace(".", ",")} (${g.miembros})`);
       }
       L.push("");
     }

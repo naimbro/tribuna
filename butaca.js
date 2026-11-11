@@ -6,7 +6,7 @@
    la sala recién cuando el profesor los revela.
    Parámetros: sala; local (ensayo) y yo (quién es esta pestaña en el ensayo).
    ===================================================================== */
-import { abrirCanal } from "./canal.js?v=20261111a";
+import { abrirCanal } from "./canal.js?v=20261111b";
 
 const P = new URLSearchParams(location.search);
 const LOCAL = P.has("local"), CODIGO = (P.get("sala") || "").toUpperCase();
