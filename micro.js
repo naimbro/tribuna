@@ -6,7 +6,7 @@
    para responder.
    Parámetros: sala, semana; local (ensayo), simular (reconocedor de mentira), ia (IA en el ensayo).
    ===================================================================== */
-import { abrirCanal } from "./canal.js?v=20261110a";
+import { abrirCanal } from "./canal.js?v=20261111a";
 
 const P = new URLSearchParams(location.search);
 const LOCAL = P.has("local"), SIMULAR = P.has("simular");
@@ -24,7 +24,9 @@ const E = { canal: null, yo: null, sala: null, ia: false, siguiendo: false,
   oido: null, probando: false, pruebaOk: false,
   voz: { quien: null, texto: "" }, vozEnviada: "", vozT: 0, vozTimer: null,
   voltear: false, sello: 0, candado: null,
-  sugs: [], iSug: 0, sugDuelo: null, sugT: 0, sugPalabras: 0, sugPidiendo: false };
+  sugs: [], iSug: 0, sugDuelo: null, sugT: 0, sugPalabras: 0, sugPidiendo: false,
+  secretos: {},                                 // por duelo: { jueces, panel, sintesis, quiz }, fuera de la sala hasta revelarlo
+  pregs: null, vistas: new Set() };             // las preguntas de la galería y las que ya entraron a la fila
 const CLAVE_PRUEBA = "tribuna_prueba_" + CODIGO;
 try { E.pruebaOk = sessionStorage.getItem(CLAVE_PRUEBA) === "1"; } catch (e) { /* sin almacenamiento */ }
 
@@ -208,31 +210,70 @@ function unJuez(juez, d, ps, ctx) {
 async function deliberar() {
   await E.listos;                               // al recargar: que ya estén los párrafos de la sala
   const d = Duelo.dueloDe(E.sala), n = d.n, sello = ++E.sello, ps = delDuelo(), jueces = juecesDeLaSesion();
-  let fichas, sintesis;
+  let fichas, sintesis, quiz;
   if (E.ia) {
     const ctx = contexto();
     const pS = E.canal.pedirLLM(Duelo.promptSintesis(d, ps, ctx), "jurado")
       .then(t => Duelo.leerSintesis(Duelo.jsonEn(t))).catch(e => { console.warn("síntesis:", e); return null; });
-    [fichas, sintesis] = await Promise.all([Promise.all(jueces.map(j => unJuez(j, d, ps, ctx))),
-      Promise.race([pS, espera(60000).then(() => null)])]);
+    // la ronda relámpago para la galería: si falla o no alcanza, simplemente no hay ronda
+    const pQ = E.canal.pedirLLM(Galeria.promptQuiz(d, Duelo.transcripcionDe(ps, d, 28000)), "jurado")
+      .then(t => Galeria.leerQuiz(Duelo.jsonEn(t))).catch(e => { console.warn("ronda:", e); return []; });
+    [fichas, sintesis, quiz] = await Promise.all([Promise.all(jueces.map(j => unJuez(j, d, ps, ctx))),
+      Promise.race([pS, espera(60000).then(() => null)]), Promise.race([pQ, espera(60000).then(() => [])])]);
   } else {                                      // ensayo sin IA: notas de mentira, que lo dicen
     await espera(2500);
     fichas = Duelo.juecesDeEnsayo(jueces, ps);
     sintesis = Duelo.sintesisDeEnsayo(ps, d);
+    quiz = Galeria.quizDeEnsayo(ps, d);
   }
   const s = E.sala;
   if (sello !== E.sello || s.fase !== "manos" || s.duelo !== n) return;      // se volvió al debate
-  const panel = panelJueces(fichas);
-  if (aplicar(Duelo.recibirVeredicto(s, fichas, panel, sintesis)) && E.sala.veredicto.estado === "listo")
-    E.canal.guardarPrivado(CODIGO, "duelo" + n, { n, pregunta: d.pregunta, jueces: fichas, panel, sintesis, t: Date.now() }).catch(() => {});
+  // El veredicto no entra a la sala todavía (la sala la lee cualquier inscrito): se guarda aparte
+  // y `siguiente` lo trae cuando ya cerraron las apuestas y la ronda.
+  const cambios = Duelo.recibirVeredicto(s, fichas);
+  if (cambios && cambios.veredicto.estado === "listo") {
+    E.secretos[n] = { jueces: fichas, panel: panelJueces(fichas), sintesis: Duelo.conMejores(sintesis, ps, d), quiz: quiz.map(q => Galeria.barajar(q)) };
+    guardarSecreto(n);
+  }
+  aplicar(cambios);
+}
+function guardarSecreto(n) {
+  const d = E.sala.duelos.find(x => x.n === n);
+  E.canal.guardarPrivado(CODIGO, "duelo" + n, { n, pregunta: d.pregunta, ...E.secretos[n], t: Date.now() })
+    .catch(() => franja("No se pudo guardar el veredicto. Revisa la conexión."));
+}
+// El teléfono se recargó con el veredicto ya listo: lo trae de vuelta. Si no está, delibera de nuevo.
+async function recuperarSecreto(n) {
+  const x = await E.canal.leerPrivado(CODIGO, "duelo" + n).catch(() => null);
+  if (x && Array.isArray(x.jueces) && x.panel) {
+    E.secretos[n] = { jueces: x.jueces, panel: x.panel, sintesis: x.sintesis || null, quiz: x.quiz || [] };
+    return pintar();
+  }
+  if (E.sala.fase === "manos" && E.sala.duelo === n) { aplicar({ veredicto: { estado: "deliberando" } }); deliberar(); }
 }
 
 /* ------------------------------ sugerencias ------------------------------ */
 function prepararSugerencias(d) {
   if (E.sugDuelo === d.n) return;
   const w = Duelo.palabrasPorLado(delDuelo());
-  Object.assign(E, { sugDuelo: d.n, iSug: 0, sugT: Date.now(), sugPalabras: w.A + w.B + w.P,
+  Object.assign(E, { sugDuelo: d.n, iSug: 0, sugT: Date.now(), sugPalabras: w.A + w.B + w.P, vistas: new Set(),
     sugs: Duelo.sugerenciasDossier(typeof CONCEPTOS !== "undefined" ? CONCEPTOS : [], d) });
+  recibirPreguntas(E.pregs);
+}
+// Las preguntas de la galería (las pasa el escenario por privado/preguntas) entran a la misma
+// fila que las sugeridas, justo después de la que el profesor está leyendo: no se la cambian.
+function recibirPreguntas(x) {
+  const s = E.sala, d = s && Duelo.dueloDe(s);
+  if (!x || !d || x.duelo !== d.n || E.sugDuelo !== d.n) return;
+  let nuevas = 0;
+  for (const q of x.lista || []) {
+    if (!q || !q.id || E.vistas.has(q.id)) continue;
+    E.vistas.add(q.id);
+    E.iSug = E.sugs.length ? E.iSug % E.sugs.length : 0;
+    E.sugs.splice(E.sugs.length ? E.iSug + 1 + nuevas : 0, 0, { origen: "galeria", ...q });
+    nuevas++;
+  }
+  if (nuevas) pintarSug();
 }
 async function talVezSugerir() {
   const s = E.sala, d = s && Duelo.dueloDe(s);
@@ -243,7 +284,7 @@ async function talVezSugerir() {
   try {
     const dossier = E.sugs.filter(x => x.origen === "dossier");
     const sug = Duelo.leerSugerencia(Duelo.jsonEn(await E.canal.pedirLLM(Duelo.promptSugerencia(d, ps, dossier), "sociedad")));
-    if (sug && E.sugDuelo === d.n) { E.sugs.splice(E.iSug % (E.sugs.length || 1), 0, sug); pintarSug(); }
+    if (sug && E.sugDuelo === d.n) { E.iSug = E.sugs.length ? E.iSug % E.sugs.length : 0; E.sugs.splice(E.iSug, 0, sug); pintarSug(); }
   } catch (e) { console.warn("sugerencia:", e); }
   E.sugPidiendo = false;
 }
@@ -251,8 +292,13 @@ function pintarSug() {
   const d = Duelo.dueloDe(E.sala), x = E.sugs.length ? E.sugs[E.iSug % E.sugs.length] : null;
   $("sug").hidden = !x || !d;
   if (!x || !d) return;
-  $("sugTxt").textContent = `${x.origen === "dossier" ? "⚡" : "💡"} ${x.para === "ambos" ? "Para los dos" : "Para " + d[x.para].corto}: ${x.texto}`;
+  const deGaleria = x.origen === "galeria", usada = deGaleria && (E.sala.usadas || []).includes(x.id);
+  $("sugTxt").textContent = deGaleria ? `🙋 De ${x.nombre}${x.grupo ? ` (${x.grupo})` : ""}: ${x.texto}`
+    : `${x.origen === "dossier" ? "⚡" : "💡"} ${x.para === "ambos" ? "Para los dos" : "Para " + d[x.para].corto}: ${x.texto}`;
   $("btnOtra").hidden = E.sugs.length < 2;
+  $("btnLaUso").hidden = !deGaleria;
+  $("btnLaUso").disabled = usada;
+  $("btnLaUso").textContent = usada ? "Usada" : "La uso";
 }
 
 /* ------------------------------ pintar ------------------------------ */
@@ -268,7 +314,7 @@ function pintar() {
     return vista("duelos");
   }
   if (s.fase === "debate") { pintarDebate(s, d); return vista("debate"); }
-  if (s.fase === "manos" || s.fase === "jueces" || s.fase === "sintesis") { pintarVeredicto(s); return vista("veredicto"); }
+  if (s.fase === "manos" || s.fase === "quiz" || s.fase === "jueces" || s.fase === "sintesis") { pintarVeredicto(s); return vista("veredicto"); }
   if (s.fase === "fin") return vista("fin");
   mensaje("Esta sala quedó en un estado que el teléfono no conoce.");
 }
@@ -306,9 +352,10 @@ function pintarDebate(s, d) {
   pintarSug();
 }
 function pintarVeredicto(s) {
-  const e = Duelo.etiquetaSiguiente(s);
+  const e = Duelo.etiquetaSiguiente(s, E.secretos[s.duelo]);
   $("veredictoQue").textContent = e.texto;
   $("btnSiguiente").disabled = !e.listo;
+  $("btnSaltar").hidden = !Number.isInteger(e.pregunta);       // solo antes de lanzar una pregunta
   $("btnVolver").hidden = s.fase !== "manos";
   $("btnReintentar").hidden = !(s.fase === "manos" && s.veredicto && s.veredicto.estado === "sin_quorum");
 }
@@ -362,7 +409,18 @@ function enlazar() {
   $("btnOtra").onclick = () => { E.iSug++; pintarSug(); };
   $("btnOtroLado").onclick = eraDelOtro;
   mantener($("btnVeredicto"), 1000, pedirVeredicto);
-  $("btnSiguiente").onclick = () => aplicar(Duelo.siguiente(E.sala));
+  $("btnSiguiente").onclick = () => aplicar(Duelo.siguiente(E.sala, E.secretos[E.sala.duelo]));
+  $("btnSaltar").onclick = () => {
+    const n = E.sala.duelo, x = E.secretos[n], e = Duelo.etiquetaSiguiente(E.sala, x);
+    if (!x || !Number.isInteger(e.pregunta)) return;
+    x.quiz[e.pregunta] = null;                  // saltada: no se lanza y no da puntos
+    guardarSecreto(n);
+    pintar();
+  };
+  $("btnLaUso").onclick = () => {
+    const x = E.sugs.length ? E.sugs[E.iSug % E.sugs.length] : null;
+    if (x && x.origen === "galeria") aplicar(Duelo.usarPregunta(E.sala, x.id));
+  };
   $("btnVolver").onclick = volverAlDebate;
   $("btnReintentar").onclick = () => { if (aplicar(Duelo.reintentar(E.sala))) deliberar(); };
   const red = () => { $("sinRed").hidden = navigator.onLine; };
@@ -383,6 +441,8 @@ function seguir() {
   let listo;
   E.listos = new Promise(r => { listo = r; });
   E.canal.escucharParrafos(CODIGO, l => { E.remotos = l; listo(); });
+  E.canal.escucharPrivado(CODIGO, "preguntas", x => { E.pregs = x; recibirPreguntas(x); });
+  E.canal.escucharPrivado(CODIGO, "preguntas", x => { E.pregs = x; recibirPreguntas(x); });
   let primera = true;
   E.canal.escucharSala(CODIGO, s => {
     if (!s) return mensaje(`La sala ${CODIGO} no existe, o esta cuenta no puede verla.`, !E.canal.local);
@@ -395,6 +455,8 @@ function seguir() {
       primera = false;
       if (s.turno) aplicar(Duelo.pausar(s, s.t0turno));          // al recargar, el micrófono vuelve en pausa
       if (s.fase === "manos" && s.veredicto && s.veredicto.estado === "deliberando") deliberar();
+      if ((s.fase === "manos" || s.fase === "quiz") && s.veredicto && s.veredicto.estado === "listo") recuperarSecreto(s.duelo);
+      if ((s.fase === "manos" || s.fase === "quiz") && s.veredicto && s.veredicto.estado === "listo") recuperarSecreto(s.duelo);
       if (s.fase !== "espera" && s.fase !== "fin") pedirCandado();
     }
     pintar();

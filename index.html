@@ -7,12 +7,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tribuna.css?v=20261110b">
+<link rel="stylesheet" href="tribuna.css?v=20261111a">
 </head>
 <body class="escena">
 <!-- El escenario: solo muestra. Todo lo que cambia lo decide el teléfono del profesor (micro.html). -->
 <main id="escena" data-fase="cargando">
   <div class="luz"></div>
+  <div class="eco eco-a" id="ecoA"></div>
+  <div class="eco eco-b" id="ecoB"></div>
+  <div class="eco eco-a" id="ecoA"></div>
+  <div class="eco eco-b" id="ecoB"></div>
   <section class="v v-portada" id="vPortada"></section>
   <section class="v v-aviso" id="vAviso"></section>
   <section class="v v-espera" id="vEspera"></section>
@@ -24,12 +28,16 @@
     </header>
     <div class="acta"><div class="acta-in" id="acta" aria-live="polite"></div></div>
     <footer class="pie">
+      <div class="pulso" id="pulso" aria-hidden="true" hidden><i id="pulsoPunto"></i></div>
       <span class="tA" id="tA">0:00</span>
       <div class="barra" aria-hidden="true"><i id="bA"></i><i id="bB"></i></div>
       <span class="tB" id="tB">0:00</span>
+      <span class="gente" id="gente"></span>
     </footer>
   </section>
   <section class="v v-manos" id="vManos"></section>
+  <section class="v v-quiz" id="vQuiz"></section>
+  <section class="v v-quiz" id="vQuiz"></section>
   <section class="v v-jueces" id="vJueces"></section>
   <section class="v v-sintesis" id="vSintesis"></section>
   <section class="v v-fin" id="vFin"></section>
@@ -45,8 +53,10 @@
       document.write('<script src="contenido/semana' + pedida + '.js?v=20261110a"><\/script>');
   })();
 </script>
-<script src="duelo.js?v=20261110b"></script>
+<script src="duelo.js?v=20261111a"></script>
+<script src="galeria.js?v=20261111a"></script>
+<script src="galeria.js?v=20261111a"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-<script type="module" src="escena.js?v=20261110c"></script>
+<script type="module" src="escena.js?v=20261111a"></script>
 </body>
 </html>

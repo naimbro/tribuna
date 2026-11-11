@@ -256,7 +256,9 @@ async function descargarMicro(codigo) {
     if (v && v.exists()) veredictos[d.n] = v.data();
   }));
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([Duelo.registroTexto(s, parrafos, veredictos)], { type: "text/plain;charset=utf-8" }));
+  const tabla = await getDoc(doc(db, "salas", codigo, "vivo", "puntos")).catch(() => null);
+  const galeria = tabla && tabla.exists() ? tabla.data() : null;
+  a.href = URL.createObjectURL(new Blob([Duelo.registroTexto(s, parrafos, veredictos, undefined, galeria)], { type: "text/plain;charset=utf-8" }));
   a.download = `tribuna_${codigo}_semana${s.semana}.txt`;
   a.click();
 }

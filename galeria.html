@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141a2e">
+<title>Tribuna, la galería</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tribuna.css?v=20261111a">
+<link rel="stylesheet" href="galeria.css?v=20261111a">
+</head>
+<body class="butaca">
+<!-- La butaca: el teléfono de cada estudiante en la galería. -->
+<div class="nota" id="nota" role="status" hidden></div>
+<main id="butaca" data-vista="mensaje">
+  <section class="b b-mensaje">
+    <p id="msgTxt">Conectando…</p>
+    <button class="boton" id="btnEntrar" hidden>Entrar con Google</button>
+  </section>
+
+  <section class="b b-grupo">
+    <h1>¿De qué grupo eres?</h1>
+    <p class="guia">Se elige una sola vez. Cuando tu grupo debate, miras; el resto del tiempo sumas puntos para él.</p>
+    <div class="lista" id="grupos"></div>
+  </section>
+
+  <section class="b b-espera">
+    <header class="cab"><span id="quien"></span><span class="puntos" id="pts1"></span></header>
+    <h1 id="esperaTit"></h1>
+    <p class="guia" id="esperaTxt"></p>
+    <div id="ganadoAntes"></div>
+    <div class="tablas" id="tablas"></div>
+  </section>
+
+  <section class="b b-debate">
+    <header class="cab"><span id="vs"></span><span class="puntos" id="pts2"></span></header>
+    <div class="flujo" id="flujo"></div>
+    <p class="mira" id="mira" hidden>Tu grupo está debatiendo: en este duelo miras.</p>
+    <div class="acciones" id="acciones">
+      <p class="quedan" id="quedan"></p>
+      <label class="pulso-lab" for="pulso"><span id="pA"></span><span>¿Quién te va convenciendo?</span><span id="pB"></span></label>
+      <input type="range" id="pulso" min="-100" max="100" step="5" value="0">
+      <button class="boton hueco" id="btnPregunta">Pregunta para el profesor</button>
+      <form id="formPregunta" hidden>
+        <textarea id="txtPregunta" maxlength="140" rows="3" placeholder="¿Qué le preguntarías a uno de los dos lados?"></textarea>
+        <div class="fila"><button type="button" class="texto" id="btnCancelar">Cancelar</button><button class="boton" id="btnEnviar">Enviar</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="b b-apuesta">
+    <header class="cab"><span>La apuesta</span><span class="puntos" id="pts3"></span></header>
+    <h1>¿A quién le darán la victoria los jueces?</h1>
+    <div class="lados">
+      <button class="lado lado-a" id="apA"></button>
+      <button class="lado lado-b" id="apB"></button>
+    </div>
+    <p class="guia" id="apTxt"></p>
+  </section>
+
+  <section class="b b-quiz">
+    <header class="cab"><span id="quizN"></span><span class="puntos" id="pts4"></span></header>
+    <h1 id="quizTxt"></h1>
+    <div class="lista" id="quizOps"></div>
+    <p class="guia" id="quizEstado"></p>
+  </section>
+
+  <section class="b b-mirar">
+    <h1 id="mirarTit"></h1>
+    <p class="guia" id="mirarTxt"></p>
+    <div id="ganado"></div>
+  </section>
+</main>
+
+<script src="duelo.js?v=20261111a"></script>
+<script src="galeria.js?v=20261111a"></script>
+<script type="module" src="butaca.js?v=20261111a"></script>
+</body>
+</html>

@@ -19,9 +19,22 @@ Cómo se usa:
 4. Mantener apretado «Veredicto». El escenario pide manos arriba y después cada toque en
    «Siguiente» revela un juez, el resultado y lo que quedó en disputa.
 
+**La galería** (`galeria.html`): el público sigue el debate en su teléfono. Entra con Google
+escaneando el QR que aparece en la sala de espera cuando el micrófono ya está conectado, y elige
+su grupo una vez. Durante el duelo tiene tres aplausos por lado, un pulso («¿quién te va
+convenciendo?») y una pregunta para el profesor, que llega solo al teléfono del profesor. Al pedir
+el veredicto apuesta a quién ganará con los jueces y responde una ronda relámpago de hasta dos
+preguntas sobre lo que dijo cada lado. Puntos: 3 por la apuesta, 2 por lado si aplaudió el párrafo
+que los jueces eligieron como el mejor, 3 si el profesor usó su pregunta y 1 por acierto en la
+ronda. Hay tabla individual y por grupo (promedio). El notebook es quien cuenta a la galería;
+mientras se apuesta y se responde, el veredicto y las respuestas no están a la vista en la sala.
+Diseño: `docs/superpowers/specs/2026-11-11-la-galeria-design.md`.
+
 Ensayo sin cuentas ni internet: `python servidor.py` y abrir
 <http://localhost:8777/index.html?local=1>; desde la sala de espera, «Abrir el micrófono en otra
 pestaña» (con voz simulada). Agregar `&ia=1` a la dirección del micrófono usa la IA de `.env`.
+Con el micrófono conectado, la sala de espera ofrece tres butacas de ensayo (Ana, Beto y Caro)
+para probar la galería en otras pestañas.
 
 Piezas: `duelo.js` (lógica pura), `oido.js` (de la voz a los párrafos, sobre `dictado.js`),
 `canal.js` (Firestore o ensayo local), `escena.js`, `micro.js`. Diseño:

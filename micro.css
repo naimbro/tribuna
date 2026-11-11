@@ -68,3 +68,8 @@
 .franja button{background:none;border:0;color:#fff;font-size:1.5rem;line-height:1;padding:0 4px}
 .pastilla{position:fixed;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4;
   background:var(--papel);color:var(--noche);border-radius:999px;padding:6px 16px;font-size:.88rem;font-weight:600}
+/* la galería en el teléfono del profesor */
+.sug{flex-wrap:wrap}
+.sug p{flex:1 1 100%}
+.usar{margin-left:auto;border:0;border-radius:999px;background:var(--bronce);color:var(--noche);font-weight:700;padding:6px 16px}
+.usar:disabled{background:var(--noche);color:var(--tenue)}

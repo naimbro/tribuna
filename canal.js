@@ -14,8 +14,9 @@ const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const nuevoCodigo = () => Array.from({ length: 4 }, () => CHARS[Math.floor(Math.random() * CHARS.length)]).join("");
 const limpio = o => JSON.parse(JSON.stringify(o));        // Firestore no acepta undefined
 
-export function abrirCanal({ local = false, ia = false } = {}) {
-  return local ? Promise.resolve(canalLocal({ ia })) : canalFirestore();
+// yo: solo en ensayo, quién abre esta pestaña (sin él, es el profesor)
+export function abrirCanal({ local = false, ia = false, yo = "" } = {}) {
+  return local ? Promise.resolve(canalLocal({ ia, yo })) : canalFirestore();
 }
 
 /* ------------------------------ Firestore ------------------------------ */
@@ -35,7 +36,7 @@ async function canalFirestore() {
     alEntrar: cb => A.onAuthStateChanged(auth, async u => {
       // sesiones anónimas de versiones antiguas: se cierran y se pide Google
       if (u && (u.isAnonymous || !u.email)) { await A.signOut(auth); return; }
-      yo = u ? { uid: u.uid, email: u.email } : null;
+      yo = u ? { uid: u.uid, email: u.email, nombre: u.displayName || "" } : null;
       cb(yo);
     }),
     entrar: () => A.signInWithPopup(auth, new A.GoogleAuthProvider()),
@@ -63,12 +64,32 @@ async function canalFirestore() {
       s => { const l = []; s.forEach(d => l.push({ id: d.id, ...d.data() })); cb(l); },
       e => console.warn("canal:", e.code || e)),
     guardarPrivado: (c, nombre, datos) => F.setDoc(sub(c, "privado", nombre), limpio(datos)),
+    async leerPrivado(c, nombre) { const s = await F.getDoc(sub(c, "privado", nombre)); return s.exists() ? s.data() : null; },
+    escucharPrivado: (c, nombre, cb) => escucharDoc(sub(c, "privado", nombre), cb),
+    // --- la galería. Las reglas piden en jugadores: nombre, el email de la sesión y equipo "P";
+    // el grupo se fija una sola vez. En publico/{uid} solo exigen `pos` entre −100 y 100.
+    entrarGaleria: (c, { nombre, grupo }) => F.setDoc(sub(c, "jugadores", yo.uid),
+      limpio({ nombre, email: yo.email, equipo: "P", ...(grupo ? { grupo } : {}) }), { merge: true }),
+    async leerJugador(c) { const s = await F.getDoc(sub(c, "jugadores", yo.uid)); return s.exists() ? s.data() : null; },
+    async leerPublico(c) { const s = await F.getDoc(sub(c, "publico", yo.uid)); return s.exists() ? s.data() : null; },
+    escribirPublico: (c, datos) => F.setDoc(sub(c, "publico", yo.uid), limpio(datos)),
+    escucharPublico: (c, cb) => F.onSnapshot(F.collection(db, "salas", c, "publico"),
+      s => { const l = []; s.forEach(d => l.push({ ...d.data(), uid: d.id })); cb(l); },
+      e => console.warn("canal:", e.code || e)),
+    publicarGaleria: (c, datos) => F.setDoc(sub(c, "vivo", "galeria"), limpio(datos)),
+    escucharGaleria: (c, cb) => escucharDoc(sub(c, "vivo", "galeria"), cb),
+    publicarPuntos: (c, datos) => F.setDoc(sub(c, "vivo", "puntos"), limpio(datos)),
+    escucharPuntos: (c, cb) => escucharDoc(sub(c, "vivo", "puntos"), cb),
     async pedirLLM(prompt, uso) { return (await evaluar({ prompt, uso })).data.text; }
   };
 }
 
 /* ------------------------------ ensayo local ------------------------------ */
-function canalLocal({ ia }) {
+function canalLocal({ ia, yo }) {
+  // en ensayo cada pestaña dice quién es con &yo=ana; sin eso, es el profesor
+  const id = String(yo || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const quien = id ? { uid: id, email: id + "@ensayo", nombre: id[0].toUpperCase() + id.slice(1) + " Ensayo" }
+    : { uid: "ensayo", email: "ensayo", nombre: "Profesor" };
   const bc = typeof BroadcastChannel === "function" ? new BroadcastChannel("tribuna_local") : null;
   const clave = c => "tribuna_local_" + c;
   const leer = c => { try { return JSON.parse(localStorage.getItem(clave(c))) || null; } catch (e) { return null; } };
@@ -76,7 +97,8 @@ function canalLocal({ ia }) {
   const avisar = (codigo, que) => { for (const o of [...oyentes]) if (o.codigo === codigo && o.que === que) o.cb(); };
   if (bc) bc.onmessage = e => avisar(e.data.codigo, e.data.que);
   function guardar(codigo, que, f) {
-    const x = leer(codigo) || { sala: null, voz: null, latido: 0, parrafos: {}, privado: {} };
+    const x = { sala: null, voz: null, latido: 0, parrafos: {}, privado: {}, jugadores: {}, publico: {}, galeria: null, puntos: null,
+      ...(leer(codigo) || {}) };
     f(x);
     localStorage.setItem(clave(codigo), JSON.stringify(x));
     avisar(codigo, que);
@@ -95,7 +117,7 @@ function canalLocal({ ia }) {
     .then(j => (j.proveedores || []).some(p => p.id === "anthropic")).catch(() => false));
   return {
     local: true,
-    alEntrar(cb) { setTimeout(() => cb({ uid: "ensayo", email: "ensayo" }), 0); return () => {}; },
+    alEntrar(cb) { setTimeout(() => cb(quien), 0); return () => {}; },
     entrar: async () => {},
     salir: async () => {},
     conIA: async () => ia && await hayMotor(),
@@ -114,7 +136,19 @@ function canalLocal({ ia }) {
     agregarParrafo: async (c, id, p) => guardar(c, "parrafos", x => { x.parrafos[id] = limpio({ tipo: "voz", ...p }); }),
     corregirParrafo: async (c, id, cambios) => guardar(c, "parrafos", x => { if (x.parrafos[id]) Object.assign(x.parrafos[id], limpio(cambios)); }),
     escucharParrafos: (c, cb) => escuchar(c, "parrafos", lista, cb),
-    guardarPrivado: async (c, nombre, datos) => guardar(c, "privado", x => { x.privado[nombre] = limpio(datos); }),
+    guardarPrivado: async (c, nombre, datos) => guardar(c, "privado:" + nombre, x => { x.privado[nombre] = limpio(datos); }),
+    leerPrivado: async (c, nombre) => ((leer(c) || {}).privado || {})[nombre] || null,
+    escucharPrivado: (c, nombre, cb) => escuchar(c, "privado:" + nombre, x => (x && x.privado && x.privado[nombre]) || null, cb),
+    entrarGaleria: async (c, { nombre, grupo }) => guardar(c, "jugadores", x => {
+      x.jugadores[quien.uid] = { ...(x.jugadores[quien.uid] || {}), nombre, email: quien.email, equipo: "P", ...(grupo ? { grupo } : {}) }; }),
+    leerJugador: async c => ((leer(c) || {}).jugadores || {})[quien.uid] || null,
+    leerPublico: async c => ((leer(c) || {}).publico || {})[quien.uid] || null,
+    escribirPublico: async (c, datos) => guardar(c, "publico", x => { x.publico[quien.uid] = limpio(datos); }),
+    escucharPublico: (c, cb) => escuchar(c, "publico", x => Object.entries((x && x.publico) || {}).map(([uid, p]) => ({ ...p, uid })), cb),
+    publicarGaleria: async (c, datos) => guardar(c, "galeria", x => { x.galeria = limpio(datos); }),
+    escucharGaleria: (c, cb) => escuchar(c, "galeria", x => (x && x.galeria) || null, cb),
+    publicarPuntos: async (c, datos) => guardar(c, "puntos", x => { x.puntos = limpio(datos); }),
+    escucharPuntos: (c, cb) => escuchar(c, "puntos", x => (x && x.puntos) || null, cb),
     async pedirLLM(prompt, uso) {
       if (!(await hayMotor())) throw new Error("servidor.py no tiene una llave de IA");
       const r = await fetch("/api/evaluar", { method: "POST", headers: { "content-type": "application/json" },

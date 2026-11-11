@@ -18,6 +18,8 @@ const sala = (extra = {}) => ({ ...D.salaNueva(C312, D.duelosDe(C312), 1000), ..
 const con = (s, cambios) => { assert.ok(cambios, "la transición devolvió null"); return { ...s, ...cambios }; };
 const p = (duelo, quien, texto, t0) => ({ duelo, quien, texto, t0, t: t0 + 1000 });
 const cinco = (a, b) => JUECES_DEFECTO.map((j, i) => D.fichaJuez(j, { A: a[i], B: b[i], fraseA: "fa" + i, fraseB: "fb" + i }));
+// lo que el teléfono del profesor guarda aparte hasta revelarlo
+const secreto = (js, sintesis = null, quiz = []) => ({ jueces: js, panel: panelJueces(js), sintesis, quiz });
 
 /* ---------- los duelos de una clase ---------- */
 test("duelosDe: clase con personajes, un duelo por pregunta con sus dos personajes", () => {
@@ -145,51 +147,54 @@ test("pedirVeredicto cierra el turno y deja a los jueces deliberando; volverAlDe
   assert.equal(D.volverAlDebate(s), null);
 });
 
-test("recibirVeredicto: con tres o más jueces hay panel; con menos, sin quórum y se puede reintentar", () => {
+test("recibirVeredicto: en la sala solo queda el estado; con menos de tres jueces no hay quórum y se reintenta", () => {
   let s = con(sala(), D.empezarDuelo(sala(), 1, 0));
   s = con(s, D.pedirVeredicto(s, 100));
+  assert.deepEqual(s.veredicto, { estado: "deliberando" });
   const pocos = cinco([7, null, null, 6, null], [5, null, null, 6, null]);
-  let q = con(s, D.recibirVeredicto(s, pocos, panelJueces(pocos), { disputa: "x", fraseA: "", fraseB: "" }));
-  assert.equal(q.veredicto.estado, "sin_quorum");
-  assert.equal(q.veredicto.panel, null);
-  assert.equal(q.sintesis, null);
-  assert.equal(D.siguiente(q), null);
+  let q = con(s, D.recibirVeredicto(s, pocos));
+  assert.deepEqual(q.veredicto, { estado: "sin_quorum" });
+  assert.equal(D.siguiente(q, secreto(pocos)), null);
   q = con(q, D.reintentar(q));
   assert.equal(q.veredicto.estado, "deliberando");
   assert.equal(D.reintentar(q), null);
   const js = cinco([7, 8, 6, 9, 5], [6, 6, 6, 6, 6]);
-  const ok = con(q, D.recibirVeredicto(q, js, panelJueces(js), { disputa: "x", fraseA: "a", fraseB: "b" }));
-  assert.equal(ok.veredicto.estado, "listo");
-  assert.equal(ok.veredicto.panel.ganador, "A");
-  assert.equal(ok.sintesis.disputa, "x");
-  assert.equal(D.recibirVeredicto(ok, js, panelJueces(js), null), null, "un veredicto listo no se pisa");
-  assert.equal(D.recibirVeredicto(sala(), js, panelJueces(js), null), null);
+  const ok = con(q, D.recibirVeredicto(q, js));
+  assert.deepEqual(ok.veredicto, { estado: "listo" }, "ni las notas ni el ganador están en la sala todavía");
+  assert.equal(ok.sintesis, null);
+  assert.equal(D.recibirVeredicto(ok, js), null, "un veredicto listo no se pisa");
+  assert.equal(D.recibirVeredicto(sala(), js), null);
 });
 
-test("siguiente: revela juez por juez, anota el resultado, pasa por la síntesis y vuelve a la espera", () => {
+test("siguiente: sin ronda, el primer toque trae el veredicto a la sala y revela juez por juez hasta la espera", () => {
   let s = con(sala(), D.empezarDuelo(sala(), 1, 0));
   s = con(s, D.darPalabra(s, "A", 0));
   s = con(s, D.pedirVeredicto(s, 60000));
   const js = cinco([7, 8, 6, 9, 5], [6, 6, 6, 6, 6]);
-  s = con(s, D.recibirVeredicto(s, js, panelJueces(js), { disputa: "d", fraseA: "a", fraseB: "b" }));
-  assert.deepEqual(D.etiquetaSiguiente(s), { texto: "Revelar: 🎓 La académica", listo: true });
-  s = con(s, D.siguiente(s));
+  const x = secreto(js, { disputa: "d", fraseA: "a", fraseB: "b", mejorA: "p1", mejorB: null });
+  s = con(s, D.recibirVeredicto(s, js));
+  assert.deepEqual(D.etiquetaSiguiente(s, x), { texto: "Revelar: 🎓 La académica", listo: true });
+  s = con(s, D.siguiente(s, x));
   assert.equal(s.fase, "jueces");
   assert.equal(s.paso, 1);
-  assert.equal(D.etiquetaSiguiente(s).texto, "Revelar: ⚖ El jurista");
-  for (let i = 0; i < 4; i++) s = con(s, D.siguiente(s));
+  assert.equal(s.veredicto.jueces.length, 5, "ahora sí el veredicto está en la sala");
+  assert.equal(s.veredicto.panel.ganador, "A");
+  assert.equal(s.sintesis.mejorA, "p1");
+  assert.equal(s.quiz, null);
+  assert.equal(D.etiquetaSiguiente(s, x).texto, "Revelar: ⚖ El jurista");
+  for (let i = 0; i < 4; i++) s = con(s, D.siguiente(s, x));
   assert.equal(s.paso, 5);
   assert.equal(s.duelos[0].jugado, false, "el resultado todavía no se muestra");
-  assert.equal(D.etiquetaSiguiente(s).texto, "Mostrar el resultado");
-  s = con(s, D.siguiente(s));
+  assert.equal(D.etiquetaSiguiente(s, x).texto, "Mostrar el resultado");
+  s = con(s, D.siguiente(s, x));
   assert.equal(s.paso, 6);
   assert.equal(s.duelos[0].jugado, true);
   assert.equal(s.duelos[0].ganador, "A");
   assert.equal(s.duelos[0].totalA, 21);
   assert.equal(s.duelos[0].totalB, 18);
   assert.equal(s.duelos[0].tiempo.A, 60000);
-  assert.equal(D.etiquetaSiguiente(s).texto, "Lo que quedó en disputa");
-  s = con(s, D.siguiente(s));
+  assert.equal(D.etiquetaSiguiente(s, x).texto, "Lo que quedó en disputa");
+  s = con(s, D.siguiente(s));                            // desde los jueces ya no hace falta el secreto
   assert.equal(s.fase, "sintesis");
   assert.equal(D.etiquetaSiguiente(s).texto, "Volver a los duelos");
   s = con(s, D.siguiente(s));
@@ -197,33 +202,39 @@ test("siguiente: revela juez por juez, anota el resultado, pasa por la síntesis
   assert.equal(s.duelo, null);
   assert.equal(s.veredicto, null);
   assert.equal(s.sintesis, null);
-  assert.equal(D.siguiente(s), null);
+  assert.equal(s.quiz, null);
+  assert.equal(D.siguiente(s, x), null);
 });
 
 test("siguiente: sin síntesis vuelve directo a la espera; totales iguales son empate", () => {
   let s = con(sala(), D.empezarDuelo(sala(), 3, 0));
   s = con(s, D.pedirVeredicto(s, 10));
-  const js = cinco([7, 7, 7, 7, 7], [7, 7, 7, 7, 7]);
-  s = con(s, D.recibirVeredicto(s, js, panelJueces(js), null));
-  for (let i = 0; i < 6; i++) s = con(s, D.siguiente(s));
+  const js = cinco([7, 7, 7, 7, 7], [7, 7, 7, 7, 7]), x = secreto(js);
+  s = con(s, D.recibirVeredicto(s, js));
+  for (let i = 0; i < 6; i++) s = con(s, D.siguiente(s, x));
   assert.equal(s.paso, 6);
   assert.equal(s.duelos[2].ganador, "empate");
   assert.equal(D.textoResultado(s.duelos[2]), "Empate, 21 a 21");
   assert.equal(D.textoResultado(s.duelos[0]), "", "un duelo sin jugar no tiene resultado");
   assert.equal(D.textoResultado({ ...s.duelos[0], jugado: true, ganador: "B", totalA: 18, totalB: 21.5 }), "Ganó Acemoglu, 21,5 a 18");
-  assert.equal(D.etiquetaSiguiente(s).texto, "Volver a los duelos");
-  s = con(s, D.siguiente(s));
+  assert.equal(D.etiquetaSiguiente(s, x).texto, "Volver a los duelos");
+  s = con(s, D.siguiente(s, x));
   assert.equal(s.fase, "espera");
 });
 
-test("etiquetaSiguiente mientras se espera a los jueces", () => {
+test("etiquetaSiguiente mientras se espera a los jueces, y sin el veredicto cargado", () => {
   let s = con(sala(), D.empezarDuelo(sala(), 1, 0));
   assert.deepEqual(D.etiquetaSiguiente(s), { texto: "", listo: false });
   s = con(s, D.pedirVeredicto(s, 10));
   assert.deepEqual(D.etiquetaSiguiente(s), { texto: "Los jueces deliberan…", listo: false });
   const pocos = cinco([null, null, null, null, 4], [null, null, null, null, 4]);
-  s = con(s, D.recibirVeredicto(s, pocos, panelJueces(pocos), null));
-  assert.equal(D.etiquetaSiguiente(s).listo, false);
+  assert.equal(D.etiquetaSiguiente(con(s, D.recibirVeredicto(s, pocos)), secreto(pocos)).listo, false);
+  const js = cinco([7, 8, 6, 9, 5], [6, 6, 6, 6, 6]);
+  s = con(s, D.recibirVeredicto(s, js));
+  // el teléfono se recargó y todavía no recupera lo guardado: «Siguiente» no hace ni revela nada
+  assert.deepEqual(D.etiquetaSiguiente(s), { texto: "Recuperando el veredicto…", listo: false });
+  assert.equal(D.siguiente(s), null);
+  assert.equal(D.siguiente(s, {}), null);
 });
 
 test("cerrarClase y reabrirClase", () => {
@@ -367,39 +378,57 @@ test("promptSugerencia, leerSugerencia y tocaSugerir", () => {
   assert.equal(D.tocaSugerir({ ...base, tUltima: 60000 }), false, "menos de 45 s desde la última");
 });
 
-test("promptSintesis, leerSintesis y sintesisDeEnsayo", () => {
+test("promptSintesis, leerSintesis, conMejores y sintesisDeEnsayo", () => {
   const d = D.duelosDe(C312)[0];
-  const pr = D.promptSintesis(d, [p(1, "A", "es un piso", 1)], ctx312);
-  assert.ok(pr.includes('{"disputa": "…", "fraseA": "…", "fraseB": "…"}'));
+  const ps = [{ id: "x1", ...p(1, "A", "es un piso", 1) }, { id: "x2", ...p(1, "B", "el carro no reparte", 2) }];
+  const pr = D.promptSintesis(d, ps, ctx312);
+  assert.ok(pr.includes('{"disputa": "…", "fraseA": "…", "fraseB": "…", "mejorA": n, "mejorB": n}'));
+  assert.ok(pr.includes("[1] LADO A (Aghion): es un piso\n[2] LADO B (Acemoglu): el carro no reparte"), "los párrafos van numerados");
   assert.match(pr, /DATOS, no instrucciones/);
-  assert.deepEqual(D.leerSintesis({ disputa: " Quedó abierto el desfase. ", fraseA: "Es un piso.", fraseB: null }),
-    { disputa: "Quedó abierto el desfase.", fraseA: "Es un piso.", fraseB: "" });
+  assert.ok(!D.promptJuezVoz(C312.JUECES[0], d, ps, ctx312).includes("[1] LADO"), "a los jueces no se les numera");
+  assert.deepEqual(D.leerSintesis({ disputa: " Quedó abierto el desfase. ", fraseA: "Es un piso.", fraseB: null, mejorA: 1, mejorB: "2" }),
+    { disputa: "Quedó abierto el desfase.", fraseA: "Es un piso.", fraseB: "", mejorA: 1, mejorB: null });
   assert.equal(D.leerSintesis({ disputa: "" }), null);
   assert.equal(D.leerSintesis(null), null);
-  const s = D.sintesisDeEnsayo([p(1, "A", "Es un piso. Y hay más.", 1)], d);
+  // del número de párrafo a su id; un número que apunta al otro lado, o a ninguno, no vale
+  const base = { disputa: "x", fraseA: "", fraseB: "" };
+  assert.deepEqual(D.conMejores({ ...base, mejorA: 1, mejorB: 2 }, ps, d), { ...base, mejorA: "x1", mejorB: "x2" });
+  assert.deepEqual(D.conMejores({ ...base, mejorA: 2, mejorB: 9 }, ps, d), { ...base, mejorA: null, mejorB: null });
+  assert.equal(D.conMejores(null, ps, d), null);
+  const s = D.sintesisDeEnsayo([...ps, { id: "x3", ...p(1, "A", "Es un piso. Y hay más, mucho más.", 3) }], d);
   assert.match(s.disputa, /ensayo/);
   assert.equal(s.fraseA, "Es un piso.");
-  assert.equal(s.fraseB, "");
+  assert.equal(s.mejorA, 3);
+  assert.equal(s.mejorB, 2);
+  assert.equal(D.sintesisDeEnsayo([], d).mejorA, null);
 });
 
 /* ---------- registro y reloj ---------- */
-test("registroTexto: la transcripción y el veredicto de cada duelo, en texto plano", () => {
+test("registroTexto: la transcripción, el veredicto, la ronda y la tabla de la galería, en texto plano", () => {
   let s = con(sala({ codigo: "AB12" }), D.empezarDuelo(sala(), 1, 0));
   s = con(s, D.pedirVeredicto(s, 10));
   const js = cinco([7, 8, 6, 9, 5], [6, 6, 6, 6, 6]);
-  const panel = panelJueces(js), sintesis = { disputa: "Quedó abierto el desfase.", fraseA: "Es un piso.", fraseB: "" };
-  s = con(s, D.recibirVeredicto(s, js, panel, sintesis));
-  for (let i = 0; i < 6; i++) s = con(s, D.siguiente(s));
+  const sintesis = { disputa: "Quedó abierto el desfase.", fraseA: "Es un piso.", fraseB: "", mejorA: null, mejorB: null };
+  const quiz = [{ texto: "¿Qué dijo Aghion?", opciones: ["que es un piso", "b", "c", "d"], correcta: 0 }, null];
+  const x = secreto(js, sintesis);
+  s = con(s, D.recibirVeredicto(s, js));
+  for (let i = 0; i < 6; i++) s = con(s, D.siguiente(s, x));
+  const galeria = { top: [{ nombre: "Antonia R.", grupo: "Khan", total: 11 }, { nombre: "Dani X.", grupo: "", total: 5 }],
+    grupos: [{ n: 4, nombre: "Khan", miembros: 3, promedio: 5.5 }] };
   const txt = D.registroTexto(s, [p(1, "A", "es un piso", 1000), p(1, "P", "¿y el desfase?", 2000)],
-    { 1: { jueces: js, panel, sintesis } }, () => "10:00");
+    { 1: { ...x, quiz } }, () => "10:00", galeria);
   assert.match(txt, /TRIBUNA · sala AB12/);
   assert.match(txt, /=== Duelo 1: La IA es una revolución/);
   assert.match(txt, /\[10:00\] Aghion: es un piso/);
   assert.match(txt, /\[10:00\] Profesor: ¿y el desfase\?/);
   assert.match(txt, /🎓 La académica: Aghion 7 «fa0» · Acemoglu 6 «fb0»/);
   assert.match(txt, /Total: Aghion 21 \/ 30 · Acemoglu 18 \/ 30 · Gana Aghion/);
+  assert.match(txt, /Ronda relámpago: ¿Qué dijo Aghion\? Respuesta: que es un piso/);
   assert.match(txt, /Lo que quedó en disputa: Quedó abierto el desfase\./);
   assert.match(txt, /=== Duelo 2: .*\n\(no se jugó\)/);
+  assert.match(txt, /=== La galería ===\n1\. Antonia R\. \(Khan\): 11\n2\. Dani X\.: 5/);
+  assert.match(txt, /Por grupo \(promedio\):\nKhan: 5,5 \(3\)/);
+  assert.ok(!D.registroTexto(s, [], {}, () => "10:00").includes("La galería"), "sin galería no hay sección");
 });
 
 test("fmtReloj", () => {
@@ -407,4 +436,85 @@ test("fmtReloj", () => {
   assert.equal(D.fmtReloj(65400), "1:05");
   assert.equal(D.fmtReloj(-5), "0:00");
   assert.equal(D.fmtReloj(undefined), "0:00");
+});
+
+/* ---------- la galería: grupos, ronda relámpago y preguntas del público ---------- */
+test("cada lado sabe qué grupo lo encarna, y la sala trae la lista de grupos", () => {
+  const ds = D.duelosDe(C312);
+  assert.deepEqual([ds[0].A.g, ds[0].B.g, ds[1].A.g, ds[2].B.g], [1, 2, 3, 6]);
+  const s = sala();
+  assert.equal(s.grupos.length, 6);
+  assert.deepEqual({ ...s.grupos[3] }, { n: 4, nombre: "Lina Khan", corto: "Khan", color: "#a78bfa" });
+  assert.equal(s.quiz, null);
+  assert.deepEqual(s.usadas, []);
+  assert.ok(!("personajes" in s), "ese campo activa otras reglas de Firestore");
+  const c307 = contenido("contenido/semana307.js");
+  assert.equal(D.duelosDe(c307)[0].A.g, 0);
+  assert.deepEqual(D.gruposDe(c307), []);
+  assert.deepEqual(D.gruposDe({}), []);
+});
+
+const Q0 = { texto: "¿Qué dijo Aghion del piso?", opciones: ["a", "b", "c", "d"], correcta: 2 };
+const Q1 = { texto: "¿Qué respondió Acemoglu?", opciones: ["e", "f", "g", "h"], correcta: 0 };
+
+test("la ronda relámpago: se lanza, se revela, sigue la otra pregunta y recién después los jueces", () => {
+  let s = con(sala(), D.empezarDuelo(sala(), 1, 0));
+  s = con(s, D.pedirVeredicto(s, 10));
+  const js = cinco([7, 8, 6, 9, 5], [6, 6, 6, 6, 6]), x = secreto(js, null, [Q0, Q1]);
+  s = con(s, D.recibirVeredicto(s, js));
+  assert.deepEqual(D.etiquetaSiguiente(s, x), { texto: "Lanzar: ¿Qué dijo Aghion del piso?", listo: true, pregunta: 0 });
+  s = con(s, D.siguiente(s, x));
+  assert.equal(s.fase, "quiz");
+  assert.deepEqual(s.quiz, { i: 0, numero: 1, total: 2, estado: "abierta", texto: Q0.texto, opciones: ["a", "b", "c", "d"], correcta: null });
+  assert.deepEqual(s.veredicto, { estado: "listo" }, "el veredicto sigue fuera de la sala");
+  assert.deepEqual(D.etiquetaSiguiente(s, x), { texto: "Mostrar la respuesta", listo: true });
+  assert.equal(D.siguiente(s), null, "sin el veredicto cargado no se revela nada");
+  assert.equal(D.etiquetaSiguiente(s).listo, false);
+  s = con(s, D.siguiente(s, x));
+  assert.equal(s.quiz.estado, "revelada");
+  assert.equal(s.quiz.correcta, 2);
+  assert.deepEqual(D.etiquetaSiguiente(s, x), { texto: "Lanzar: ¿Qué respondió Acemoglu?", listo: true, pregunta: 1 });
+  s = con(s, D.siguiente(s, x));
+  assert.deepEqual([s.quiz.i, s.quiz.numero, s.quiz.estado, s.quiz.correcta], [1, 2, "abierta", null]);
+  s = con(s, D.siguiente(s, x));
+  assert.equal(s.quiz.correcta, 0);
+  assert.equal(D.etiquetaSiguiente(s, x).texto, "Revelar: 🎓 La académica");
+  s = con(s, D.siguiente(s, x));
+  assert.equal(s.fase, "jueces");
+  assert.equal(s.paso, 1);
+  assert.equal(s.quiz, null);
+  assert.equal(s.veredicto.jueces.length, 5);
+  assert.equal(D.volverAlDebate(s), null, "de la ronda en adelante no se vuelve al debate");
+});
+
+test("una pregunta saltada (null) no se lanza: sigue la otra, o los jueces", () => {
+  let s = con(sala(), D.empezarDuelo(sala(), 1, 0));
+  s = con(s, D.pedirVeredicto(s, 10));
+  const js = cinco([7, 8, 6, 9, 5], [6, 6, 6, 6, 6]);
+  s = con(s, D.recibirVeredicto(s, js));
+  const una = secreto(js, null, [null, Q1]);
+  assert.deepEqual(D.etiquetaSiguiente(s, una), { texto: "Lanzar: ¿Qué respondió Acemoglu?", listo: true, pregunta: 1 });
+  const q = con(s, D.siguiente(s, una));
+  assert.deepEqual([q.quiz.i, q.quiz.numero, q.quiz.total], [1, 1, 1]);
+  const ninguna = secreto(js, null, [null, null]);
+  assert.deepEqual(D.etiquetaSiguiente(s, ninguna), { texto: "Revelar: 🎓 La académica", listo: true });
+  assert.equal(con(s, D.siguiente(s, ninguna)).fase, "jueces");
+  // se salta la segunda después de revelar la primera
+  let r = con(s, D.siguiente(s, secreto(js, null, [Q0, Q1])));
+  r = con(r, D.siguiente(r, secreto(js, null, [Q0, Q1])));
+  assert.equal(r.quiz.estado, "revelada");
+  assert.equal(con(r, D.siguiente(r, secreto(js, null, [Q0, null]))).fase, "jueces");
+  // volver al debate desde la apuesta limpia todo
+  const v = con(s, D.volverAlDebate(s));
+  assert.equal(v.quiz, null);
+  assert.equal(v.veredicto, null);
+});
+
+test("usarPregunta: anota una sola vez la pregunta de la galería que el profesor usó", () => {
+  let s = con(sala(), D.empezarDuelo(sala(), 1, 0));
+  s = con(s, D.usarPregunta(s, "ana_1"));
+  assert.deepEqual(s.usadas, ["ana_1"]);
+  assert.equal(D.usarPregunta(s, "ana_1"), null);
+  assert.equal(D.usarPregunta(s, ""), null);
+  assert.equal(D.usarPregunta(sala(), "ana_1"), null, "solo durante el debate");
 });

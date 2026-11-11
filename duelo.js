@@ -28,9 +28,10 @@ const Duelo = (() => {
     const S = (c && c.SESION) || {}, E = (c && c.EQUIPOS) || {};
     const pers = c && Array.isArray(c.PERSONAJES) ? c.PERSONAJES : null;
     const pregs = c && Array.isArray(c.PREGUNTAS) && c.PREGUNTAS.length ? c.PREGUNTAS : [S.mocion];
+    // g: el grupo que encarna a ese lado (el orden de PERSONAJES, 1…N); 0 si la clase no tiene
     const lado = (k, pj) => pj
-      ? { id: pj.id, nombre: pj.nombre, corto: pj.corto || pj.nombre, cargo: pj.cargo || "", color: pj.color || COLOR[k] }
-      : { id: k, nombre: k === "A" ? "A favor" : "En contra", corto: k === "A" ? "A favor" : "En contra", cargo: "",
+      ? { id: pj.id, g: pers.length <= 10 ? pers.indexOf(pj) + 1 : 0, nombre: pj.nombre, corto: pj.corto || pj.nombre, cargo: pj.cargo || "", color: pj.color || COLOR[k] }
+      : { id: k, g: 0, nombre: k === "A" ? "A favor" : "En contra", corto: k === "A" ? "A favor" : "En contra", cargo: "",
           color: (E[k] && E[k].color) || COLOR[k] };
     const out = [];
     for (const q of pregs) {
@@ -44,11 +45,19 @@ const Duelo = (() => {
     return out;
   }
 
+  // Los grupos de la clase, para la galería: uno por personaje. Las reglas de Firestore admiten
+  // hasta el grupo 10; con más personajes, o sin ellos, la clase no tiene grupos.
+  function gruposDe(c) {
+    const pers = c && Array.isArray(c.PERSONAJES) ? c.PERSONAJES : [];
+    if (!pers.length || pers.length > 10) return [];
+    return pers.map((pj, i) => ({ n: i + 1, nombre: pj.nombre, corto: pj.corto || pj.nombre, color: pj.color || "#9aa1b9" }));
+  }
+  // (la sala no puede llamar `personajes` a esa lista: ese campo activa las reglas de cupos del juego clásico)
   function salaNueva(c, duelos, ahora) {
     const S = (c && c.SESION) || {};
     return { modo: "micro", curso: S.curso || "", semana: S.semana || 0, tema: S.tema || "", fase: "espera", duelos,
-      duelo: null, turno: null, t0turno: null, tiempo: CERO(), t0duelo: null, veredicto: null, paso: 0, sintesis: null,
-      creada: ahora, actualizado: ahora };
+      grupos: gruposDe(c), duelo: null, turno: null, t0turno: null, tiempo: CERO(), t0duelo: null, veredicto: null, paso: 0,
+      sintesis: null, quiz: null, usadas: [], creada: ahora, actualizado: ahora };
   }
   const dueloDe = s => (s && s.duelos || []).find(d => d.n === s.duelo) || null;
 
@@ -65,7 +74,7 @@ const Duelo = (() => {
     const d = (s.duelos || []).find(x => x.n === n);
     if (s.fase !== "espera" || !d || d.jugado) return null;
     return { fase: "debate", duelo: n, turno: null, t0turno: null, tiempo: { ...CERO(), ...(d.tiempo || {}) },
-      t0duelo: ahora, veredicto: null, paso: 0, sintesis: null };
+      t0duelo: ahora, veredicto: null, paso: 0, sintesis: null, quiz: null };
   }
   // volver a la lista sin veredicto (se abrió el duelo equivocado): el duelo queda sin jugar
   function salirDelDuelo(s, ahora) {
@@ -84,24 +93,27 @@ const Duelo = (() => {
     if (s.fase !== "debate" || !s.turno) return null;
     return { turno: null, t0turno: null, tiempo: tiempos(s, ahora) };
   }
-  const DELIBERANDO = () => ({ estado: "deliberando", jueces: [], panel: null });
+  // En la sala el veredicto es solo su estado hasta la fase "jueces": la sala la lee cualquier
+  // inscrito, y mientras se apuesta y se responde la ronda nadie puede ver las notas.
+  const DELIBERANDO = () => ({ estado: "deliberando" });
   function pedirVeredicto(s, ahora) {
     if (s.fase !== "debate") return null;
-    return { fase: "manos", turno: null, t0turno: null, tiempo: tiempos(s, ahora), veredicto: DELIBERANDO(), paso: 0, sintesis: null };
+    return { fase: "manos", turno: null, t0turno: null, tiempo: tiempos(s, ahora), veredicto: DELIBERANDO(), paso: 0, sintesis: null, quiz: null };
   }
   function volverAlDebate(s) {
     if (s.fase !== "manos") return null;
-    return { fase: "debate", veredicto: null, paso: 0, sintesis: null };
+    return { fase: "debate", veredicto: null, paso: 0, sintesis: null, quiz: null };
   }
   function reintentar(s) {
     if (s.fase !== "manos" || !s.veredicto || s.veredicto.estado !== "sin_quorum") return null;
     return { veredicto: DELIBERANDO() };
   }
   const votaron = jueces => (jueces || []).filter(j => typeof j.A === "number" && typeof j.B === "number").length;
-  function recibirVeredicto(s, jueces, panel, sintesis) {
+  // Llegaron los jueces. El veredicto mismo es «el secreto» { jueces, panel, sintesis, quiz }: lo
+  // guarda el teléfono del profesor (privado/duelo{n}) y entra a la sala recién en `siguiente`.
+  function recibirVeredicto(s, jueces) {
     if (s.fase !== "manos" || !s.veredicto || s.veredicto.estado === "listo") return null;
-    const listo = votaron(jueces) >= CFG.QUORUM;
-    return { veredicto: { estado: listo ? "listo" : "sin_quorum", jueces, panel: listo ? panel : null }, sintesis: listo ? sintesis || null : null };
+    return { veredicto: { estado: votaron(jueces) >= CFG.QUORUM ? "listo" : "sin_quorum" } };
   }
   const resultadoDe = panel => ({ ganador: panel && panel.ganador ? panel.ganador : "empate",
     totalA: r1(panel && panel.A && panel.A.total), totalB: r1(panel && panel.B && panel.B.total) });
@@ -112,12 +124,29 @@ const Duelo = (() => {
     if (d.ganador !== "A" && d.ganador !== "B") return `Empate, ${n(d.totalA)} a ${n(d.totalB)}`;
     return `Ganó ${d[d.ganador].corto}, ${n(d["total" + d.ganador])} a ${n(d["total" + otro(d.ganador)])}`;
   }
-  const aLaEspera = () => ({ fase: "espera", duelo: null, turno: null, t0turno: null, tiempo: CERO(), veredicto: null, paso: 0, sintesis: null });
-  // el único botón del veredicto: cada toque revela lo que sigue
-  function siguiente(s) {
-    const v = s.veredicto;
-    if (s.fase === "manos") return v && v.estado === "listo" ? { fase: "jueces", paso: 1 } : null;
-    if (s.fase === "jueces" && v) {
+  const aLaEspera = () => ({ fase: "espera", duelo: null, turno: null, t0turno: null, tiempo: CERO(), veredicto: null, paso: 0, sintesis: null, quiz: null });
+  // La ronda relámpago: x.quiz es la lista de preguntas; una saltada por el profesor queda en null.
+  const proxima = (x, desde) => { const qs = (x && x.quiz) || []; for (let i = desde; i < qs.length; i++) if (qs[i]) return i; return -1; };
+  // después de la apuesta o de una pregunta revelada: la pregunta que sigue, o los jueces (y ahí
+  // el veredicto y la síntesis entran por fin a la sala)
+  function trasLaRonda(x, desde) {
+    const i = proxima(x, desde);
+    if (i < 0) return { fase: "jueces", paso: 1, quiz: null, veredicto: { estado: "listo", jueces: x.jueces, panel: x.panel }, sintesis: x.sintesis || null };
+    const vivas = x.quiz.map((q, k) => (q ? k : -1)).filter(k => k >= 0);
+    return { fase: "quiz", quiz: { i, numero: vivas.indexOf(i) + 1, total: vivas.length, estado: "abierta",
+      texto: x.quiz[i].texto, opciones: x.quiz[i].opciones, correcta: null } };
+  }
+  // El único botón del veredicto: cada toque revela lo que sigue. x = el secreto del duelo; sin él
+  // (el teléfono se recargó y aún no lo recupera) la apuesta y la ronda no avanzan.
+  function siguiente(s, x) {
+    const v = s.veredicto, hay = !!(x && Array.isArray(x.jueces) && x.panel);
+    if (s.fase === "manos") return v && v.estado === "listo" && hay ? trasLaRonda(x, 0) : null;
+    if (s.fase === "quiz") {
+      if (!hay || !s.quiz || !x.quiz || !x.quiz[s.quiz.i]) return null;
+      if (s.quiz.estado === "abierta") return { quiz: { ...s.quiz, estado: "revelada", correcta: x.quiz[s.quiz.i].correcta } };
+      return trasLaRonda(x, s.quiz.i + 1);
+    }
+    if (s.fase === "jueces" && v && v.jueces) {
       const n = v.jueces.length;
       if (s.paso < n) return { paso: s.paso + 1 };
       if (s.paso === n) return { paso: n + 1,
@@ -129,14 +158,21 @@ const Duelo = (() => {
   }
   const nombreJuez = j => `${j.emoji || ""} ${j.nombre || ""}`.trim();
   // qué va a mostrar el próximo toque, para la línea bajo el botón
-  function etiquetaSiguiente(s) {
-    const v = s.veredicto;
+  // `pregunta` = el índice de la que se va a lanzar: el profesor la lee antes y la puede saltar
+  function etiquetaSiguiente(s, x) {
+    const v = s.veredicto, hay = !!(x && Array.isArray(x.jueces) && x.panel);
+    const tras = desde => {
+      if (!hay) return { texto: "Recuperando el veredicto…", listo: false };
+      const i = proxima(x, desde);
+      return i < 0 ? { texto: "Revelar: " + nombreJuez(x.jueces[0]), listo: true } : { texto: "Lanzar: " + x.quiz[i].texto, listo: true, pregunta: i };
+    };
     if (s.fase === "manos") {
       if (!v || v.estado === "deliberando") return { texto: "Los jueces deliberan…", listo: false };
       if (v.estado === "sin_quorum") return { texto: "Los jueces no alcanzaron a responder", listo: false };
-      return { texto: "Revelar: " + nombreJuez(v.jueces[0]), listo: true };
+      return tras(0);
     }
-    if (s.fase === "jueces" && v) {
+    if (s.fase === "quiz" && s.quiz) return s.quiz.estado === "abierta" ? { texto: "Mostrar la respuesta", listo: hay } : tras(s.quiz.i + 1);
+    if (s.fase === "jueces" && v && v.jueces) {
       const n = v.jueces.length;
       if (s.paso < n) return { texto: "Revelar: " + nombreJuez(v.jueces[s.paso]), listo: true };
       if (s.paso === n) return { texto: "Mostrar el resultado", listo: true };
@@ -147,6 +183,16 @@ const Duelo = (() => {
   }
   const cerrarClase = s => (s.fase === "espera" ? { fase: "fin" } : null);
   const reabrirClase = s => (s.fase === "fin" ? { fase: "espera" } : null);
+  // el profesor usó una pregunta de la galería (id = "<uid>_<duelo>"): le da puntos a quien la mandó
+  function usarPregunta(s, id) {
+    if (s.fase !== "debate" || !id || (s.usadas || []).includes(id)) return null;
+    return { usadas: [...(s.usadas || []), id] };
+  }
+  // el profesor usó una pregunta de la galería (id = "<uid>_<duelo>"): le da puntos a quien la mandó
+  function usarPregunta(s, id) {
+    if (s.fase !== "debate" || !id || (s.usadas || []).includes(id)) return null;
+    return { usadas: [...(s.usadas || []), id] };
+  }
 
   /* ---------------- párrafos y transcripción ---------------- */
   const delDuelo = (parrafos, n) => (parrafos || []).filter(x => x.duelo === n).sort((a, b) => (a.t0 || 0) - (b.t0 || 0));
@@ -167,13 +213,16 @@ const Duelo = (() => {
     const cabeza = Math.round(tope * 8 / 30);
     return t.slice(0, cabeza) + MARCA + t.slice(-(tope - cabeza));
   }
-  function transcripcionDe(parrafos, d, tope = CFG.TOPE) {
-    return recortar(delDuelo(parrafos, d.n).filter(x => plano(x.texto)).map(x => `${rotulo(x.quien, d)}: ${plano(x.texto)}`).join("\n"), tope);
+  // los párrafos con texto del duelo, en orden: su posición (desde 1) es su número
+  const dichos = (parrafos, d) => delDuelo(parrafos, d.n).filter(x => plano(x.texto));
+  // numerada: cada línea parte con «[n] », para que el modelo pueda señalar un párrafo
+  function transcripcionDe(parrafos, d, tope = CFG.TOPE, numerada = false) {
+    return recortar(dichos(parrafos, d).map((x, i) => `${numerada ? `[${i + 1}] ` : ""}${rotulo(x.quien, d)}: ${plano(x.texto)}`).join("\n"), tope);
   }
   // arma el prompt dejando para la transcripción lo que el resto del texto permita
-  function conTranscripcion(armar, parrafos, d) {
+  function conTranscripcion(armar, parrafos, d, numerada = false) {
     const libre = CFG.MAX_PROMPT - armar("").length - MARCA.length;
-    return armar(transcripcionDe(parrafos, d, Math.max(2000, Math.min(CFG.TOPE, libre))));
+    return armar(transcripcionDe(parrafos, d, Math.max(2000, Math.min(CFG.TOPE, libre)), numerada));
   }
 
   /* ---------------- prompts ---------------- */
@@ -242,7 +291,10 @@ TU TAREA, para proyectar frente a la clase:
 2. "fraseA" y "fraseB": la mejor frase que dijo cada lado, tomada de la transcripción, con la
    puntuación arreglada y sin inventar nada, de no más de 30 palabras. Si un lado no habló, "".
 
-Responde SOLO un JSON: {"disputa": "…", "fraseA": "…", "fraseB": "…"}`, parrafos, d);
+3. "mejorA" y "mejorB": el número entre corchetes del párrafo de donde tomaste cada frase, o null
+   si ese lado no habló.
+
+Responde SOLO un JSON: {"disputa": "…", "fraseA": "…", "fraseB": "…", "mejorA": n, "mejorB": n}`, parrafos, d, true);
   }
 
   function promptSugerencia(d, parrafos, dossier) {
@@ -291,7 +343,17 @@ Responde SOLO un JSON: {"para": "A" | "B" | "ambos", "pregunta": "…"}`;
   function leerSintesis(j) {
     const disputa = plano(j && j.disputa);
     if (!disputa) return null;
-    return { disputa: disputa.slice(0, 600), fraseA: plano(j.fraseA).slice(0, 300), fraseB: plano(j.fraseB).slice(0, 300) };
+    const num = v => (Number.isInteger(v) && v > 0 ? v : null);
+    return { disputa: disputa.slice(0, 600), fraseA: plano(j.fraseA).slice(0, 300), fraseB: plano(j.fraseB).slice(0, 300),
+      mejorA: num(j.mejorA), mejorB: num(j.mejorB) };
+  }
+  // mejorA y mejorB llegan como número de párrafo: se guardan como el id del párrafo (lo que
+  // aplaude la galería). Un número que no existe, o que apunta a un párrafo del otro lado, no vale.
+  function conMejores(sintesis, parrafos, d) {
+    if (!sintesis) return null;
+    const ps = dichos(parrafos, d);
+    const id = (num, lado) => { const x = Number.isInteger(num) ? ps[num - 1] : null; return x && x.quien === lado && x.id ? x.id : null; };
+    return { ...sintesis, mejorA: id(sintesis.mejorA, "A"), mejorB: id(sintesis.mejorB, "B") };
   }
   function leerSugerencia(j) {
     const texto = plano(j && j.pregunta).slice(0, 220);
@@ -329,17 +391,19 @@ Responde SOLO un JSON: {"para": "A" | "B" | "ambos", "pregunta": "…"}`;
       fraseA: "(ensayo) nota simulada, sin IA", fraseB: "(ensayo) nota simulada, sin IA" }));
   }
   function sintesisDeEnsayo(parrafos, d) {
-    const frase = k => {
-      const l = delDuelo(parrafos, d.n).filter(x => x.quien === k).sort((a, b) => palabras(b.texto) - palabras(a.texto))[0];
-      return l ? (plano(l.texto).match(/^[^.!?]+[.!?]?/) || [""])[0].split(" ").slice(0, 30).join(" ") : "";
-    };
-    return { disputa: "(ensayo) Sin IA no hay síntesis real: aquí aparecerá lo que quedó en disputa entre los dos lados.", fraseA: frase("A"), fraseB: frase("B") };
+    const ps = dichos(parrafos, d);
+    const mejor = k => ps.filter(x => x.quien === k).sort((a, b) => palabras(b.texto) - palabras(a.texto))[0] || null;
+    const frase = l => (l ? (plano(l.texto).match(/^[^.!?]+[.!?]?/) || [""])[0].split(" ").slice(0, 30).join(" ") : "");
+    const A = mejor("A"), B = mejor("B");
+    return { disputa: "(ensayo) Sin IA no hay síntesis real: aquí aparecerá lo que quedó en disputa entre los dos lados.",
+      fraseA: frase(A), fraseB: frase(B), mejorA: A ? ps.indexOf(A) + 1 : null, mejorB: B ? ps.indexOf(B) + 1 : null };
   }
 
   /* ---------------- registro y reloj ---------------- */
   const horaLocal = t => new Date(t).toTimeString().slice(0, 5);
   // Todo lo de una sala en texto plano. veredictos: { [n]: { jueces, panel, sintesis } }
-  function registroTexto(s, parrafos, veredictos, hora = horaLocal) {
+  // galeria: { top: [{ nombre, grupo, total }], grupos: [{ nombre, miembros, promedio }] } o null
+  function registroTexto(s, parrafos, veredictos, hora = horaLocal, galeria = null) {
     const L = [`TRIBUNA · sala ${s.codigo || ""} · ${s.curso || ""}`, s.tema || "", ""];
     for (const d of s.duelos || []) {
       L.push(`=== Duelo ${d.n}: ${d.pregunta} ===`);
@@ -354,11 +418,31 @@ Responde SOLO un JSON: {"para": "A" | "B" | "ambos", "pregunta": "…"}`;
           ? `${nombreJuez(j)}: ${d.A.corto} ${j.A} «${j.fraseA}» · ${d.B.corto} ${j.B} «${j.fraseB}»` : `${nombreJuez(j)}: se abstuvo`);
         const r = resultadoDe(v.panel);
         L.push(`Total: ${d.A.corto} ${r.totalA ?? "—"} / 30 · ${d.B.corto} ${r.totalB ?? "—"} / 30 · ${r.ganador === "empate" ? "Empate" : "Gana " + d[r.ganador].corto}`);
+        for (const q of v.quiz || []) if (q) L.push(`Ronda relámpago: ${q.texto} Respuesta: ${q.opciones[q.correcta]}`);
+        for (const q of v.quiz || []) if (q) L.push(`Ronda relámpago: ${q.texto} Respuesta: ${q.opciones[q.correcta]}`);
         if (v.sintesis) {
           L.push(`Lo que quedó en disputa: ${v.sintesis.disputa}`);
           if (v.sintesis.fraseA) L.push(`Mejor frase de ${d.A.corto}: «${v.sintesis.fraseA}»`);
           if (v.sintesis.fraseB) L.push(`Mejor frase de ${d.B.corto}: «${v.sintesis.fraseB}»`);
         }
+      }
+      L.push("");
+    }
+    if (galeria && ((galeria.top || []).length || (galeria.grupos || []).length)) {
+      L.push("=== La galería ===");
+      (galeria.top || []).forEach((x, i) => L.push(`${i + 1}. ${x.nombre}${x.grupo ? ` (${x.grupo})` : ""}: ${x.total}`));
+      if ((galeria.grupos || []).length) {
+        L.push("", "Por grupo (promedio):");
+        for (const g of galeria.grupos) L.push(`${g.nombre}: ${String(g.promedio).replace(".", ",")} (${g.miembros})`);
+      }
+      L.push("");
+    }
+    if (galeria && ((galeria.top || []).length || (galeria.grupos || []).length)) {
+      L.push("=== La galería ===");
+      (galeria.top || []).forEach((x, i) => L.push(`${i + 1}. ${x.nombre}${x.grupo ? ` (${x.grupo})` : ""}: ${x.total}`));
+      if ((galeria.grupos || []).length) {
+        L.push("", "Por grupo (promedio):");
+        for (const g of galeria.grupos) L.push(`${g.nombre}: ${String(g.promedio).replace(".", ",")} (${g.miembros})`);
       }
       L.push("");
     }
@@ -369,7 +453,7 @@ Responde SOLO un JSON: {"para": "A" | "B" | "ambos", "pregunta": "…"}`;
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   }
 
-  return { CFG, duelosDe, salaNueva, dueloDe, tiempos, empezarDuelo, salirDelDuelo, darPalabra, pausar, pedirVeredicto,
+  return { CFG, duelosDe, gruposDe, salaNueva, dueloDe, usarPregunta, conMejores, tiempos, empezarDuelo, salirDelDuelo, darPalabra, pausar, pedirVeredicto,
     volverAlDebate, reintentar, recibirVeredicto, resultadoDe, textoResultado, siguiente, etiquetaSiguiente, cerrarClase, reabrirClase,
     delDuelo, palabrasPorLado, ultimoDeLados, otro, recortar, transcripcionDe, promptJuezVoz, promptSintesis,
     promptSugerencia, jsonEn, fichaJuez, conFrases, leerSintesis, leerSugerencia, sugerenciasDossier, tocaSugerir,
