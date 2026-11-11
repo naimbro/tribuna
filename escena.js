@@ -392,7 +392,7 @@ function pintarManos(s, d) {
   p.append(a, el("i", "", "o"), b);
   $("vManos").replaceChildren(el("p", "gran-pregunta", "¿Quién ganó?"), p,
     el("p", "manos", juegan ? "Apuesten en su teléfono." : "Manos arriba."),
-    ...(juegan ? [el("p", "cuenta", `${apostaron} de ${juegan} ya apostaron`)] : []),
+    ...(juegan ? [el("p", "cuenta", `${apostaron} de ${juegan} ya ${apostaron === 1 ? "apostó" : "apostaron"}`)] : []),
     el("p", "delib", est === "listo" ? "Los jueces ya tienen su veredicto." : "Los jueces deliberan…"));
 }
 // la ronda relámpago: la pregunta y sus alternativas; al revelar, la correcta y cuántos acertaron
@@ -408,7 +408,7 @@ function pintarQuiz(s, d) {
   $("vQuiz").replaceChildren(
     el("p", "quiz-n", q.total > 1 ? `Ronda relámpago, pregunta ${q.numero} de ${q.total}` : "Ronda relámpago"),
     el("h1", "quiz-q", q.texto), ol,
-    el("p", "cuenta", !revelada ? `${respondieron} ya respondieron`
+    el("p", "cuenta", !revelada ? `${respondieron} ya ${respondieron === 1 ? "respondió" : "respondieron"}`
       : r.n ? `Acertó el ${r.pct} % de la galería (${r.bien} de ${r.n}).` : "Nadie alcanzó a responder."));
 }
 function pintarJueces(s, d) {

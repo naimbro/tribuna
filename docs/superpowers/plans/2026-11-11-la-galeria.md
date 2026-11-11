@@ -1806,7 +1806,7 @@ Expected: «¿De qué grupo eres?» con los seis personajes; al tocar uno, «Ya 
 ```
 
 ```html
-<script src="galeria.js?v=20261111a"></script>
+<script src="galeria.js?v=20261111b"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 ```
 
@@ -1840,7 +1840,7 @@ Expected: «¿De qué grupo eres?» con los seis personajes; al tocar uno, «Ya 
 .quiz-q{font:600 clamp(28px,calc(3*var(--u)),58px)/1.15 var(--voz);margin:0;text-wrap:balance;max-width:26em}
 .alternativas{margin:0;padding:0;list-style:none;counter-reset:alt;display:grid;grid-template-columns:1fr 1fr;gap:1.6vh 3vw}
 .alternativas li{counter-increment:alt;display:grid;grid-template-columns:auto 1fr;gap:.8em;align-items:baseline;padding:1.4vh 1.4vw;
-  border:1px solid var(--linea);border-radius:14px;font:400 clamp(18px,calc(1.6*var(--u)),32px)/1.25 var(--voz);
+  border:1px solid var(--linea);border-radius:14px;font:400 clamp(20px,calc(2*var(--u)),40px)/1.25 var(--voz);
   transition:opacity .4s,background .4s,border-color .4s}
 .alternativas li::before{content:counter(alt,lower-alpha) ")";font:700 .8em/1 var(--aparato);color:var(--tenue)}
 .alternativas li.correcta{border-color:var(--bronce);background:color-mix(in srgb,var(--bronce) 16%,transparent)}
@@ -2172,7 +2172,7 @@ function pintarManos(s, d) {
   p.append(a, el("i", "", "o"), b);
   $("vManos").replaceChildren(el("p", "gran-pregunta", "¿Quién ganó?"), p,
     el("p", "manos", juegan ? "Apuesten en su teléfono." : "Manos arriba."),
-    ...(juegan ? [el("p", "cuenta", `${apostaron} de ${juegan} ya apostaron`)] : []),
+    ...(juegan ? [el("p", "cuenta", `${apostaron} de ${juegan} ya ${apostaron === 1 ? "apostó" : "apostaron"}`)] : []),
     el("p", "delib", est === "listo" ? "Los jueces ya tienen su veredicto." : "Los jueces deliberan…"));
 }
 // la ronda relámpago: la pregunta y sus alternativas; al revelar, la correcta y cuántos acertaron
@@ -2188,7 +2188,7 @@ function pintarQuiz(s, d) {
   $("vQuiz").replaceChildren(
     el("p", "quiz-n", q.total > 1 ? `Ronda relámpago, pregunta ${q.numero} de ${q.total}` : "Ronda relámpago"),
     el("h1", "quiz-q", q.texto), ol,
-    el("p", "cuenta", !revelada ? `${respondieron} ya respondieron`
+    el("p", "cuenta", !revelada ? `${respondieron} ya ${respondieron === 1 ? "respondió" : "respondieron"}`
       : r.n ? `Acertó el ${r.pct} % de la galería (${r.bien} de ${r.n}).` : "Nadie alcanzó a responder."));
 }
 ```
@@ -2299,7 +2299,7 @@ Expected: con el micrófono conectado el QR cambia a «Entren a la galería con 
 
 ```html
 <script src="oido.js?v=20261110a"></script>
-<script src="galeria.js?v=20261111a"></script>
+<script src="galeria.js?v=20261111b"></script>
 ```
 
 **Agregar al final de:** `micro.css`

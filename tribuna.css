@@ -187,7 +187,7 @@ a{color:inherit}
 .quiz-q{font:600 clamp(28px,calc(3*var(--u)),58px)/1.15 var(--voz);margin:0;text-wrap:balance;max-width:26em}
 .alternativas{margin:0;padding:0;list-style:none;counter-reset:alt;display:grid;grid-template-columns:1fr 1fr;gap:1.6vh 3vw}
 .alternativas li{counter-increment:alt;display:grid;grid-template-columns:auto 1fr;gap:.8em;align-items:baseline;padding:1.4vh 1.4vw;
-  border:1px solid var(--linea);border-radius:14px;font:400 clamp(18px,calc(1.6*var(--u)),32px)/1.25 var(--voz);
+  border:1px solid var(--linea);border-radius:14px;font:400 clamp(20px,calc(2*var(--u)),40px)/1.25 var(--voz);
   transition:opacity .4s,background .4s,border-color .4s}
 .alternativas li::before{content:counter(alt,lower-alpha) ")";font:700 .8em/1 var(--aparato);color:var(--tenue)}
 .alternativas li.correcta{border-color:var(--bronce);background:color-mix(in srgb,var(--bronce) 16%,transparent)}
