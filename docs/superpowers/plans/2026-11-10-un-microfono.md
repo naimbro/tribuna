@@ -1561,7 +1561,7 @@ a{color:inherit}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tribuna.css?v=20261110a">
+<link rel="stylesheet" href="tribuna.css?v=20261110b">
 </head>
 <body class="escena">
 <!-- El escenario: solo muestra. Todo lo que cambia lo decide el teléfono del profesor (micro.html). -->
@@ -1599,9 +1599,9 @@ a{color:inherit}
       document.write('<script src="contenido/semana' + pedida + '.js?v=20261110a"><\/script>');
   })();
 </script>
-<script src="duelo.js?v=20261110a"></script>
+<script src="duelo.js?v=20261110b"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-<script type="module" src="escena.js?v=20261110a"></script>
+<script type="module" src="escena.js?v=20261110b"></script>
 </body>
 </html>
 ```
@@ -2009,7 +2009,7 @@ El único cerebro: guarda el estado, abre el micrófono y llama a los jueces. Se
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tribuna.css?v=20261110a">
+<link rel="stylesheet" href="tribuna.css?v=20261110b">
 <link rel="stylesheet" href="micro.css?v=20261110a">
 </head>
 <body class="micro">
@@ -2080,9 +2080,9 @@ El único cerebro: guarda el estado, abre el micrófono y llama a los jueces. Se
 <script src="rotacion.js?v=20261003a"></script>
 <script src="jueces.js?v=20261001c"></script>
 <script src="dictado.js?v=20261003a"></script>
-<script src="duelo.js?v=20261110a"></script>
+<script src="duelo.js?v=20261110b"></script>
 <script src="oido.js?v=20261110a"></script>
-<script type="module" src="micro.js?v=20261110a"></script>
+<script type="module" src="micro.js?v=20261110b"></script>
 </body>
 </html>
 ```
@@ -2640,7 +2640,7 @@ Reemplazar la última línea de scripts:
 por:
 
 ```html
-<script src="duelo.js?v=20261110a"></script>
+<script src="duelo.js?v=20261110b"></script>
 <script type="module" src="admin.js?v=20261110a"></script>
 ```
 
