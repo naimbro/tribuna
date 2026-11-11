@@ -278,6 +278,16 @@ Responde SOLO un JSON: {"para": "A" | "B" | "ambos", "pregunta": "…"}`;
   const fichaJuez = (juez, lectura) => ({ id: juez.id, nombre: juez.nombre, emoji: juez.emoji || "",
     A: lectura ? lectura.A : null, B: lectura ? lectura.B : null,
     fraseA: lectura ? lectura.fraseA || "" : "", fraseB: lectura ? lectura.fraseB || "" : "" });
+  // leerJuez (jueces.js) corta la frase a 120 caracteres, a veces a media palabra: aquí se toma
+  // entera de la respuesta y, si es larguísima, se corta en un espacio.
+  function fraseEntera(x) {
+    const s = plano(x);
+    if (s.length <= 170) return s;
+    const c = s.slice(0, 170);
+    return c.slice(0, c.lastIndexOf(" ") > 80 ? c.lastIndexOf(" ") : 170) + "…";
+  }
+  const conFrases = (lectura, crudo) => (lectura ? { ...lectura, fraseA: fraseEntera(crudo && crudo.A && crudo.A.frase),
+    fraseB: fraseEntera(crudo && crudo.B && crudo.B.frase) } : null);
   function leerSintesis(j) {
     const disputa = plano(j && j.disputa);
     if (!disputa) return null;
@@ -362,7 +372,7 @@ Responde SOLO un JSON: {"para": "A" | "B" | "ambos", "pregunta": "…"}`;
   return { CFG, duelosDe, salaNueva, dueloDe, tiempos, empezarDuelo, salirDelDuelo, darPalabra, pausar, pedirVeredicto,
     volverAlDebate, reintentar, recibirVeredicto, resultadoDe, textoResultado, siguiente, etiquetaSiguiente, cerrarClase, reabrirClase,
     delDuelo, palabrasPorLado, ultimoDeLados, otro, recortar, transcripcionDe, promptJuezVoz, promptSintesis,
-    promptSugerencia, jsonEn, fichaJuez, leerSintesis, leerSugerencia, sugerenciasDossier, tocaSugerir,
+    promptSugerencia, jsonEn, fichaJuez, conFrases, leerSintesis, leerSugerencia, sugerenciasDossier, tocaSugerir,
     juecesDeEnsayo, sintesisDeEnsayo, registroTexto, fmtReloj };
 })();
 

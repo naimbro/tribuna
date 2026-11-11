@@ -311,6 +311,15 @@ test("respuestas de los jueces: se lee el JSON aunque venga envuelto; lo ilegibl
     assert.equal(f.fraseA, "");
   }
   assert.equal(D.jsonEn(null), null);
+  // la frase no se corta a media palabra
+  const larga = "Acemoglu repite su 0,66 sin distinguir tareas fáciles de difíciles ni productividad total de laboral, y queda contaminado por una línea ajena";
+  const crudo = { A: { nota: 7, frase: larga }, B: { nota: 6, frase: "palabra ".repeat(40) } };
+  assert.equal(leerJuez(crudo).fraseA.length, 120, "leerJuez sí la corta");
+  const entera = D.conFrases(leerJuez(crudo), crudo);
+  assert.equal(entera.fraseA, larga);
+  assert.equal(entera.A, 7);
+  assert.ok(entera.fraseB.length <= 171 && entera.fraseB.endsWith("palabra…"), entera.fraseB);
+  assert.equal(D.conFrases(null, crudo), null);
   // el panel no se rompe con abstenciones
   const mezcla = cinco([7, null, 8, null, 6], [5, null, 6, null, 7]);
   assert.equal(panelJueces(mezcla).ganador, "A");

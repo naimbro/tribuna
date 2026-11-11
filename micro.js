@@ -151,16 +151,24 @@ function salirDelDuelo() {
 // un lado tiene la palabra, la palabra pasa también: es el olvido típico de no haber cambiado.
 function eraDelOtro() {
   const s = E.sala, t = s.turno;
+  // el tiempo de palabra de ese párrafo también era del otro lado
+  const pasarTiempo = (de, p) => {
+    const dt = Math.max(0, (p.t || 0) - (p.t0 || 0)), tiempo = { A: 0, B: 0, P: 0, ...(E.sala.tiempo || {}) };
+    tiempo[Duelo.otro(de)] += Math.min(dt, tiempo[de]);
+    tiempo[de] = Math.max(0, tiempo[de] - dt);
+    aplicar({ tiempo });
+  };
   if (t === "A" || t === "B") {
     const antes = E.mios.size;
     E.voltear = true;
     darPalabra(Duelo.otro(t));                  // cierra el párrafo abierto, que sale ya del otro lado
     E.voltear = false;
-    if (E.mios.size > antes) return;
+    if (E.mios.size > antes) return pasarTiempo(t, [...E.mios.values()].pop());
   }
   const u = Duelo.ultimoDeLados(delDuelo());
   if (!u) return;
   const quien = Duelo.otro(u.quien);
+  pasarTiempo(u.quien, u);
   u.quien = quien;
   if (E.mios.has(u.id)) E.mios.get(u.id).quien = quien;
   E.canal.corregirParrafo(CODIGO, u.id, { quien }).catch(() => franja("No se pudo corregir. Revisa la conexión."));
@@ -188,7 +196,8 @@ function unJuez(juez, d, ps, ctx) {
   const intentos = (async () => {
     for (let i = 0; i < 2; i++) {
       try {
-        const r = leerJuez(Duelo.jsonEn(await E.canal.pedirLLM(Duelo.promptJuezVoz(juez, d, ps, ctx), "jurado")));
+        const crudo = Duelo.jsonEn(await E.canal.pedirLLM(Duelo.promptJuezVoz(juez, d, ps, ctx), "jurado"));
+        const r = Duelo.conFrases(leerJuez(crudo), crudo);
         if (r) return Duelo.fichaJuez(juez, r);
       } catch (e) { console.warn("juez " + juez.id + ":", e); }
     }

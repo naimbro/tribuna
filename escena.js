@@ -127,6 +127,7 @@ function pintar() {
   if (!vista) return aviso("Esta sala quedó en un estado que el escenario no conoce.");
   vista(s, d);
   fase(s.fase);
+  if (s.fase === "jueces") ajustarJueces();
 }
 // solo se rearma una vista cuando cambia lo que muestra
 function cambio(vista, datos) {
@@ -294,6 +295,18 @@ function pintarJueces(s, d) {
   });
   $("vJueces").querySelector(".totales").classList.toggle("visible", final);
 }
+// Si las paletas y las frases no caben (una ventana baja, frases largas), se achican hasta que
+// quepan: nunca se corta lo que dijo un juez.
+function ajustarJueces() {
+  const t = $("vJueces").querySelector(".tribunal");
+  if (!t) return;
+  let k = 1;
+  t.style.setProperty("--k", k);
+  while (k > 0.5 && t.scrollHeight > t.clientHeight + 1) { k -= 0.05; t.style.setProperty("--k", k.toFixed(2)); }
+}
+addEventListener("resize", () => { if (E.sala && E.sala.fase === "jueces") ajustarJueces(); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (E.sala && E.sala.fase === "jueces") ajustarJueces(); });
+
 function pintarSintesis(s, d) {
   const x = s.sintesis || { disputa: "", fraseA: "", fraseB: "" };
   if (!cambio("sintesis", [d.n, x])) return;
