@@ -393,3 +393,27 @@ test("semana 14: brújula corta, cinco jueces, preguntas con campo y los estudio
     assert.ok(p[k] && p[k].length >= 30 && p[k].length <= 200, `${k} de «${p.texto.slice(0, 30)}…»`);
   assert.equal(s.SESION.mocion, s.PREGUNTAS[0].texto, "la moción del syllabus es la primera pregunta");
 });
+
+// Tribuna con un solo micrófono: toda semana del catálogo tiene que dar duelos jugables.
+test("todas las semanas del catálogo producen duelos válidos para el juego de un micrófono", () => {
+  const Duelo = require("../duelo.js");
+  const cat = {};
+  vm.createContext(cat);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "contenido/sesiones.js"), "utf8") + "\n;this.SESIONES = SESIONES;", cat);
+  assert.ok(cat.SESIONES.length >= 7);
+  for (const x of cat.SESIONES) {
+    const s = cargarSesion(`contenido/semana${x.semana}.js`);
+    const ds = Duelo.duelosDe(s);
+    assert.ok(ds.length >= 1, `semana ${x.semana}: sin duelos`);
+    ds.forEach((d, i) => {
+      assert.equal(d.n, i + 1);
+      assert.ok(d.pregunta && d.pregunta.length > 10, `semana ${x.semana}, duelo ${d.n}: sin pregunta`);
+      for (const k of ["A", "B"]) {
+        assert.ok(d[k].nombre && d[k].corto, `semana ${x.semana}, duelo ${d.n}, lado ${k}: sin nombre`);
+        assert.match(d[k].color, /^#[0-9a-f]{6}$/i, `semana ${x.semana}, duelo ${d.n}, lado ${k}: color`);
+      }
+      assert.notEqual(d.A.nombre, d.B.nombre);
+    });
+    if (s.PERSONAJES) assert.ok(ds.every(d => d.personajes), `semana ${x.semana}: un duelo quedó sin personajes`);
+  }
+});

@@ -1,0 +1,70 @@
+/* TRIBUNA con un solo micrófono — el teléfono del profesor (micro.html).
+   Se usa de pie, con una mano y mirando a los estudiantes: pocos botones, grandes, y el estado
+   siempre dicho con palabras además del color. Las variables vienen de tribuna.css. */
+[hidden]{display:none!important}
+.micro{overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#micro{height:100dvh;display:flex;flex-direction:column;
+  padding:max(14px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom))}
+.m{display:none;flex:1;min-height:0;flex-direction:column;gap:14px}
+#micro[data-vista="mensaje"] .m-mensaje,#micro[data-vista="prueba"] .m-prueba,#micro[data-vista="duelos"] .m-duelos,
+#micro[data-vista="debate"] .m-debate,#micro[data-vista="veredicto"] .m-veredicto,#micro[data-vista="fin"] .m-fin{display:flex}
+.m h1{font:600 1.7rem/1.15 var(--voz);margin:8px 0 0;text-wrap:balance}
+.guia{color:var(--tenue);margin:0;line-height:1.4}
+.texto{background:none;border:0;color:var(--tenue);padding:12px 6px;font-size:1rem;text-decoration:underline;text-underline-offset:.2em}
+.boton{width:100%;padding:1em 1.5em;font-size:1.1rem}
+.boton.hueco{background:transparent;color:var(--bronce);box-shadow:inset 0 0 0 2px var(--bronce)}
+
+.m-mensaje,.m-fin{justify-content:center;align-items:center;text-align:center;padding:0 10px}
+.m-mensaje p{font:500 1.35rem/1.35 var(--voz);margin:0}
+
+.oido-prueba{flex:1;min-height:0;overflow:auto;margin:0;padding:16px;border:1px dashed var(--linea);border-radius:16px;font:400 1.5rem/1.3 var(--voz)}
+.oido-prueba:empty::before{content:"Aquí aparece lo que oye el teléfono.";color:var(--tenue);font-style:italic}
+
+.lista{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.duelo{display:block;width:100%;text-align:left;background:var(--noche2);border:1px solid var(--linea);border-radius:18px;padding:16px}
+.duelo .vs{display:block;font:750 1.3rem/1.15 var(--aparato);font-stretch:88%}
+.duelo .vs i{font:italic 400 .8em var(--voz);color:var(--tenue);margin:0 .4em}
+.duelo .q{display:block;font:400 .98rem/1.3 var(--voz);color:var(--tenue);margin-top:6px}
+.duelo .res{display:block;color:var(--bronce);margin-top:6px;font-size:.95rem}
+.duelo .ir{display:block;margin-top:10px;font-weight:700;color:var(--bronce)}
+.duelo:disabled{opacity:.7;cursor:default}
+
+.arriba{display:flex;align-items:center;gap:8px;min-height:44px}
+.arriba .texto{flex:none;padding-left:0}
+.oyendo{flex:1;min-width:0;margin:0;text-align:right;white-space:nowrap;overflow:hidden;font:italic 400 1rem/1.3 var(--voz);color:var(--tenue)}
+.sug{display:flex;align-items:flex-start;gap:6px;background:var(--noche2);border-left:3px solid var(--bronce);border-radius:12px;padding:12px 8px 12px 14px}
+.sug p{flex:1;margin:0;font:400 1.05rem/1.3 var(--voz)}
+.sug .texto{padding:2px 6px}
+.lados{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lado{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px;border:2px solid currentColor;border-radius:24px;
+  transition:background .2s,color .2s,box-shadow .2s}
+.lado-a{color:var(--a);background:color-mix(in srgb,var(--a) 9%,var(--noche))}
+.lado-b{color:var(--b);background:color-mix(in srgb,var(--b) 9%,var(--noche))}
+.lado .nom{font:800 clamp(1.5rem,7.6vw,2.7rem)/1.02 var(--aparato);font-stretch:84%;text-align:center;overflow-wrap:anywhere}
+.lado .est,.yo .est{font-size:.9rem;font-weight:500;opacity:.85}
+.lado-a.activo{background:var(--a);color:var(--noche);box-shadow:0 0 0 5px color-mix(in srgb,var(--a) 35%,transparent)}
+.lado-b.activo{background:var(--b);color:var(--noche);box-shadow:0 0 0 5px color-mix(in srgb,var(--b) 35%,transparent)}
+.yo{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:20px 22px;border:2px solid var(--bronce);border-radius:20px;
+  color:var(--bronce);background:color-mix(in srgb,var(--bronce) 8%,var(--noche));transition:background .2s,color .2s}
+.yo .nom{font:750 1.3rem/1 var(--aparato)}
+.yo.activo{background:var(--bronce);color:var(--noche)}
+.abajo{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.mantener{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:2px;padding:11px 24px;
+  border:1px solid var(--linea);border-radius:999px;background:var(--noche2);font-weight:700}
+.mantener small{font-weight:400;font-size:.72rem;color:var(--tenue)}
+.mantener>*{position:relative}
+.mantener::before{content:"";position:absolute;inset:0;width:0;background:color-mix(in srgb,var(--bronce) 50%,transparent);transition:width .15s}
+.mantener.apretado::before{width:100%;transition:width 1s linear}
+
+.m-veredicto{justify-content:center;align-items:stretch;gap:18px}
+.que{font:500 1.5rem/1.3 var(--voz);text-align:center;margin:0;min-height:2.6em}
+.gran{height:38dvh;border:0;border-radius:30px;background:var(--bronce);color:var(--noche);font:800 2.3rem/1 var(--aparato)}
+.gran:disabled{background:var(--noche2);color:var(--tenue);cursor:default}
+.m-veredicto .texto{align-self:center}
+
+.franja{position:fixed;inset:0 0 auto 0;z-index:5;display:flex;align-items:flex-start;gap:10px;background:var(--alerta);color:#fff;
+  padding:max(12px,env(safe-area-inset-top)) 14px 12px;font-weight:600;line-height:1.35}
+.franja span{flex:1}
+.franja button{background:none;border:0;color:#fff;font-size:1.5rem;line-height:1;padding:0 4px}
+.pastilla{position:fixed;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4;
+  background:var(--papel);color:var(--noche);border-radius:999px;padding:6px 16px;font-size:.88rem;font-weight:600}

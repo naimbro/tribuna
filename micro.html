@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#141a2e">
+<title>Tribuna, el micrófono</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tribuna.css?v=20261110a">
+<link rel="stylesheet" href="micro.css?v=20261110a">
+</head>
+<body class="micro">
+<!-- El teléfono del profesor: el único micrófono y el único control. -->
+<div class="franja" id="franja" role="alert" hidden><span id="franjaTxt"></span><button id="franjaCerrar" aria-label="Cerrar el aviso">×</button></div>
+<div class="pastilla" id="sinRed" hidden>Sin conexión</div>
+
+<main id="micro" data-vista="mensaje">
+  <section class="m m-mensaje">
+    <p id="mensajeTxt">Conectando…</p>
+    <button class="boton" id="btnEntrar" hidden>Entrar con Google</button>
+  </section>
+
+  <section class="m m-prueba">
+    <h1>Prueba de micrófono</h1>
+    <p class="guia">Toca «Probar el micrófono» y di una frase. Tiene que aparecer escrita aquí abajo.</p>
+    <p class="oido-prueba" id="pruebaTxt"></p>
+    <button class="boton hueco" id="btnProbar">Probar el micrófono</button>
+    <button class="boton" id="btnSeOye">Se oye bien</button>
+  </section>
+
+  <section class="m m-duelos">
+    <h1 id="duelosTema"></h1>
+    <div class="lista" id="duelosLista"></div>
+    <button class="texto" id="btnCerrar">Cerrar la clase</button>
+  </section>
+
+  <section class="m m-debate">
+    <div class="arriba">
+      <button class="texto" id="btnSalir">‹ Duelos</button>
+      <p class="oyendo" id="oyendo"></p>
+    </div>
+    <div class="sug" id="sug" hidden><p id="sugTxt"></p><button class="texto" id="btnOtra">otra</button></div>
+    <div class="lados">
+      <button class="lado lado-a" id="ladoA"><span class="nom"></span><span class="est"></span></button>
+      <button class="lado lado-b" id="ladoB"><span class="nom"></span><span class="est"></span></button>
+    </div>
+    <button class="yo" id="btnYo"><span class="nom">Pregunto yo</span><span class="est"></span></button>
+    <div class="abajo">
+      <button class="texto" id="btnOtroLado">⇄ Era del otro lado</button>
+      <button class="mantener" id="btnVeredicto"><span>Veredicto</span><small>mantén apretado</small></button>
+    </div>
+  </section>
+
+  <section class="m m-veredicto">
+    <p class="que" id="veredictoQue"></p>
+    <button class="gran" id="btnSiguiente">Siguiente</button>
+    <button class="texto" id="btnReintentar" hidden>Reintentar</button>
+    <button class="texto" id="btnVolver" hidden>Volver al debate</button>
+  </section>
+
+  <section class="m m-fin">
+    <h1>La clase está cerrada</h1>
+    <p class="guia">El tablero final está en el proyector.</p>
+    <button class="texto" id="btnReabrir">Volver a los duelos</button>
+  </section>
+</main>
+
+<script src="contenido/sesiones.js?v=20260928a"></script>
+<script>
+  // El QR trae la clase (?semana=N): de ahí salen los jueces y el dossier de las sugerencias.
+  (function () {
+    const pedida = +new URLSearchParams(location.search).get("semana");
+    if (pedida && SESIONES.some(x => x.semana === pedida))
+      document.write('<script src="contenido/semana' + pedida + '.js?v=20261110a"><\/script>');
+  })();
+</script>
+<script src="rotacion.js?v=20261003a"></script>
+<script src="jueces.js?v=20261001c"></script>
+<script src="dictado.js?v=20261003a"></script>
+<script src="duelo.js?v=20261110a"></script>
+<script src="oido.js?v=20261110a"></script>
+<script type="module" src="micro.js?v=20261110a"></script>
+</body>
+</html>

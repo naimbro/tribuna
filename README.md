@@ -1,5 +1,38 @@
 # TRIBUNA
 
+## Tribuna con un solo micrófono (noviembre de 2026)
+
+La entrada del juego cambió. Ahora hay dos pantallas y nada más:
+
+- **El escenario** (`index.html`), en el notebook conectado al proyector: muestra la moción, quién
+  tiene la palabra y la transcripción en grande; al final, el veredicto de cinco jueces de IA.
+- **El micrófono** (`micro.html`), en el teléfono del profesor (Android con Chrome): es el único
+  micrófono y el único control. Los estudiantes no usan teléfono.
+
+Cómo se usa:
+
+1. Abrir `index.html`, entrar con Google y elegir la clase. Aparece un código QR.
+2. Escanear el QR con el teléfono, entrar con la misma cuenta y hacer la prueba de micrófono.
+3. En el teléfono, empezar un duelo. Tocar el lado que tiene la palabra; «Pregunto yo» para las
+   preguntas del profesor; tocar de nuevo lo activo deja el micrófono en pausa; «⇄ Era del otro
+   lado» corrige la atribución.
+4. Mantener apretado «Veredicto». El escenario pide manos arriba y después cada toque en
+   «Siguiente» revela un juez, el resultado y lo que quedó en disputa.
+
+Ensayo sin cuentas ni internet: `python servidor.py` y abrir
+<http://localhost:8777/index.html?local=1>; desde la sala de espera, «Abrir el micrófono en otra
+pestaña» (con voz simulada). Agregar `&ia=1` a la dirección del micrófono usa la IA de `.env`.
+
+Piezas: `duelo.js` (lógica pura), `oido.js` (de la voz a los párrafos, sobre `dictado.js`),
+`canal.js` (Firestore o ensayo local), `escena.js`, `micro.js`. Diseño:
+`docs/superpowers/specs/2026-11-10-un-microfono-design.md`.
+
+**El juego anterior** (rotación de grupos, teléfonos de los estudiantes, moderadora) sigue en
+`clasico.html`, con `jugar.html`, `control.html` y `admin.html`. Todo lo que sigue en este
+documento describe ese juego.
+
+## El juego clásico
+
 Prototipo de debate en equipos con audiencia sintética, para el curso
 **CSC00155 — Inteligencia Artificial y Democracia**. La sesión cargada es la
 **Semana 5: Populismo y oligarquía de la IA**.

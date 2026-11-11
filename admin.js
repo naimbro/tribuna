@@ -26,6 +26,12 @@ const fecha = s => s.creada || s.actualizado || 0;
 const fmtFecha = t => t ? new Date(t).toLocaleString("es-CL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 
 function estadoDe(s) {
+  if (s.modo === "micro") {
+    const n = (s.duelos || []).length, j = (s.duelos || []).filter(d => d.jugado).length;
+    if (s.fase === "fin") return ["terminada", "fin"];
+    if (s.fase === "espera") return [j ? `${j} de ${n} duelos` : "sin empezar", j ? "vivo" : ""];
+    return [`duelo ${s.duelo}`, "vivo"];
+  }
   if (s.etapa === "portada") return ["en portada", "vivo"];
   if (s.etapa === "intro") return ["intro", "vivo"];
   if (s.fase === "fin") return s.veredicto ? ["terminada", "fin"] : ["por revelar", "vivo"];
@@ -42,6 +48,7 @@ function estadoDe(s) {
 const gN = (s, n) => rotuloGrupo(n, s.personajes);
 // Rotación: el campeón (o quien va primero). Salas antiguas: se calcula con sus marcadores.
 function ganadorDe(s) {
+  if (s.modo === "micro") return null;
   if (s.modo === "rotacion") return s.veredicto && s.veredicto.campeon ? gN(s, s.veredicto.campeon) : (s.ranking && s.ranking[0] && s.ranking[0].debates ? `${gN(s, s.ranking[0].grupo)} (va primero)` : null);
   const v = s.veredicto; if (!v) return null;
   if (v.ganaG) return v.ganaG;
@@ -81,7 +88,8 @@ async function cargar(uid) {
 
 /* ------------------------------ pintar ----------------------------- */
 function pintar() {
-  const visibles = V.partidas.filter(p => (V.verArchivadas || !p.s.archivada) && (V.verVacias || p.jugadores.length > 0));
+  // las salas de un micrófono nunca tienen jugadores inscritos: no cuentan como vacías
+  const visibles = V.partidas.filter(p => (V.verArchivadas || !p.s.archivada) && (V.verVacias || p.jugadores.length > 0 || p.s.modo === "micro"));
   const ocultas = V.partidas.length - visibles.length;
   const cursos = {};
   for (const p of visibles) (cursos[cursoDe(p.s)] = cursos[cursoDe(p.s)] || []).push(p);
@@ -108,9 +116,10 @@ function pintar() {
   });
   document.querySelectorAll("[data-nueva]").forEach(b => b.onclick = () => {
     const sel = $("sel-" + b.dataset.nueva);
-    location.href = `index.html?semana=${sel.value}`;
+    location.href = `clasico.html?semana=${sel.value}`;
   });
   document.querySelectorAll("[data-txt]").forEach(b => b.onclick = () => descargarConversacion(b.dataset.txt));
+  document.querySelectorAll("[data-mtxt]").forEach(b => b.onclick = () => descargarMicro(b.dataset.mtxt).catch(e => alert("No se pudo descargar: " + (e.code || e.message))));
   document.querySelectorAll("[data-tlc]").forEach(b => b.onclick = () => detalleTelemetria(b.dataset.tlc, +b.dataset.tli));
   document.querySelectorAll("[data-fin]").forEach(b => b.onclick = () => terminarPartida(b.dataset.fin, b));
   document.querySelectorAll("[data-arch]").forEach(b => b.onclick = async () => {
@@ -208,7 +217,52 @@ function campoAlumno(s, j) {
   return `<small style="display:block;margin-left:34px">${j.grupo ? esc(rotuloCorto(j.grupo, s.personajes)) : "G?"} · <b style="color:${antes.color}">${esc(antes.nombre)}</b>${despues ? ` → <b style="color:${despues.color}">${esc(despues.nombre)}</b>` : ""}</small>`;
 }
 
+// Una sala del juego de un solo micrófono: no hay alumnos inscritos ni feedback. Se muestran sus
+// duelos con el resultado y se descarga el registro (transcripción y veredictos) como texto.
+function microHtml(s) {
+  const [est, cls] = estadoDe(s);
+  const ds = s.duelos || [], jug = ds.filter(d => d.jugado).length;
+  return `<div class="partida ${V.abiertas.has(s.codigo) ? "abierta" : ""}">
+    <div class="fila" data-cod="${s.codigo}">
+      <span class="f">${fmtFecha(fecha(s))}</span>
+      <span class="cod">${s.codigo}</span>
+      <span class="tema"><div>${esc(s.tema)}</div><small>Un micrófono, ${ds.length} duelo${ds.length === 1 ? "" : "s"}</small></span>
+      <span class="gana" style="color:var(--dim2)">${jug} jugado${jug === 1 ? "" : "s"}</span>
+      <span class="gente"></span><span class="fbm"></span>
+      <span class="estado ${cls}">${est}</span>
+    </div>
+    <div class="detalle">
+      <div class="caja" style="margin-bottom:12px"><h3>DUELOS</h3>
+        ${ds.map(d => `<div class="com"><div class="q"><b>${d.n}.</b> <span style="color:${esc(d.A.color)}">${esc(d.A.nombre)}</span> vs <span style="color:${esc(d.B.color)}">${esc(d.B.nombre)}</span>
+          <span style="margin-left:auto;color:var(--dim)">${esc(Duelo.textoResultado(d) || "no se jugó")}</span></div><p>${esc(d.pregunta)}</p></div>`).join("")}
+      </div>
+      <div class="acc">
+        <a class="btn" href="index.html?sala=${s.codigo}" target="_blank">▶ Abrir escenario</a>
+        <button class="btn" data-mtxt="${s.codigo}">⬇ Transcripción y veredictos (.txt)</button>
+        <button class="btn" data-arch="${s.codigo}">${s.archivada ? "↩ Desarchivar" : "🗄 Archivar"}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function descargarMicro(codigo) {
+  const s = V.partidas.find(x => x.s.codigo === codigo).s;
+  const snap = await getDocs(query(collection(db, "salas", codigo, "mensajes"), orderBy("t0")));
+  const parrafos = [];
+  snap.forEach(d => parrafos.push({ id: d.id, ...d.data() }));
+  const veredictos = {};
+  await Promise.all((s.duelos || []).filter(d => d.jugado).map(async d => {
+    const v = await getDoc(doc(db, "salas", codigo, "privado", "duelo" + d.n)).catch(() => null);
+    if (v && v.exists()) veredictos[d.n] = v.data();
+  }));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([Duelo.registroTexto(s, parrafos, veredictos)], { type: "text/plain;charset=utf-8" }));
+  a.download = `tribuna_${codigo}_semana${s.semana}.txt`;
+  a.click();
+}
+
 function partidaHtml({ s, jugadores, feedback, telemetria }) {
+  if (s.modo === "micro") return microHtml(s);
   const [est, cls] = estadoDe(s);
   const g = ganadorDe(s);
   const n = r => jugadores.filter(j => j.equipo === r).length;
@@ -271,7 +325,7 @@ function partidaHtml({ s, jugadores, feedback, telemetria }) {
       </div>
       ${telemetriaHtml(telemetria, s.codigo, s.personajes)}
       <div class="acc">
-        <a class="btn" href="index.html?sala=${s.codigo}&semana=${s.semana}" target="_blank">▶ Abrir pantalla</a>
+        <a class="btn" href="clasico.html?sala=${s.codigo}&semana=${s.semana}" target="_blank">▶ Abrir pantalla</a>
         <button class="btn" data-txt="${s.codigo}">⬇ Conversación (.txt)</button>
         ${rot && cls === "vivo" ? `<button class="btn" data-fin="${s.codigo}" title="Cierra la partida: el debate a medias no cuenta, se calcula el ranking y los teléfonos pasan al feedback y al campeón">🏁 Terminar partida</button>` : ""}
         <button class="btn" data-arch="${s.codigo}">${s.archivada ? "↩ Desarchivar" : "🗄 Archivar"}</button>
@@ -359,7 +413,7 @@ onAuthStateChanged(auth, user => {
     $("btnG").onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch(e => alert("No se pudo entrar: " + e.code));
     return;
   }
-  $("yo").innerHTML = `${esc(user.email)} · <a href="index.html?semana=${(typeof SESIONES !== "undefined" && SESIONES.length) ? SESIONES[SESIONES.length - 1].semana : 7}">pantalla del profesor</a> · <a href="#" id="salir">salir</a>`;
+  $("yo").innerHTML = `${esc(user.email)} · <a href="index.html">Tribuna</a> · <a href="#" id="salir">salir</a>`;
   $("salir").onclick = e => { e.preventDefault(); signOut(auth); };
   cargar(user.uid).catch(e => $("main").innerHTML = `<div class="aviso">No se pudieron cargar las partidas: ${esc(e.message)}</div>`);
 });

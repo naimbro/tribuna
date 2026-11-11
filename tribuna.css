@@ -1,0 +1,160 @@
+/* TRIBUNA con un solo micrófono — lo común y el escenario (index.html).
+   Regla tipográfica: Literata para lo que se DICE (moción, transcripción, frases, citas);
+   Archivo para el APARATO (nombres, relojes, notas, botones).
+   --a y --b son los colores de los dos lados del duelo en curso: los pone escena.js / micro.js. */
+:root{
+  --noche:#141a2e; --noche2:#1b2340; --linea:#2c3558;
+  --papel:#f2ede1; --tenue:#9aa1b9; --bronce:#d2b06a; --alerta:#e5484d;
+  --a:#38bdf8; --b:#fb7185;
+  --voz:"Literata",Georgia,"Times New Roman",serif;
+  --aparato:"Archivo","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--noche);color:var(--papel);font-family:var(--aparato);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--bronce);outline-offset:3px}
+.boton{border:0;border-radius:999px;background:var(--bronce);color:var(--noche);font-weight:700;padding:.7em 1.5em;font-size:1.05rem}
+.boton:disabled{opacity:.45;cursor:default}
+.enlace{color:var(--tenue);text-underline-offset:.2em}
+.enlace:hover{color:var(--papel)}
+
+/* ============================ el escenario ============================ */
+.escena{overflow:hidden}
+#escena{position:relative;height:100vh;isolation:isolate}
+/* la luz sigue a quien habla: desde la izquierda (A), la derecha (B) o arriba (el profesor) */
+#escena::before,#escena::after,.luz{content:"";position:absolute;inset:0;z-index:-1;opacity:0;transition:opacity .6s ease;pointer-events:none}
+#escena::before{background:radial-gradient(72vw 95vh at -12% 42%,color-mix(in srgb,var(--a) 36%,transparent),transparent 70%)}
+#escena::after{background:radial-gradient(72vw 95vh at 112% 42%,color-mix(in srgb,var(--b) 36%,transparent),transparent 70%)}
+.luz{background:radial-gradient(62vw 62vh at 50% -18%,color-mix(in srgb,var(--bronce) 30%,transparent),transparent 70%)}
+#escena[data-turno="A"]::before,#escena[data-turno="B"]::after,#escena[data-turno="P"] .luz{opacity:1}
+
+.v{display:none;height:100%}
+#escena[data-fase="portada"] .v-portada,#escena[data-fase="aviso"] .v-aviso{display:flex}
+#escena[data-fase="espera"] .v-espera,#escena[data-fase="debate"] .v-debate{display:grid}
+#escena[data-fase="manos"] .v-manos,#escena[data-fase="jueces"] .v-jueces,
+#escena[data-fase="sintesis"] .v-sintesis,#escena[data-fase="fin"] .v-fin{display:flex}
+
+/* --- portada y avisos --- */
+.v-portada,.v-aviso{flex-direction:column;align-items:flex-start;gap:1.2rem;padding:8vh 9vw;overflow:auto}
+.marca{font:600 clamp(56px,7vw,120px)/1 var(--voz);margin:0;letter-spacing:-.02em}
+.bajada{font:400 clamp(20px,1.6vw,30px)/1.3 var(--voz);color:var(--tenue);margin:0 0 1rem}
+.curso{width:min(100%,900px)}
+.curso h2{font:600 clamp(14px,1vw,18px)/1.3 var(--aparato);color:var(--tenue);margin:1.4rem 0 .3rem}
+.clase{display:block;padding:.7rem .9rem;margin:0 -.9rem;border-radius:10px;font:500 clamp(19px,1.5vw,28px)/1.3 var(--voz);text-decoration:none}
+.clase:hover{background:var(--noche2)}
+.pie-portada{margin-top:auto;padding-top:2rem;display:flex;gap:1.6rem;flex-wrap:wrap;color:var(--tenue);font-size:.95rem}
+.aviso-txt{font:500 clamp(24px,2.2vw,42px)/1.3 var(--voz);max-width:28em;margin:auto 0 0}
+.v-aviso .enlace{margin-bottom:auto}
+
+/* --- la espera: los duelos de la clase y el QR --- */
+.v-espera{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:5vw;padding:7vh 6vw;align-items:start}
+.tema{font:600 clamp(32px,3.2vw,64px)/1.08 var(--voz);margin:0 0 .3em;letter-spacing:-.01em;text-wrap:balance}
+.del-curso{color:var(--tenue);font-size:clamp(14px,1.05vw,20px);margin:0 0 4vh}
+.duelos{list-style:none;margin:0;padding:0;counter-reset:d}
+.duelos li{counter-increment:d;display:grid;grid-template-columns:2.2em 1fr;padding:1.6vh 0;border-top:1px solid var(--linea)}
+.duelos li::before{content:counter(d);font:700 clamp(18px,1.5vw,28px)/1.3 var(--aparato);color:var(--tenue)}
+.duelos .q{font:400 clamp(17px,1.35vw,26px)/1.3 var(--voz);margin:0}
+.duelos .vs{margin:.35em 0 0;font-weight:700;font-size:clamp(15px,1.15vw,22px)}
+.duelos .vs i{font-style:normal;font-weight:400;color:var(--tenue);margin:0 .5em}
+.duelos .res{margin:.2em 0 0;color:var(--bronce);font-size:clamp(14px,1.05vw,20px)}
+.duelos .jugado .q{color:var(--tenue)}
+.parear{justify-self:end;text-align:center;width:min(100%,30vw)}
+.parear .qr{background:var(--papel);border-radius:14px;padding:14px;line-height:0}
+.parear .qr svg{width:100%;height:auto}
+.parear p{color:var(--tenue);font-size:clamp(14px,1.1vw,21px);margin:1em 0 .2em}
+.parear .codigo{font:800 clamp(28px,2.6vw,52px)/1 var(--aparato);letter-spacing:.14em;color:var(--papel)}
+.parear.conectado{width:min(100%,14vw)}
+.parear.conectado p{color:var(--bronce)}
+
+/* --- el debate --- */
+.v-debate{grid-template-rows:auto minmax(0,1fr) auto;gap:2.5vh;padding:4vh 4vw 3vh}
+.cab{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.1fr) minmax(0,1fr);gap:3vw;align-items:start}
+.placa .nom{display:block;font:750 clamp(26px,2.5vw,50px)/1.05 var(--aparato);font-stretch:88%}
+.placa .cargo{display:block;color:var(--tenue);font-size:clamp(13px,1.05vw,21px);margin-top:.3em}
+.placa .estado{display:block;font-size:clamp(13px,1.05vw,21px);font-weight:600;margin-top:.3em;visibility:hidden}
+.placa::after{content:"";display:block;height:4px;margin-top:1.2vh;background:currentColor;opacity:.22;transition:opacity .4s}
+.placa-a{color:var(--a)} .placa-b{color:var(--b);text-align:right}
+.placa.habla::after{opacity:1}
+.placa.habla .estado{visibility:visible}
+.mocion{font:500 clamp(19px,1.75vw,34px)/1.25 var(--voz);text-align:center;margin:0;text-wrap:balance}
+.acta{overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 24%);mask-image:linear-gradient(to bottom,transparent 0,#000 24%)}
+.acta-in{display:flex;flex-direction:column;font-family:var(--voz);font-size:clamp(28px,2.6vw,44px);line-height:1.3}
+.par{margin:0 0 .5em;max-width:74%;opacity:.6}
+.par:nth-last-child(-n+3){opacity:1}
+.par-A{align-self:flex-start} .par-B{align-self:flex-end;text-align:right}
+.par-P{align-self:center;text-align:center;font-style:italic;color:var(--bronce);max-width:62%}
+.par .quien{display:block;font:700 .44em/1.2 var(--aparato);margin-bottom:.15em}
+.par-A .quien{color:var(--a)} .par-B .quien{color:var(--b)} .par-P .quien{display:none}
+.par.vivo .dicho{color:color-mix(in srgb,var(--papel) 86%,transparent)}
+.par-P.vivo .dicho{color:color-mix(in srgb,var(--bronce) 86%,transparent)}
+.par.nuevo{animation:entra .4s ease-out}
+.par[hidden]{display:none}
+.vacio{align-self:center;font:italic 400 .7em/1.3 var(--voz);color:var(--tenue);margin:0 0 20vh}
+@keyframes entra{from{opacity:0}}
+.pie{display:grid;grid-template-columns:auto 1fr auto;gap:1.4vw;align-items:center;font-weight:600;font-size:clamp(16px,1.3vw,26px);font-variant-numeric:tabular-nums}
+.pie .tA{color:var(--a)} .pie .tB{color:var(--b)}
+.barra{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--linea)}
+.barra i{display:block;transition:width .5s linear}
+.barra #bA{background:var(--a)} .barra #bB{background:var(--b);flex:1}
+
+/* --- manos arriba --- */
+.v-manos{flex-direction:column;align-items:center;justify-content:center;gap:3vh;text-align:center;padding:6vh 6vw}
+.gran-pregunta{font:600 clamp(64px,8.5vw,160px)/1 var(--voz);margin:0;letter-spacing:-.02em}
+.dos{font:750 clamp(34px,4.4vw,88px)/1.1 var(--aparato);font-stretch:88%;margin:0}
+.dos i{font:italic 400 .55em var(--voz);color:var(--tenue);margin:0 .7em}
+.manos{font:400 clamp(22px,2vw,40px)/1.3 var(--voz);margin:0}
+.delib{color:var(--tenue);font-size:clamp(15px,1.2vw,24px);margin:4vh 0 0}
+
+/* --- los jueces levantan sus paletas --- */
+.v-jueces{flex-direction:column;padding:4vh 4vw 3vh;gap:2vh}
+.v-jueces .mocion{text-align:left;color:var(--tenue);font-size:clamp(16px,1.3vw,26px)}
+.leyenda{display:flex;gap:2.5vw;margin:0;font:750 clamp(20px,1.8vw,36px)/1.1 var(--aparato);font-stretch:88%}
+.tribunal{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:1.6vw;margin-top:1vh;min-height:0;overflow:hidden}
+.juez{opacity:.3;transition:opacity .4s}
+.juez.visto{opacity:1}
+.juez header{display:flex;flex-direction:column;gap:.4vh;padding-bottom:1.2vh;border-bottom:1px solid var(--linea)}
+.juez .emoji{font-size:clamp(30px,2.8vw,56px);line-height:1}
+.juez .quien{font-weight:700;font-size:clamp(15px,1.25vw,25px)}
+.fallo{display:grid;grid-template-columns:auto 1fr;gap:.9vw;align-items:center;margin-top:2.2vh;visibility:hidden}
+.juez.visto .fallo{visibility:visible;animation:alza .5s cubic-bezier(.2,.9,.3,1.25) both}
+.juez.visto .fallo-b{animation-delay:.12s}
+@keyframes alza{from{opacity:0;transform:translateY(22px) scale(.7)}}
+.nota{display:grid;place-items:center;width:clamp(54px,4.8vw,96px);aspect-ratio:1;border-radius:50%;color:var(--noche);
+  font:800 clamp(23px,2.2vw,44px)/1 var(--aparato);font-variant-numeric:tabular-nums;transition:background .4s,color .4s,opacity .4s}
+.fallo-a .nota{background:var(--a)} .fallo-b .nota{background:var(--b)}
+.frase{font:400 clamp(15px,1.2vw,23px)/1.3 var(--voz);margin:0;transition:opacity .4s}
+.fallo.fuera .nota{background:transparent;text-decoration:line-through;opacity:.6}
+.fallo-a.fuera .nota{color:var(--a);box-shadow:inset 0 0 0 2px var(--a)}
+.fallo-b.fuera .nota{color:var(--b);box-shadow:inset 0 0 0 2px var(--b)}
+.fallo.fuera .frase{opacity:.45}
+.juez.abst .frase{color:var(--tenue);font-style:italic}
+.totales{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:3vw;margin-top:auto;visibility:hidden}
+.totales.visible{visibility:visible;animation:entra .7s ease-out}
+.total{white-space:nowrap}
+.total b{display:block;font:750 clamp(18px,1.6vw,32px)/1.1 var(--aparato);font-stretch:88%}
+.total .num{font:800 clamp(60px,6.6vw,132px)/.95 var(--aparato);font-variant-numeric:tabular-nums}
+.total small{font-size:clamp(14px,1.1vw,22px);color:var(--tenue);margin-left:.5em}
+.total-a{color:var(--a)} .total-b{color:var(--b);text-align:right}
+.ganador{font:600 clamp(34px,3.8vw,76px)/1.05 var(--voz);margin:0 0 .15em;text-align:center}
+.descarte{grid-column:1/-1;text-align:center;color:var(--tenue);font-size:clamp(13px,1vw,20px);margin:0}
+
+/* --- la síntesis --- */
+.v-sintesis{flex-direction:column;padding:7vh 8vw 6vh;gap:3vh}
+.v-sintesis h1{font:600 clamp(18px,1.5vw,30px)/1.2 var(--aparato);color:var(--bronce);margin:0}
+.disputa{font:500 clamp(30px,3vw,58px)/1.22 var(--voz);margin:0;max-width:27em;text-wrap:pretty}
+.citas{display:grid;grid-template-columns:1fr 1fr;gap:5vw;margin-top:auto}
+.citas blockquote{margin:0;padding-left:1.4vw;border-left:4px solid;font:italic 400 clamp(20px,1.8vw,36px)/1.3 var(--voz);color:var(--papel)}
+.citas cite{display:block;font:700 .62em/1.2 var(--aparato);margin-top:.6em}
+.citas .cita-a{border-color:var(--a)} .cita-a cite{color:var(--a)}
+.citas .cita-b{border-color:var(--b)} .cita-b cite{color:var(--b)}
+
+/* --- el cierre --- */
+.v-fin{flex-direction:column;padding:7vh 8vw;overflow:auto}
+.v-fin .duelos .q{color:var(--papel)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
