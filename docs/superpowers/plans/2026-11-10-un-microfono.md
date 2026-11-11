@@ -1601,7 +1601,7 @@ a{color:inherit}
 </script>
 <script src="duelo.js?v=20261110b"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-<script type="module" src="escena.js?v=20261110b"></script>
+<script type="module" src="escena.js?v=20261110c"></script>
 </body>
 </html>
 ```
@@ -1908,17 +1908,19 @@ function pintarJueces(s, d) {
   });
   $("vJueces").querySelector(".totales").classList.toggle("visible", final);
 }
-// Si las paletas y las frases no caben (una ventana baja, frases largas), se achican hasta que
-// quepan: nunca se corta lo que dijo un juez.
+// Las paletas y las frases usan todo el alto disponible: parten grandes y se achican hasta caber
+// (una ventana baja, frases largas). Nunca se corta lo que dijo un juez.
 function ajustarJueces() {
   const t = $("vJueces").querySelector(".tribunal");
   if (!t) return;
-  let k = 1;
+  let k = 1.35;
   t.style.setProperty("--k", k);
   while (k > 0.5 && t.scrollHeight > t.clientHeight + 1) { k -= 0.05; t.style.setProperty("--k", k.toFixed(2)); }
 }
-addEventListener("resize", () => { if (E.sala && E.sala.fase === "jueces") ajustarJueces(); });
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (E.sala && E.sala.fase === "jueces") ajustarJueces(); });
+const reajustar = () => { if (E.sala && E.sala.fase === "jueces") ajustarJueces(); };
+addEventListener("resize", reajustar);
+// cada tipografía que termina de cargar cambia las medidas del texto
+if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", reajustar);
 
 function pintarSintesis(s, d) {
   const x = s.sintesis || { disputa: "", fraseA: "", fraseB: "" };
