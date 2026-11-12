@@ -382,13 +382,21 @@ test("semana 14: brújula corta, cinco jueces, preguntas con campo y los estudio
   assert.equal(ejes.filter(e => e === "x").length, 3);
   const extremos = [0, 3].flatMap(i => [0, 3].map(j => Object.fromEntries(b.preguntas.map(p => [p.id, typeof p.opciones[0].x === "number" ? i : j]))));
   assert.equal(new Set(extremos.map(r => B.campoDe(B.posicion(r, b.preguntas), b.campos))).size, 4);
-  for (const n of ["hidalgo", "innerarity", "abeliuk", "schneier"]) assert.ok(s.FUENTES.includes(n), n);
+  for (const n of ["hidalgo", "innerarity", "abeliuk", "evans", "fishkin"]) assert.ok(s.FUENTES.includes(n), n);
+  // lo que salió del deck el 9-nov-2026 no puede volver al material de los jueces
+  const material = s.CONCEPTOS.map(c => c.etiqueta + " " + c.fuente).join(" ") + s.JUECES_COMUN + s.JUECES.map(j => j.valora).join(" ");
+  assert.doesNotMatch(material, /Schneier|Sanders|Diella|TSE|77 ?%/);
+  for (const c of s.CONCEPTOS) assert.ok(c.id && c.etiqueta && c.fuente && c.claves.length && [-1, 0, 1].includes(c.lado), c.id);
+  // el prompt de los jueces corta el material a los 9.000 caracteres: tiene que caber entero
+  assert.ok(s.CONCEPTOS.map(c => `- ${c.etiqueta} — ${c.fuente}`).join("\n").length <= 9000, "el material no cabe en el prompt");
   assert.equal(s.JUECES.length, 5);
   for (const j of s.JUECES) assert.ok(!j.valora.includes(s.JUECES_COMUN.slice(0, 40)), `${j.id} repite el piso común`);
   assert.equal(new Set(s.JUECES.map(j => j.valora.split(/\s+/).slice(0, 4).join(" "))).size, 5, "dos jueces parten igual");
   const campos = new Set(b.campos.map(c => c.id));
-  assert.ok(s.PREGUNTAS.length >= 4);
+  // dos duelos largos, y entre los dos debaten los cuatro campos
+  assert.equal(s.PREGUNTAS.length, 2);
   for (const p of s.PREGUNTAS) assert.ok(campos.has(p.afirma), p.texto);
+  assert.equal(new Set(s.PREGUNTAS.map(p => p.afirma)).size, 2);
   for (const p of s.PREGUNTAS) for (const k of ["favor", "contra"])
     assert.ok(p[k] && p[k].length >= 30 && p[k].length <= 200, `${k} de «${p.texto.slice(0, 30)}…»`);
   assert.equal(s.SESION.mocion, s.PREGUNTAS[0].texto, "la moción del syllabus es la primera pregunta");
