@@ -17,7 +17,7 @@ function el(tag, cls, txt) {
   if (txt != null) e.textContent = txt;
   return e;
 }
-const E = { canal: null, yo: null, sala: null, jugador: null, mio: { pos: 0, d: {} }, dentro: false,
+const E = { canal: null, yo: null, sala: null, jugador: null, mio: { pos: 0, d: {} }, dentro: false, compas: null, xy: null,
   parrafos: [], voz: null, agg: null, puntos: null, firma: {}, vivo: null, pulsoTimer: null, notaTimer: null };
 
 const vista = v => { $("butaca").dataset.vista = v; };
@@ -50,7 +50,8 @@ function lo() {
   return E.mio.d[n];
 }
 function guardar() {
-  E.canal.escribirPublico(CODIGO, { pos: E.mio.pos || 0, nombre: nombre(), grupo: grupo(), t: Date.now(), d: E.mio.d })
+  // xy: dónde quedó en el compás (solo lo leen el profesor y el propio estudiante)
+  E.canal.escribirPublico(CODIGO, { pos: E.mio.pos || 0, nombre: nombre(), grupo: grupo(), t: Date.now(), d: E.mio.d, ...(E.mio.xy ? { xy: E.mio.xy } : {}) })
     .catch(() => nota("No se pudo guardar. Revisa tu conexión."));
 }
 
@@ -68,6 +69,42 @@ function pintarGrupos(s) {
   }
   vista("grupo");
 }
+// El compás: las preguntas de la brújula corta de la clase, de a una. Al terminar, el campo en
+// que quedó es su grupo, y se fija una sola vez (como al elegirlo a mano).
+function pintarCompas() {
+  const c = E.sala.compas, x = E.compas, p = c.preguntas[x.i];
+  $("compasN").textContent = `Pregunta ${x.i + 1} de ${c.preguntas.length}`;
+  $("compasTxt").textContent = p.texto;
+  const lista = $("compasOps");
+  lista.replaceChildren();
+  p.opciones.forEach((o, k) => {
+    const b = el("button", "opcion" + (x.resp[p.id] === k ? " elegida" : ""), o.texto);
+    b.onclick = () => responderCompas(p.id, k);
+    lista.append(b);
+  });
+  $("btnAtras").hidden = x.i === 0;
+  vista("compas");
+}
+function responderCompas(id, k) {
+  const c = E.sala.compas, x = E.compas;
+  x.resp[id] = k;
+  if (x.i < c.preguntas.length - 1) { x.i++; return pintarCompas(); }
+  const g = Galeria.grupoDelCompas(x.resp, c, { posicion, campoDe });      // de brujula.js
+  if (!g) { x.i = 0; return pintarCompas(); }
+  pintarCampo(g);
+}
+function pintarCampo(g) {
+  $("campoNom").textContent = g.nombre;
+  $("campoNom").style.color = g.color || "";
+  $("campoAfirma").textContent = g.afirma;
+  const d = E.sala.duelos.find(x => x.A.g === g.n || x.B.g === g.n);
+  $("campoDuelo").textContent = d
+    ? `Tu campo debate «${d.pregunta}» y va ${d.A.g === g.n ? "a favor" : "en contra"}. Cuando debaten otros campos, juegas desde la galería.`
+    : "Vas a seguir los duelos desde la galería.";
+  $("btnCampo").disabled = false;
+  $("btnCampo").onclick = () => { $("btnCampo").disabled = true; E.xy = g.pos; entrar(g.n); };
+  vista("campo");
+}
 async function entrar(g) {
   const n = Galeria.nombreCorto(E.yo.nombre || String(E.yo.email || "").split("@")[0]);
   try { await E.canal.entrarGaleria(CODIGO, { nombre: n, grupo: g }); }
@@ -77,7 +114,7 @@ async function entrar(g) {
 }
 async function adentro() {
   const guardado = await E.canal.leerPublico(CODIGO).catch(() => null);
-  E.mio = { pos: (guardado && guardado.pos) || 0, d: (guardado && guardado.d) || {} };
+  E.mio = { pos: (guardado && guardado.pos) || 0, d: (guardado && guardado.d) || {}, xy: (guardado && guardado.xy) || E.xy || null };
   E.dentro = true;
   guardar();                                    // que el escenario lo cuente desde ya
   E.canal.escucharParrafos(CODIGO, l => { E.parrafos = l; pintarFlujo(); });
@@ -267,6 +304,8 @@ function enlazar() {
     pintarDebate(E.sala, duelo());
   };
   for (const k of ["A", "B"]) $("ap" + k).onclick = () => { lo().apuesta = k; guardar(); pintarApuesta(duelo()); };
+  $("btnAtras").onclick = () => { if (E.compas && E.compas.i > 0) { E.compas.i--; pintarCompas(); } };
+  $("btnRehacer").onclick = () => { E.compas = { i: 0, resp: {} }; pintarCompas(); };
 }
 
 /* ------------------------------ arranque ------------------------------ */
@@ -280,6 +319,8 @@ function seguir() {
     primera = false;
     E.jugador = await E.canal.leerJugador(CODIGO).catch(() => null);
     if (E.jugador && E.jugador.equipo === "P") return adentro();
+    // con compás el grupo no se elige: sale de las respuestas
+    if (s.compas && (s.grupos || []).length) { E.compas = { i: 0, resp: {} }; return pintarCompas(); }
     if ((s.grupos || []).length) return pintarGrupos(s);
     entrar(0);
   });

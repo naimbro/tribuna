@@ -71,7 +71,8 @@ async function crear() {
   const c = { SESION,
     EQUIPOS: typeof EQUIPOS !== "undefined" ? EQUIPOS : null,
     PERSONAJES: typeof PERSONAJES !== "undefined" ? PERSONAJES : null,
-    PREGUNTAS: typeof PREGUNTAS !== "undefined" ? PREGUNTAS : null };
+    PREGUNTAS: typeof PREGUNTAS !== "undefined" ? PREGUNTAS : null,
+    BRUJULA: typeof BRUJULA !== "undefined" ? BRUJULA : null };
   const duelos = Duelo.duelosDe(c);
   if (!duelos.length) return aviso("Esta clase no tiene preguntas para debatir.");
   try {
@@ -270,7 +271,9 @@ function listaDuelos(s) {
   const ol = el("ol", "duelos");
   for (const d of s.duelos) {
     const li = el("li", d.jugado ? "jugado" : ""), caja = el("div");
-    const vs = el("p", "vs"), a = el("span", "", d.A.nombre), b = el("span", "", d.B.nombre);
+    // con compás, el campo que defiende cada lado («A favor · Avatar ya»)
+    const rot = x => (x.cargo && !d.personajes ? `${x.nombre} · ${x.cargo}` : x.nombre);
+    const vs = el("p", "vs"), a = el("span", "", rot(d.A)), b = el("span", "", rot(d.B));
     a.style.color = d.A.color; b.style.color = d.B.color;
     vs.append(a, el("i", "", "contra"), b);
     caja.append(el("p", "q", d.pregunta), vs);
@@ -282,16 +285,29 @@ function listaDuelos(s) {
 }
 function pintarEspera(s) {
   const gente = E.agg ? E.agg.n : 0;
-  if (!cambio("espera", [s.duelos, E.conectado, gente, E.tabla])) return;
+  // con compás: cuántos hay en cada campo, para ver los tamaños antes de empezar
+  const campos = s.compas && E.conectado ? Galeria.porGrupo(E.publicos, s.grupos) : [];
+  if (!cambio("espera", [s.duelos, E.conectado, gente, E.tabla, campos])) return;
   const izq = el("div"), t = tablasEl();
   izq.append(el("h1", "tema", s.tema), el("p", "del-curso", s.curso), listaDuelos(s));
+  if (campos.length) {
+    const ul = el("ul", "campos");
+    for (const g of campos) {
+      const li = el("li"), n = el("span", "", g.nombre);
+      n.style.color = g.color;
+      li.append(n, el("b", "", String(g.cuantos)));
+      ul.append(li);
+    }
+    izq.append(el("p", "campos-tit", "El compás de la sala"), ul);
+  }
   if (t) izq.append(t);
   const base = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}`;
   const urlMicro = `${base}micro.html?sala=${E.codigo}&semana=${s.semana}${EXTRA}`, urlGaleria = `${base}galeria.html?sala=${E.codigo}${EXTRA}`;
   // primero se empareja el teléfono del profesor; con él conectado, el QR pasa a ser el de la galería
   const der = el("aside", "parear"), qr = qrDe(E.conectado ? urlGaleria : urlMicro);
   if (qr) der.append(qr);
-  der.append(el("p", "", E.conectado ? "Entren a la galería con su teléfono" : "Escanea con tu teléfono: va a ser el micrófono"),
+  der.append(el("p", "", !E.conectado ? "Escanea con tu teléfono: va a ser el micrófono"
+    : s.compas ? "Entren con su teléfono y respondan el compás" : "Entren a la galería con su teléfono"),
     el("div", "codigo", E.codigo));
   if (E.conectado) der.append(el("p", "gente", gente ? `${gente} en la galería` : "Micrófono conectado. Todavía no entra nadie a la galería."));
   if (LOCAL || !qr) {

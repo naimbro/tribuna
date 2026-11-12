@@ -130,6 +130,24 @@ const Galeria = (() => {
       .sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
   }
 
+  /* ---------------- el compás de entrada ---------------- */
+  // De las respuestas de la brújula corta al campo, que es el grupo. B = brujula.js (posicion y
+  // campoDe). Mientras falte una respuesta no hay grupo.
+  function grupoDelCompas(respuestas, compas, B) {
+    const ps = (compas && compas.preguntas) || [], cs = (compas && compas.campos) || [];
+    if (!ps.length || !cs.length) return null;
+    if (ps.some(p => { const i = respuestas ? respuestas[p.id] : null; return !Number.isInteger(i) || !p.opciones[i]; })) return null;
+    const pos = B.posicion(respuestas, ps);
+    if (!pos) return null;
+    const id = B.campoDe(pos, cs), i = cs.findIndex(c => c.id === id);
+    return i < 0 ? null : { n: i + 1, id, nombre: cs[i].nombre, afirma: cs[i].afirma || "", color: cs[i].color || "", pos };
+  }
+  // cuántos hay en cada grupo, para que el profesor vea los tamaños antes de empezar
+  function porGrupo(publicos, grupos) {
+    return (grupos || []).map(g => ({ n: g.n, nombre: g.nombre, color: g.color,
+      cuantos: (publicos || []).filter(p => p && p.uid && (p.grupo || 0) === g.n).length }));
+  }
+
   /* ---------------- la ronda relámpago ---------------- */
   function promptQuiz(d, transcripcion) {
     return `Ayudas a un profesor en un debate universitario a viva voz. Acaba de terminar un duelo y el público lo siguió desde su teléfono. Escribe hasta ${CFG.QUIZ_MAX} preguntas de alternativas para comprobar quién puso atención.
@@ -184,7 +202,7 @@ Responde SOLO un JSON: {"preguntas": [{"texto": "…", "opciones": ["…", "…"
   }
 
   return { CFG, nombreCorto, juega, deDuelo, aplaudir, quedan, agregados, fotoAplausos, fotoApuestas, fotoQuiz,
-    puntosDuelo, puntosDeTodos, tabla, resumenApuestas, resumenQuiz, preguntasDe, promptQuiz, leerQuiz, barajar, quizDeEnsayo };
+    puntosDuelo, puntosDeTodos, tabla, resumenApuestas, resumenQuiz, preguntasDe, grupoDelCompas, porGrupo, promptQuiz, leerQuiz, barajar, quizDeEnsayo };
 })();
 
 if (typeof module !== "undefined") module.exports = Galeria;

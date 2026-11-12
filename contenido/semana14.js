@@ -34,6 +34,7 @@ const SESION = {
   tema: "¿Puede la IA reemplazar a los políticos? Avatares, representación y deliberación",
   mocion: "Un avatar entrenado con mis respuestas me representa mejor que mi diputado.",
   grupos: 5,                // solo el juego clásico: 5 grupos de 4–5 (el profesor lo cambia en la portada)
+  compas: true,             // un micrófono: los campos de BRUJULA son los grupos de la galería
   favor: "A FAVOR",
   contra: "EN CONTRA"
 };

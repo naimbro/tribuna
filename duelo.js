@@ -24,39 +24,65 @@ const Duelo = (() => {
   /* ---------------- los duelos de una clase ---------------- */
   // Con PERSONAJES, cada pregunta trae su duelo { A, B }; sin ellos los lados son a favor y en
   // contra. Una pregunta puede ser un texto suelto (semana 307) o un objeto con `texto`.
+  // El compás (SESION.compas): en una clase sin personajes, los campos de su brújula corta son los
+  // grupos de la galería. Cada estudiante responde la brújula al entrar y queda en su campo.
+  function camposDe(c) {
+    const S = (c && c.SESION) || {}, b = c && c.BRUJULA;
+    if (!S.compas || (c && Array.isArray(c.PERSONAJES) && c.PERSONAJES.length)) return [];
+    const cs = b && Array.isArray(b.campos) && Array.isArray(b.preguntas) && b.preguntas.length ? b.campos : [];
+    return cs.length >= 2 && cs.length <= 10 && cs.every(x => x && x.id && x.nombre && x.centro) ? cs : [];
+  }
   function duelosDe(c) {
     const S = (c && c.SESION) || {}, E = (c && c.EQUIPOS) || {};
     const pers = c && Array.isArray(c.PERSONAJES) ? c.PERSONAJES : null;
     const pregs = c && Array.isArray(c.PREGUNTAS) && c.PREGUNTAS.length ? c.PREGUNTAS : [S.mocion];
-    // g: el grupo que encarna a ese lado (el orden de PERSONAJES, 1…N); 0 si la clase no tiene
-    const lado = (k, pj) => pj
-      ? { id: pj.id, g: pers.length <= 10 ? pers.indexOf(pj) + 1 : 0, nombre: pj.nombre, corto: pj.corto || pj.nombre, cargo: pj.cargo || "", color: pj.color || COLOR[k] }
-      : { id: k, g: 0, nombre: k === "A" ? "A favor" : "En contra", corto: k === "A" ? "A favor" : "En contra", cargo: "",
-          color: (E[k] && E[k].color) || COLOR[k] };
+    const campos = camposDe(c);
+    const lejos = (a, b) => Math.hypot(a.centro.x - b.centro.x, a.centro.y - b.centro.y);
+    // g: el grupo que encarna a ese lado (el orden de PERSONAJES o de los campos, 1…N); 0 si no hay
+    const lado = (k, pj, campo) => {
+      if (pj) return { id: pj.id, g: pers.length <= 10 ? pers.indexOf(pj) + 1 : 0, nombre: pj.nombre, corto: pj.corto || pj.nombre,
+        cargo: pj.cargo || "", color: pj.color || COLOR[k] };
+      const nombre = k === "A" ? "A favor" : "En contra";
+      return campo ? { id: k, g: campos.indexOf(campo) + 1, nombre, corto: nombre, cargo: campo.nombre, color: campo.color || COLOR[k] }
+        : { id: k, g: 0, nombre, corto: nombre, cargo: "", color: (E[k] && E[k].color) || COLOR[k] };
+    };
     const out = [];
     for (const q of pregs) {
       const pregunta = plano(typeof q === "string" ? q : q && q.texto);
       if (!pregunta) continue;
       const dq = q && q.duelo, pA = pers && dq ? pers.find(x => x.id === dq.A) : null, pB = pers && dq ? pers.find(x => x.id === dq.B) : null;
       const con = !!(pA && pB);
-      out.push({ n: out.length + 1, pregunta, personajes: con, A: lado("A", con ? pA : null), B: lado("B", con ? pB : null),
+      // con compás cada campo defiende lo suyo: a favor, el que afirma la pregunta; en contra, el
+      // campo más lejano en el mapa. Los demás campos siguen el duelo desde la galería.
+      const cA = !con && q && q.afirma ? campos.find(x => x.id === q.afirma) || null : null;
+      const cB = cA ? campos.filter(x => x !== cA).reduce((m, x) => (lejos(x, cA) > lejos(m, cA) ? x : m)) : null;
+      out.push({ n: out.length + 1, pregunta, personajes: con, A: lado("A", con ? pA : null, cA), B: lado("B", con ? pB : null, cB),
         jugado: false, ganador: null, totalA: null, totalB: null });
     }
     return out;
   }
 
-  // Los grupos de la clase, para la galería: uno por personaje. Las reglas de Firestore admiten
-  // hasta el grupo 10; con más personajes, o sin ellos, la clase no tiene grupos.
+  // Los grupos de la clase, para la galería: uno por personaje o, con compás, uno por campo. Las
+  // reglas de Firestore admiten hasta el grupo 10; con más, o sin nada de eso, la clase no tiene grupos.
   function gruposDe(c) {
     const pers = c && Array.isArray(c.PERSONAJES) ? c.PERSONAJES : [];
-    if (!pers.length || pers.length > 10) return [];
-    return pers.map((pj, i) => ({ n: i + 1, nombre: pj.nombre, corto: pj.corto || pj.nombre, color: pj.color || "#9aa1b9" }));
+    if (pers.length) return pers.length > 10 ? [] : pers.map((pj, i) => ({ n: i + 1, nombre: pj.nombre, corto: pj.corto || pj.nombre, color: pj.color || "#9aa1b9" }));
+    return camposDe(c).map((x, i) => ({ n: i + 1, nombre: x.nombre, corto: x.nombre, color: x.color || "#9aa1b9" }));
+  }
+  // Lo que la butaca necesita para preguntar y ubicar: va en la sala, porque la galería no carga el
+  // archivo de la clase. (No puede llamarse `brujula`: ese campo activa reglas del juego clásico.)
+  function compasDe(c) {
+    const campos = camposDe(c);
+    if (!campos.length) return null;
+    return JSON.parse(JSON.stringify({
+      preguntas: c.BRUJULA.preguntas.map(p => ({ id: p.id, texto: p.texto, opciones: p.opciones })),
+      campos: campos.map(x => ({ id: x.id, nombre: x.nombre, centro: { x: x.centro.x, y: x.centro.y }, color: x.color || "#9aa1b9", afirma: x.afirma || "" })) }));
   }
   // (la sala no puede llamar `personajes` a esa lista: ese campo activa las reglas de cupos del juego clásico)
   function salaNueva(c, duelos, ahora) {
     const S = (c && c.SESION) || {};
     return { modo: "micro", curso: S.curso || "", semana: S.semana || 0, tema: S.tema || "", fase: "espera", duelos,
-      grupos: gruposDe(c), duelo: null, turno: null, t0turno: null, tiempo: CERO(), t0duelo: null, veredicto: null, paso: 0,
+      grupos: gruposDe(c), compas: compasDe(c), duelo: null, turno: null, t0turno: null, tiempo: CERO(), t0duelo: null, veredicto: null, paso: 0,
       sintesis: null, quiz: null, usadas: [], creada: ahora, actualizado: ahora };
   }
   const dueloDe = s => (s && s.duelos || []).find(d => d.n === s.duelo) || null;

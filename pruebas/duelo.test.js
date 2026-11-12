@@ -9,7 +9,7 @@ const { leerJuez, JUECES_DEFECTO } = require("../jueces.js");
 function contenido(archivo) {
   const ctx = {};
   vm.createContext(ctx);
-  const opc = ["PERSONAJES", "PREGUNTAS", "JUECES", "JUECES_COMUN"].map(k => `${k}: typeof ${k} === 'undefined' ? null : ${k}`).join(", ");
+  const opc = ["PERSONAJES", "PREGUNTAS", "JUECES", "JUECES_COMUN", "BRUJULA"].map(k => `${k}: typeof ${k} === 'undefined' ? null : ${k}`).join(", ");
   vm.runInContext(fs.readFileSync(path.join(__dirname, "..", archivo), "utf8") + `\n;this.C = { SESION, CONCEPTOS, EQUIPOS, ${opc} };`, ctx);
   return ctx.C;
 }
@@ -517,4 +517,52 @@ test("usarPregunta: anota una sola vez la pregunta de la galería que el profeso
   assert.equal(D.usarPregunta(s, "ana_1"), null);
   assert.equal(D.usarPregunta(s, ""), null);
   assert.equal(D.usarPregunta(sala(), "ana_1"), null, "solo durante el debate");
+});
+
+/* ---------- el compás: los campos de la brújula como grupos de la galería ---------- */
+const C14 = contenido("contenido/semana14.js");
+test("compás: con SESION.compas los campos de la brújula son los grupos de la galería", () => {
+  const gs = D.gruposDe(C14);
+  // (Array.from: la lista viene del contexto en que se evaluó el archivo de la semana)
+  assert.deepEqual(Array.from(gs, g => g.nombre), ["Avatar ya", "Asesor, no votante", "Agentes que deliberan", "Urna y asamblea"]);
+  assert.deepEqual({ ...gs[0] }, { n: 1, nombre: "Avatar ya", corto: "Avatar ya", color: "#38bdf8" });
+  // sin el interruptor, o sin brújula, la clase no tiene grupos
+  assert.deepEqual(D.gruposDe({ ...C14, SESION: { ...C14.SESION, compas: false } }), []);
+  assert.deepEqual(D.gruposDe({ ...C14, BRUJULA: null }), []);
+  // una clase con personajes sigue con sus personajes
+  assert.equal(D.gruposDe({ ...C312, SESION: { ...C312.SESION, compas: true }, BRUJULA: C14.BRUJULA }).length, 6);
+});
+
+test("compás: va a favor el campo que afirma la pregunta y en contra su opuesto en el mapa", () => {
+  const ds = D.duelosDe(C14);
+  assert.equal(ds.length, 2);
+  assert.deepEqual([ds[0].A.g, ds[0].B.g, ds[1].A.g, ds[1].B.g], [1, 4, 3, 2]);
+  assert.deepEqual([ds[0].A.nombre, ds[0].A.corto, ds[0].A.cargo], ["A favor", "A favor", "Avatar ya"]);
+  assert.deepEqual([ds[0].B.nombre, ds[0].B.corto, ds[0].B.cargo], ["En contra", "En contra", "Urna y asamblea"]);
+  assert.deepEqual([ds[1].A.cargo, ds[1].B.cargo], ["Agentes que deliberan", "Asesor, no votante"]);
+  // cada lado lleva el color de su campo
+  assert.deepEqual([ds[0].A.color, ds[0].B.color, ds[1].A.color, ds[1].B.color], ["#38bdf8", "#fb7185", "#f59e0b", "#34d399"]);
+  assert.equal(ds[0].personajes, false);
+  // una pregunta suelta, o con un campo que no existe, queda sin grupos: toda la galería juega
+  const sueltas = D.duelosDe({ ...C14, PREGUNTAS: ["Una pregunta suelta sobre los avatares.", { texto: "Otra pregunta, con un campo inventado.", afirma: "nada" }] });
+  assert.deepEqual(sueltas.map(d => [d.A.g, d.B.g, d.A.cargo, d.A.color]), [[0, 0, "", C14.EQUIPOS.A.color], [0, 0, "", C14.EQUIPOS.A.color]]);
+  // sin el interruptor, como antes
+  const sin = D.duelosDe({ ...C14, SESION: { ...C14.SESION, compas: false } });
+  assert.deepEqual([sin[0].A.g, sin[0].B.g, sin[0].A.cargo], [0, 0, ""]);
+});
+
+test("compás: la sala lleva las preguntas y los campos, para que la butaca no necesite el archivo de la clase", () => {
+  const s = D.salaNueva(C14, D.duelosDe(C14), 1000);
+  assert.equal(s.grupos.length, 4);
+  assert.equal(s.compas.preguntas.length, 6);
+  assert.deepEqual(Object.keys(s.compas.preguntas[0]).sort(), ["id", "opciones", "texto"]);
+  assert.deepEqual(s.compas.preguntas[0].opciones[0], { texto: C14.BRUJULA.preguntas[0].opciones[0].texto, x: -8 });
+  assert.deepEqual(s.compas.preguntas[1].opciones[3], { texto: C14.BRUJULA.preguntas[1].opciones[3].texto, y: 8 });
+  assert.deepEqual(s.compas.campos.map(c => c.id), ["avatar_ya", "asesor", "agentes", "urna"]);
+  assert.ok(s.compas.campos.every(c => c.nombre && c.afirma && /^#[0-9a-f]{6}$/i.test(c.color) && typeof c.centro.x === "number" && typeof c.centro.y === "number"));
+  assert.ok(!("brujula" in s), "ese campo activa las reglas de la brújula del juego clásico");
+  assert.ok(JSON.stringify(s).length < 12000, "la sala tiene que seguir siendo un documento chico");
+  // una clase sin compás no lo lleva
+  assert.equal(sala().compas, null);
+  assert.equal(D.salaNueva({ ...C14, SESION: { ...C14.SESION, compas: false } }, [], 1).compas, null);
 });

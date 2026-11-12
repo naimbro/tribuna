@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tribuna.css?v=20261111c">
+<link rel="stylesheet" href="tribuna.css?v=20261112a">
 </head>
 <body class="escena">
 <!-- El escenario: solo muestra. Todo lo que cambia lo decide el teléfono del profesor (micro.html). -->
@@ -47,12 +47,12 @@
   (function () {
     const pedida = +new URLSearchParams(location.search).get("semana");
     if (pedida && SESIONES.some(x => x.semana === pedida))
-      document.write('<script src="contenido/semana' + pedida + '.js?v=20261112a"><\/script>');
+      document.write('<script src="contenido/semana' + pedida + '.js?v=20261112b"><\/script>');
   })();
 </script>
-<script src="duelo.js?v=20261111b"></script>
-<script src="galeria.js?v=20261111b"></script>
+<script src="duelo.js?v=20261112a"></script>
+<script src="galeria.js?v=20261112a"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-<script type="module" src="escena.js?v=20261111c"></script>
+<script type="module" src="escena.js?v=20261112a"></script>
 </body>
 </html>

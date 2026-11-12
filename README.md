@@ -30,6 +30,18 @@ ronda. Hay tabla individual y por grupo (promedio). El notebook es quien cuenta 
 mientras se apuesta y se responde, el veredicto y las respuestas no están a la vista en la sala.
 Diseño: `docs/superpowers/specs/2026-11-11-la-galeria-design.md`.
 
+**El compás** (desde el 12-nov-2026): una clase sin personajes puede formar los grupos de la
+galería con su brújula corta. Con `compas: true` en `SESION` y un bloque `BRUJULA`, cada
+estudiante responde las preguntas al entrar a la galería (cerca de un minuto) y el campo en que
+queda es su grupo: no lo elige. En cada duelo va a favor el campo que la pregunta nombra en
+`afirma` y en contra el campo más lejano en el mapa; los demás campos juegan desde la galería. La
+sala de espera muestra cuántos hay en cada campo. Los grupos salen por convicción y no se
+balancean: si un campo queda vacío o muy chico, el profesor lo resuelve de palabra, porque el
+micrófono lo lleva él. Las preguntas y los campos viajan en la sala (`compas`), así que la galería
+no carga el archivo de la clase; la posición de cada estudiante queda en su documento
+`publico/{uid}` (`xy`), que solo leen él y el profesor. La primera clase con compás es la Semana 14
+de CSC00155.
+
 Ensayo sin cuentas ni internet: `python servidor.py` y abrir
 <http://localhost:8777/index.html?local=1>; desde la sala de espera, «Abrir el micrófono en otra
 pestaña» (con voz simulada). Agregar `&ia=1` a la dirección del micrófono usa la IA de `.env`.

@@ -210,3 +210,34 @@ test("quizDeEnsayo: una pregunta de mentira sobre el párrafo más largo; sin de
   assert.deepEqual(G.quizDeEnsayo([{ id: "x", duelo: 1, quien: "P", texto: "solo el profesor", t0: 1 }], D), []);
   assert.deepEqual(G.quizDeEnsayo([], D), []);
 });
+
+/* ---------- el compás de entrada ---------- */
+const B = require("../brujula.js");
+const eje = k => [-8, -3, 3, 8].map((v, i) => ({ texto: "op" + i, [k]: v }));
+const COMPAS = {
+  preguntas: [{ id: "p1", texto: "sobre x", opciones: eje("x") }, { id: "p2", texto: "sobre y", opciones: eje("y") }],
+  campos: [{ id: "nw", nombre: "Uno", centro: { x: -5, y: 5 }, color: "#111111", afirma: "afirma uno" }, { id: "sw", nombre: "Dos", centro: { x: -5, y: -5 } },
+    { id: "ne", nombre: "Tres", centro: { x: 5, y: 5 } }, { id: "se", nombre: "Cuatro", centro: { x: 5, y: -5 } }] };
+
+test("grupoDelCompas: de las respuestas al campo, que es el grupo", () => {
+  assert.deepEqual(G.grupoDelCompas({ p1: 0, p2: 3 }, COMPAS, B), { n: 1, id: "nw", nombre: "Uno", afirma: "afirma uno", color: "#111111", pos: { x: -8, y: 8 } });
+  assert.equal(G.grupoDelCompas({ p1: 1, p2: 1 }, COMPAS, B).n, 2);
+  assert.equal(G.grupoDelCompas({ p1: 2, p2: 2 }, COMPAS, B).n, 3);
+  assert.equal(G.grupoDelCompas({ p1: 3, p2: 0 }, COMPAS, B).n, 4);
+  assert.deepEqual([G.grupoDelCompas({ p1: 3, p2: 0 }, COMPAS, B).afirma, G.grupoDelCompas({ p1: 3, p2: 0 }, COMPAS, B).color], ["", ""]);
+  // con respuestas de menos, o que no existen, todavía no hay grupo
+  assert.equal(G.grupoDelCompas({ p1: 0 }, COMPAS, B), null);
+  assert.equal(G.grupoDelCompas({ p1: 0, p2: 7 }, COMPAS, B), null);
+  assert.equal(G.grupoDelCompas({ p1: 0, p2: "3" }, COMPAS, B), null);
+  assert.equal(G.grupoDelCompas(null, COMPAS, B), null);
+  assert.equal(G.grupoDelCompas({ p1: 0, p2: 3 }, null, B), null);
+  assert.equal(G.grupoDelCompas({ p1: 0, p2: 3 }, { preguntas: COMPAS.preguntas, campos: [] }, B), null);
+});
+
+test("porGrupo: cuántos hay en cada grupo de la galería, en el orden de los grupos", () => {
+  const ps = [pub("ana", 1), pub("beto", 1), pub("caro", 3), pub("dani", 0), null, { nombre: "sin uid", grupo: 2 }];
+  assert.deepEqual(G.porGrupo(ps, GRUPOS).map(g => [g.n, g.nombre, g.cuantos]), [[1, "Grupo 1", 2], [2, "Grupo 2", 0], [3, "Grupo 3", 1], [4, "Grupo 4", 0]]);
+  assert.equal(G.porGrupo(ps, GRUPOS)[0].color, "#000000");
+  assert.deepEqual(G.porGrupo([], []), []);
+  assert.deepEqual(G.porGrupo(null, null), []);
+});

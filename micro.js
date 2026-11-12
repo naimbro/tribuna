@@ -323,7 +323,9 @@ function pintarDuelos(s) {
   const lista = $("duelosLista");
   lista.replaceChildren();
   for (const d of s.duelos) {
-    const b = el("button", "duelo"), vs = el("span", "vs"), a = el("span", "", d.A.corto), c = el("span", "", d.B.corto);
+    // con compás, el campo que defiende cada lado dice más que «A favor»
+    const rot = x => (x.cargo && !d.personajes ? x.cargo : x.corto);
+    const b = el("button", "duelo"), vs = el("span", "vs"), a = el("span", "", rot(d.A)), c = el("span", "", rot(d.B));
     a.style.color = d.A.color; c.style.color = d.B.color;
     vs.append(a, el("i", "", "contra"), c);
     b.append(vs, el("span", "q", d.pregunta));

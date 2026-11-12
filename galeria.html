@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tribuna.css?v=20261111c">
-<link rel="stylesheet" href="galeria.css?v=20261111b">
+<link rel="stylesheet" href="tribuna.css?v=20261112a">
+<link rel="stylesheet" href="galeria.css?v=20261112a">
 </head>
 <body class="butaca">
 <!-- La butaca: el teléfono de cada estudiante en la galería. -->
@@ -24,6 +24,23 @@
     <h1>¿De qué grupo eres?</h1>
     <p class="guia">Se elige una sola vez. Cuando tu grupo debate, miras; el resto del tiempo sumas puntos para él.</p>
     <div class="lista" id="grupos"></div>
+  </section>
+
+  <section class="b b-compas">
+    <header class="cab"><span id="compasN"></span><span>El compás</span></header>
+    <h1 id="compasTxt"></h1>
+    <p class="guia">Responde lo que piensas: de aquí sale tu grupo.</p>
+    <div class="lista" id="compasOps"></div>
+    <button class="texto" id="btnAtras" hidden>Volver a la pregunta anterior</button>
+  </section>
+
+  <section class="b b-campo">
+    <p class="guia">Tu campo</p>
+    <h1 id="campoNom"></h1>
+    <p class="afirma" id="campoAfirma"></p>
+    <p class="guia" id="campoDuelo"></p>
+    <button class="boton" id="btnCampo">Entrar a la galería</button>
+    <button class="texto" id="btnRehacer">Responder de nuevo</button>
   </section>
 
   <section class="b b-espera">
@@ -74,8 +91,9 @@
   </section>
 </main>
 
-<script src="duelo.js?v=20261111b"></script>
-<script src="galeria.js?v=20261111b"></script>
-<script type="module" src="butaca.js?v=20261111b"></script>
+<script src="brujula.js?v=20261112a"></script>
+<script src="duelo.js?v=20261112a"></script>
+<script src="galeria.js?v=20261112a"></script>
+<script type="module" src="butaca.js?v=20261112a"></script>
 </body>
 </html>

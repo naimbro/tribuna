@@ -63,6 +63,10 @@ a{color:inherit}
 .duelos .vs i{font-style:normal;font-weight:400;color:var(--tenue);margin:0 .5em}
 .duelos .res{margin:.2em 0 0;color:var(--bronce);font-size:clamp(14px,calc(1.05*var(--u)),20px)}
 .duelos .jugado .q{color:var(--tenue)}
+.campos-tit{margin:3.5vh 0 0;color:var(--tenue);font-size:clamp(14px,calc(1.05*var(--u)),20px)}
+.campos{list-style:none;margin:1vh 0 0;padding:0;display:flex;flex-wrap:wrap;gap:.5em 1.8em;font-size:clamp(16px,calc(1.3*var(--u)),25px)}
+.campos li{display:flex;align-items:baseline;gap:.45em;font-weight:700}
+.campos b{font:800 1.2em/1 var(--aparato);color:var(--papel);font-variant-numeric:tabular-nums}
 .parear{justify-self:end;text-align:center;width:min(100%,30vw)}
 .parear .qr{background:var(--papel);border-radius:14px;padding:14px;line-height:0}
 .parear .qr svg{width:100%;height:auto}

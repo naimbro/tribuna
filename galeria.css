@@ -9,7 +9,12 @@
 #butaca[data-vista="mensaje"] .b-mensaje,#butaca[data-vista="grupo"] .b-grupo,#butaca[data-vista="espera"] .b-espera,
 #butaca[data-vista="debate"] .b-debate,#butaca[data-vista="apuesta"] .b-apuesta,#butaca[data-vista="quiz"] .b-quiz,
 #butaca[data-vista="mirar"] .b-mirar{display:flex}
+#butaca[data-vista="compas"] .b-compas,#butaca[data-vista="campo"] .b-campo{display:flex}
 .b h1{font:600 1.55rem/1.2 var(--voz);margin:4px 0 0;text-wrap:balance}
+/* el compás de entrada: una pregunta por pantalla y, al final, el campo en que quedó */
+.b-campo{justify-content:center;text-align:center;padding:0 8px}
+.b-campo h1{font:800 2.1rem/1.1 var(--aparato);font-stretch:88%}
+.afirma{font:500 1.15rem/1.4 var(--voz);margin:0 0 6px;text-wrap:balance}
 .guia{color:var(--tenue);margin:0;line-height:1.4}
 .texto{background:none;border:0;color:var(--tenue);padding:12px 6px;font-size:1rem;text-decoration:underline;text-underline-offset:.2em}
 .boton{width:100%;padding:.9em 1.4em;font-size:1.05rem}
