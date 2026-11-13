@@ -4,10 +4,10 @@
    indicación con su bancada y vota. Solo escribe su propio documento (jugadores/{uid}).
    ===================================================================== */
 import { D, L, LOCAL, $, e, VOTO, ESTADO, conectar, urlDe, codigoPedido, pintar, nota, relojTexto,
-  hojaVigente, hojaIndicacion, chip, tablaPuntaje, fraseVoto, crearHemiciclo, escanosConVoto } from "./sala-comun.js?v=20261112a";
+  hojaVigente, hojaIndicacion, chip, tablaPuntaje, fraseVoto, crearHemiciclo, escanosConVoto } from "./sala-comun.js?v=20261113a";
 
 const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false };
-const U = { pestana: "sala", expN: 0, F: null, base: 0, prensaVista: 0, sentado: false };
+const U = { pestana: "sala", expN: 0, F: null, base: 0, sucio: false, rellenar: false, prensaVista: 0, sentado: false };
 const vista = $("vista");
 let hemi = null;
 
@@ -53,8 +53,10 @@ function formulario() {
   const n = miNudo();
   if (!n) return tarjetaBancada();
   const bor = L.borradorDe(S.sala, S.jugadores, n.autora);
-  if (!U.F) { U.F = bor ? L.limpiarInd(bor) : L.limpiarInd({}); U.base = bor ? bor.t : 0; }
-  const nueva = bor && bor.t > U.base && bor.por !== S.yo.uid;
+  // Si otra persona de la bancada guardó algo más nuevo y aquí nadie ha escrito, se carga solo.
+  // Si aquí ya hay algo escrito, se avisa y decide quien escribe.
+  let nueva = !!bor && bor.t > U.base && bor.por !== S.yo.uid;
+  if (!U.F || (nueva && !U.sucio)) { U.F = bor ? L.limpiarInd(bor) : L.limpiarInd({}); U.base = bor ? bor.t : 0; U.sucio = false; U.rellenar = true; nueva = false; }
   const estado = !bor ? "Tu bancada todavía no guarda nada." : `${bor.lista ? "Entregada" : "Borrador"}. Última versión: ${e(bor.por === S.yo.uid ? "la tuya" : bor.nombre)}.`;
   return `<section class="tarjeta"><p class="rot">Nudo ${n.n}. ${e(n.articulos)}</p><h2>${e(n.titulo)}</h2><p>${e(n.pregunta)}</p>
       <p class="estado ${bor && bor.lista ? "ok" : ""}">${estado}</p>
@@ -98,7 +100,7 @@ function guardarInd(lista) {
   leerForm();
   if (lista && L.faltaInd(U.F, D).length) return faltas();
   const t = Date.now();
-  U.base = t;
+  U.base = t; U.sucio = false;
   escribir({ ind: { ...U.F, t, lista } });
   nota(lista ? "Entregada a la Secretaría." : "Guardado. Tu bancada ya ve esta versión.");
 }
@@ -227,13 +229,13 @@ function render() {
   const b = L.bancada(D, miB());
   document.body.style.setProperty("--b", b ? b.color : "var(--laton)");
   pintar($("cab"), `<span class="marca">La Sala</span>${b ? chip(b.n) : ""}<span class="quien">${e(L.nombreCorto(S.yo.nombre || S.yo.email))}</span>`);
-  if (s.fase !== "redaccion") U.F = null;
+  if (s.fase !== "redaccion") { U.F = null; U.sucio = false; }
   const filt = s.filtVer && s.filtVer.t > U.prensaVista ? D.filtraciones.find(x => x.id === s.filtVer.id) : null;
   const cuerpo = U.pestana === "expediente" ? expediente() : U.pestana === "prensa" ? prensa() : (FASES[s.fase] || (() => ""))();
   const pinto = pintar(vista, (filt && U.pestana !== "prensa" ? `<article class="recorte nuevo"><p class="rot">Filtración</p><h3>${e(filt.titular)}</h3><p>${e(filt.detalle)}</p><span>${e(filt.fuente)}</span><button class="texto" data-a="vistaPrensa">Cerrar</button></article>` : "")
     + (s.aviso && s.aviso.txt && U.pestana === "sala" ? `<p class="regla"><b>Regla</b> ${e(s.aviso.txt)}</p>` : "") + cuerpo
     + (U.pestana === "sala" ? `<svg id="miniHemi" class="mini-hemi" role="img" aria-label="Los escaños de la sala"></svg>` : ""));
-  if (pinto) llenarForm();
+  if (pinto || U.rellenar) { U.rellenar = false; llenarForm(); }
   if ($("miniHemi")) { if (!$("miniHemi").firstChild) hemi = crearHemiciclo($("miniHemi")); hemi.pintar(escanosConVoto(S, S.yo.uid)); }
   $("pestanas").hidden = false;
   for (const p of $("pestanas").querySelectorAll("button")) p.classList.toggle("elegido", p.dataset.p === U.pestana);
@@ -250,14 +252,14 @@ vista.addEventListener("click", ev => {
   else if (a === "apostar") escribir({ ap: { [n]: b.dataset.v } });
   else if (a === "guardar") guardarInd(false);
   else if (a === "entregar") guardarInd(true);
-  else if (a === "cargar") { U.F = null; vista.__html = null; render(); }
+  else if (a === "cargar") { U.F = null; U.sucio = false; vista.__html = null; render(); }
   else if (a === "exp") { U.expN = n; render(); }
   else if (a === "vistaPrensa") { U.prensaVista = Date.now(); render(); }
 });
 // mientras escriben no se repinta: solo se actualiza lo que falta y el botón de entregar
 vista.addEventListener("input", ev => {
   if (!ev.target.closest("#fInd")) return;
-  leerForm(); faltas();
+  leerForm(); faltas(); U.sucio = true;
 });
 $("pestanas").addEventListener("click", ev => {
   const b = ev.target.closest("button"); if (!b) return;

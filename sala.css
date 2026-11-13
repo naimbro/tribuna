@@ -358,7 +358,11 @@ option,optgroup{background:var(--panel);color:var(--papel)}
 .testera .entrada h1{font:600 3rem/1 var(--voz);color:var(--laton)}
 .testera .entrada form{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
 .testera .entrada input{width:9em;background:var(--panel);border:2px solid var(--linea);border-radius:.4em;padding:.7em;letter-spacing:.15em;text-transform:uppercase}
-.testera .puntaje{font-size:.92rem}
+.testera .col,.testera section{min-width:0}
+.testera section{overflow-x:auto}
+.testera .puntaje{font-size:.85rem}
+.testera .puntaje th,.testera .puntaje td{padding-left:.3em;padding-right:.3em}
+.testera .puntaje th{font-size:.7em}
 .testera .pestanas{position:fixed}
 .testera.ancho .pestanas{display:none}
 .testera.ancho{padding-bottom:1rem}

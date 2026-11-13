@@ -4,7 +4,7 @@
    escaños de ensayo y llama al Senado simulado) y los dibujos: hemiciclo, triángulo y comparado.
    D = el contenido (sala-datos.js); L = la lógica pura (sala-logica.js).
    ===================================================================== */
-import { abrirCanal } from "./sala-canal.js?v=20261112a";
+import { abrirCanal } from "./sala-canal.js?v=20261113a";
 
 export const D = LA_SALA, L = SalaLogica;
 export const P = new URLSearchParams(location.search);
@@ -232,14 +232,15 @@ export function crearTriangulo(svg) {
     return t;
   } };
 }
+export const vertice = id => D.vertices.find(v => v.id === id).con;      // «el Estado», «las empresas»…
 // en palabras: hacia dónde se movió el reparto
 export function repartoTexto(sala) {
-  const t = L.triangulo(sala, D), nom = id => D.vertices.find(v => v.id === id).nombre.toLowerCase();
+  const t = L.triangulo(sala, D);
   if (!t.pasos.length) return "El reparto sigue donde lo dejó el Mensaje.";
   const d = k => t.pos[k] - L.CENTRO[k], orden = Object.keys(L.CENTRO).sort((a, b) => d(b) - d(a));
   const gana = orden.filter(k => d(k) > 0.01), pierde = orden.filter(k => d(k) < -0.01);
   if (!gana.length) return "Las indicaciones aprobadas se compensan: el reparto volvió al punto de partida.";
-  const lista = ks => ks.map(k => k === "estado" ? "el Estado" : "los " + nom(k)).join(" y ");
+  const lista = ks => ks.map(vertice).join(" y ");
   return `Esta ley mueve poder hacia ${lista(gana)}${pierde.length ? ". Lo saca de " + lista(pierde) : ""}.`;
 }
 

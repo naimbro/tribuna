@@ -31,9 +31,9 @@ const LA_SALA = {
 
   /* ---------------- el triángulo del poder ---------------- */
   vertices: [
-    { id: "estado", nombre: "Estado" },
-    { id: "empresas", nombre: "Empresas" },
-    { id: "ciudadanos", nombre: "Ciudadanos" }
+    { id: "estado", nombre: "Estado", con: "el Estado" },
+    { id: "empresas", nombre: "Empresas", con: "las empresas" },
+    { id: "ciudadanos", nombre: "Ciudadanos", con: "los ciudadanos" }
   ],
   ideaCentral: "Cada artículo reparte poder entre el Estado, las empresas y los ciudadanos.",
 

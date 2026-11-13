@@ -5,7 +5,7 @@
    ===================================================================== */
 import { D, L, P, LOCAL, $, e, VOTO, ESTADO, conectar, urlDe, codigoPedido, recordar, reciente, salaNueva, pintar, nota,
   relojTexto, relojVencido, qrDe, despachar, motorPrincipal, crearHemiciclo, escanosConVoto, crearTriangulo, repartoTexto,
-  hojaVigente, comparado, chip, tablaPuntaje, fraseVoto } from "./sala-comun.js?v=20261112a";
+  hojaVigente, comparado, chip, tablaPuntaje, fraseVoto, vertice } from "./sala-comun.js?v=20261113a";
 
 const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false };
 const raiz = $("sala"), escena = $("escena");
@@ -107,7 +107,7 @@ const ESCENAS = {
     const n = nd(), r = (L.deNudo(S.sala, n.n).v || {}).r || L.contar({}, 0);
     if (!r.quorum) return `<div class="e-voto"><p class="sobre">Nudo ${n.n}</p>${sello("Sin quórum", "no")}${conteo(r)}<p class="guia">${e(D.reglas.quorum)}</p></div>`;
     return `<div class="e-voto"><p class="sobre">Nudo ${n.n}: ${e(n.titulo)}</p>${sello(r.aprobada ? "Aprobada" : "Rechazada", r.aprobada ? "si" : "no")}
-      ${conteo(r)}<p class="guia">Gana la sala ${chip(r.aprobada ? n.autora : n.impugna)}</p></div>`;
+      ${conteo(r)}<p class="guia">${r.f === r.c ? "Con empate no se aprueba. " : ""}Gana la sala ${chip(r.aprobada ? n.autora : n.impugna)}</p></div>`;
   },
   apuesta() {
     const n = nd(), k = Object.keys(L.apuestasDe(S.sala, S.jugadores, n.n)).length;
@@ -123,7 +123,7 @@ const ESCENAS = {
       const contraste = sala === s.r.aprueba ? "La sala y el Senado simulado coinciden."
         : sala ? "La sala la aprobó, pero fuera de esta sala no sobreviviría." : "La sala la rechazó, pero el Senado simulado la habría aprobado.";
       pie = `<div class="fallo">${sello(s.r.aprueba ? "El Senado simulado aprueba" : "El Senado simulado rechaza", s.r.aprueba ? "si" : "no")}
-        <p class="guia">${s.r.f} a favor, ${s.r.c} en contra. ${contraste}${ap.n ? ` Acertaron ${ap.acertaron} de ${ap.n} apuestas.` : ""}</p></div>`;
+        <p class="guia">${s.r.f} a favor, ${s.r.c} en contra.${s.r.f === s.r.c ? " Con empate no se aprueba." : ""} ${contraste}${ap.n ? ` Acertaron ${ap.acertaron} de ${ap.n} apuestas.` : ""}</p></div>`;
     }
     return `<div class="e-senado"><p class="sobre">Nudo ${n.n}: el Senado simulado</p>${senadores(n.n, visto, s.votos)}${pie}</div>`;
   },
@@ -163,7 +163,7 @@ const ESCENAS = {
       ${tablaPuntaje(S.sala)}</div>`;
   }
 };
-const vert = id => (id === "estado" ? "el Estado" : "los " + D.vertices.find(v => v.id === id).nombre.toLowerCase());
+const vert = vertice;
 function debate(verbo, b) {
   const n = nd(), p = S.sala.pedido;
   return `<div class="e-debate"><div class="cab"><div>${`<p class="sobre">Nudo ${n.n}: ${e(n.titulo)}</p>`}<h2>${verbo} ${chip(b)}</h2></div><span class="reloj" id="reloj"></span></div>
@@ -266,7 +266,7 @@ function abrir() {
 }
 let ultimaTecla = 0;
 document.addEventListener("keydown", ev => {
-  if (!S.dueno || !S.sala || ev.target.closest("input, textarea")) return;
+  if (!S.dueno || !S.sala || (ev.target.closest && ev.target.closest("input, textarea"))) return;
   if (!["ArrowRight", "PageDown"].includes(ev.key) || Date.now() - ultimaTecla < 450) return;
   ultimaTecla = Date.now();
   despachar(S, { t: "sig" });

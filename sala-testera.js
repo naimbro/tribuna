@@ -5,7 +5,7 @@
    resto del equipo deja órdenes que ejecuta el motor del hemiciclo (sala-comun.js).
    ===================================================================== */
 import { D, L, LOCAL, $, e, VOTO, ESTADO, TIPO, conectar, urlDe, codigoPedido, recordar, reciente, salaNueva, pintar, nota,
-  relojTexto, despachar, iniciarMotor, chip, tablaPuntaje } from "./sala-comun.js?v=20261112a";
+  relojTexto, despachar, iniciarMotor, chip, tablaPuntaje } from "./sala-comun.js?v=20261113a";
 
 const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false };
 const U = { pestana: "presidente", notas: {}, latido: 0, oyendo: false };
@@ -86,7 +86,7 @@ function secretaria() {
         <span class="cita">${e(f.detalle)} ${e(f.fuente)}. Sirve para el nudo ${f.nudo}.</span></span>
         <span class="botones">${enPantalla === f.id ? '<button class="on" data-a="filtrar" data-id="">Quitar de la pantalla</button>' : `<button data-a="filtrar" data-id="${f.id}">${pub.includes(f.id) ? "Mostrar otra vez" : "Publicar"}</button>`}</span></div>`).join("")}</div></section>
     <section><h2>Puntaje</h2>${tablaPuntaje(s)}</section>
-    <section><h2>La sala</h2><p class="estado">Código <b>${e(S.codigo)}</b>. ${L.sentados(s, S.jugadores).length} escaños ocupados.</p>
+    <section><h2>La sala</h2><p class="estado">Código <b>${e(S.codigo)}</b>. ${(k => k === 1 ? "1 escaño ocupado" : k + " escaños ocupados")(L.sentados(s, S.jugadores).length)}.</p>
       <p class="enlaces"><a target="_blank" href="${e(urlDe("sala.html", S.codigo))}">Abrir el hemiciclo</a><a target="_blank" href="${e(urlDe("escano.html", S.codigo, LOCAL ? { yo: "ana" } : {}))}">Abrir un escaño</a></p>
       <div class="fila"><label class="lbl" for="inBots">Escaños de ensayo</label><input id="inBots" type="number" min="0" max="40" value="${s.bots || 0}"><button data-a="bots">Aplicar</button></div>
       <p class="ayuda">Votan y redactan solos, para ensayar. Antes de la clase, déjalos en 0.</p>
