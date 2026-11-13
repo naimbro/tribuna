@@ -1,5 +1,83 @@
 # TRIBUNA
 
+## La Sala (taller integrador, 16 y 19 de noviembre de 2026)
+
+Un juego aparte dentro de este repo, con sus propias páginas y módulos. No toca el resto de tribuna.
+
+El curso es el Senado. Simula la discusión en particular de la ley marco de IA (boletín 16821-19).
+Cuatro bancadas (habilitantes, garantistas, orden y seguridad, soberanistas) redactan una indicación
+cada una sobre cuatro nudos del proyecto, las defienden y las votan. La idea central: cada artículo
+reparte poder entre el Estado, las empresas y los ciudadanos, y cada votación mueve ese reparto a la
+vista de todos.
+
+Tres pantallas:
+
+| Pantalla | Dirección | Quién |
+|---|---|---|
+| **El hemiciclo** | <https://naimbro.github.io/tribuna/sala.html> | El proyector. Muestra el comparado, los escaños y el triángulo del poder. |
+| **El escaño** | <https://naimbro.github.io/tribuna/escano.html> | El teléfono de cada estudiante. Entra con el QR o el código, y con Google. |
+| **La testera** | <https://naimbro.github.io/tribuna/testera.html> | El equipo docente: Presidente, Ejecutivo y Secretaría. |
+
+Dos actos sobre la misma sala (el código sirve el lunes y el jueves):
+
+- **Acto 1, la comisión.** Cuenta del proyecto, voto en general, sorteo equilibrado de bancadas, los
+  cuatro nudos, redacción de indicaciones en formato fijo (tipo, texto y un concepto de cada módulo
+  con una frase que lo aplique), lectura y tarea.
+- **Acto 2, la Sala.** Por cada nudo: la pelea (el artículo y dos voces reales), defensa y respuesta
+  con reloj, votación nominal, apuesta, Senado simulado (cinco tipos de senador de IA que votan uno
+  por uno) y cierre. Al final, veto e insistencia, y «La ley que despachó este curso».
+
+Reglas reales que el juego enseña, cada una explicada en una frase cuando actúa: urgencia (el nudo
+se debate en la mitad del tiempo), iniciativa exclusiva (la indicación del nudo 3 crea un organismo:
+sin patrocinio del Ejecutivo es inadmisible y no se vota) y veto con insistencia por dos tercios.
+
+Puntaje por bancada: 2 por ganar la sala, 2 por ganar el Senado simulado, 1 por conseguir el
+patrocinio y 1 por cada fundamento que valide el presidente (máximo 2).
+
+### Cómo se conduce
+
+1. Abre `sala.html` en el notebook del proyector, entra con Google y crea la sala. **La cuenta que
+   crea la sala es la que la conduce**: esa pestaña es además el motor (ejecuta las órdenes del resto
+   del equipo, sienta a quien llega tarde y llama al Senado simulado). Tiene que quedar abierta y a la vista.
+2. Abre `testera.html?sala=CÓDIGO` con la misma cuenta. El botón grande avanza la sesión; en el
+   hemiciclo también avanza la flecha →.
+3. Para que el resto del equipo use la testera desde su propia cuenta, agrega sus correos en
+   Secretaría → «Equipo docente». Sus botones dejan una orden que ejecuta el hemiciclo.
+4. Si una bancada no entrega, Secretaría → «Cargar la de partida». Al entrar a un nudo sin
+   indicación, se carga sola.
+
+### Cómo ensayar (sin cuentas ni internet)
+
+```bash
+python servidor.py
+```
+
+y abrir <http://localhost:8777/sala.html?local=1>. Se crea una sala de ensayo con doce escaños que
+redactan y votan solos. Con la flecha → se recorren los dos actos completos en unos cinco minutos.
+En la portada hay enlaces para abrir la testera y un escaño en otras pestañas del mismo navegador
+(`escano.html?local=1&sala=CÓDIGO&yo=ana`; cada `yo` distinto es un estudiante distinto). En ensayo,
+los cinco senadores votan con votos fijos rotulados «ensayo»; con `&ia=1` y una llave en `.env`
+usan el motor de `servidor.py`.
+
+En línea también se puede ensayar: Secretaría → «Escaños de ensayo». Antes de la clase, déjalos en 0.
+
+### Archivos
+
+- `sala-datos.js`: **todo el contenido** (artículos, citas, bancadas, conceptos, senadores,
+  filtraciones, reglas). El articulado es el del Mensaje de mayo de 2024 y así se rotula en pantalla;
+  cuando llegue el oficio de la Cámara, se corrige aquí y en ninguna otra parte. Ninguna cifra, cita o
+  atribución sale de fuera del dossier del 12-nov-2026, el articulado, el syllabus o `contenido/semana307.js`.
+- `sala-logica.js`: lógica pura (conteo, quórum, dos tercios, admisibilidad, triángulo, puntaje,
+  sorteo, flujo). Pruebas: `node pruebas/sala.test.js`.
+- `sala-canal.js`: Firestore o ensayo local, misma interfaz (el patrón de `canal.js`).
+- `sala-comun.js`: despacho de acciones, el motor y los dibujos (hemiciclo, triángulo, comparado).
+- `sala-hemiciclo.js`, `sala-escano.js`, `sala-testera.js`, `sala.css`: las tres pantallas.
+
+Datos: caben en las reglas de Firestore de siempre, sin colecciones nuevas. El estado vive en
+`salas/{código}` (lo escribe quien creó la sala) y cada escaño escribe solo su documento en
+`jugadores/{uid}` (voto en general, borrador de la indicación, votos y apuestas). Los senadores
+simulados usan la Function `evaluar`, que solo responde a profesores autorizados.
+
 ## Tribuna con un solo micrófono (noviembre de 2026)
 
 La entrada del juego cambió. Ahora hay dos pantallas y nada más:

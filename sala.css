@@ -215,11 +215,11 @@ h1,h2,h3,p{margin:0}
 .e-final h2{font-size:calc(2.6*var(--u))!important}
 .e-final{gap:calc(.7*var(--u))!important}
 .e-final .ley-filas{gap:calc(.45*var(--u))}
-.e-final .ley-filas article{padding:.3em .9em;font-size:.76em}
+.e-final .ley-filas article{padding:.4em .9em;font-size:.86em}
 .e-final .ley-filas p{-webkit-line-clamp:1}
 .e-final .linea{font-size:.88em!important}
-.e-final .puntaje{font-size:.74em}
-.e-final .puntaje td{padding:.22em .5em}
+.e-final .puntaje{font-size:.86em}
+.e-final .puntaje td{padding:.26em .5em}
 .e-final .puntaje th{padding:.1em .5em}
 
 /* ============================ el escaño (teléfono) ============================ */
