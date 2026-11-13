@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1c1512">
+<title>La Sala, la testera</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sala.css?v=20261112a">
+</head>
+<body class="testera">
+<!-- La testera: el control del equipo docente (Presidente, Ejecutivo, Secretaría). -->
+<div class="nota" id="nota" role="status" hidden></div>
+<header class="arriba" id="arriba"></header>
+<nav class="pestanas" id="pestanas" hidden aria-label="Secciones">
+  <button data-p="presidente" class="elegido">Presidente</button>
+  <button data-p="ejecutivo">Ejecutivo</button>
+  <button data-p="secretaria">Secretaría</button>
+</nav>
+<main id="vista"></main>
+<script src="sala-datos.js?v=20261112a"></script>
+<script src="sala-logica.js?v=20261112a"></script>
+<script type="module" src="sala-testera.js?v=20261112a"></script>
+</body>
+</html>

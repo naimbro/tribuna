@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1c1512">
+<title>La Sala, el hemiciclo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sala.css?v=20261112a">
+</head>
+<body class="proyector">
+<!-- El hemiciclo: la pantalla del proyector. Muestra el comparado, los escaños y el triángulo del poder. -->
+<div class="nota" id="nota" role="status" hidden></div>
+<main id="sala" data-fase="mensaje" data-foco="ancho">
+  <header class="cinta">
+    <span class="marca">La Sala</span>
+    <span class="fase" id="cintaFase"></span>
+    <span class="der" id="cintaDer"></span>
+  </header>
+  <section id="escena" aria-live="polite"></section>
+  <aside id="hemi" aria-label="El hemiciclo">
+    <svg id="hemiSvg" role="img" aria-label="Los escaños de la sala"></svg>
+    <p class="pie" id="hemiPie"></p>
+  </aside>
+  <aside id="tri" aria-label="El triángulo del poder">
+    <svg id="triSvg" role="img" aria-label="Reparto de poder entre Estado, empresas y ciudadanos"></svg>
+    <p class="pie" id="triPie"></p>
+  </aside>
+  <footer id="aviso" hidden></footer>
+  <div id="prensa" hidden></div>
+</main>
+<script src="sala-datos.js?v=20261112a"></script>
+<script src="sala-logica.js?v=20261112a"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script type="module" src="sala-hemiciclo.js?v=20261112a"></script>
+</body>
+</html>
