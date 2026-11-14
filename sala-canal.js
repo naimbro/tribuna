@@ -1,7 +1,8 @@
 /* =====================================================================
    LA SALA — el canal entre las tres pantallas. Dos implementaciones de la misma interfaz:
-     · Firestore: salas/{codigo} (el estado; lo escribe la cuenta que creó la sala) y
-       jugadores/{uid} (lo de cada escaño; lo escribe su dueño). Cabe en las reglas de tribuna:
+     · Firestore: salas/{codigo} (el estado; lo escribe la cuenta que creó la sala),
+       jugadores/{uid} (lo de cada escaño; lo escribe su dueño) y vivo/voz (lo que se está oyendo
+       por el micrófono del profesor; lo escribe la testera). Cabe en las reglas de tribuna:
        no hay colecciones nuevas. Los escaños de ensayo son documentos de jugadores que escribe
        el dueño de la sala.
      · Ensayo local (?local=1): lo mismo sobre localStorage y BroadcastChannel, entre pestañas
@@ -72,6 +73,9 @@ async function canalFirestore() {
     // el latido de la pantalla que hace de motor (vivo/sala): la testera sabe si el hemiciclo está vivo
     latido: c => F.setDoc(F.doc(db, "salas", c, "vivo", "sala"), { t: Date.now() }),
     escucharLatido: (c, cb) => F.onSnapshot(F.doc(db, "salas", c, "vivo", "sala"), s => cb(s.exists() ? s.data().t || 0 : 0), () => cb(0)),
+    // lo que se está oyendo ahora (vivo/voz): lo escribe el micrófono, lo muestra el hemiciclo
+    publicarVoz: (c, voz) => F.setDoc(F.doc(db, "salas", c, "vivo", "voz"), limpio(voz)),
+    escucharVoz: (c, cb) => F.onSnapshot(F.doc(db, "salas", c, "vivo", "voz"), s => cb(s.exists() ? s.data() : null), () => cb(null)),
     async pedirLLM(prompt, uso) { return (await evaluar({ prompt, uso })).data.text; }
   };
 }
@@ -88,7 +92,7 @@ function canalLocal({ yo, ia }) {
   const avisar = (codigo, que) => { for (const o of [...oyentes]) if (o.codigo === codigo && o.que === que) o.cb(); };
   if (bc) bc.onmessage = e => avisar(e.data.codigo, e.data.que);
   function guardar(codigo, que, f) {
-    const x = { sala: null, jug: {}, latido: 0, ...(leer(codigo) || {}) };
+    const x = { sala: null, jug: {}, latido: 0, voz: null, ...(leer(codigo) || {}) };
     f(x);
     localStorage.setItem(clave(codigo), JSON.stringify(x));
     avisar(codigo, que);
@@ -125,6 +129,8 @@ function canalLocal({ yo, ia }) {
     escribirEscano: async (c, uid, datos) => guardar(c, "jug", x => { x.jug[uid] = fundir(x.jug[uid], limpio(datos)); }),
     latido: async c => guardar(c, "latido", x => { x.latido = Date.now(); }),
     escucharLatido: (c, cb) => escuchar(c, "latido", x => (x && x.latido) || 0, cb),
+    publicarVoz: async (c, voz) => guardar(c, "voz", x => { x.voz = limpio(voz); }),
+    escucharVoz: (c, cb) => escuchar(c, "voz", x => (x && x.voz) || null, cb),
     async pedirLLM(prompt, uso) {
       if (!(await hayMotor())) throw new Error("servidor.py no tiene una llave de IA");
       const r = await fetch("/api/evaluar", { method: "POST", headers: { "content-type": "application/json" },

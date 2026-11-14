@@ -222,6 +222,33 @@ h1,h2,h3,p{margin:0}
 .e-final .puntaje td{padding:.26em .5em}
 .e-final .puntaje th{padding:.1em .5em}
 
+/* --- lo que se oye: el micrófono del profesor (párrafos cerrados y la línea viva) --- */
+.cinta .mic-on{color:var(--si)}
+.cinta .mic-on::before{content:"";display:inline-block;width:.6em;height:.6em;border-radius:50%;background:var(--si);margin-right:.45em}
+.oido{flex:none;display:flex;flex-direction:column;gap:calc(.8*var(--u))}
+.oido .dichos{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:calc(1*var(--u))}
+.oido .dichos article{background:var(--panel);border-left:.35em solid var(--b);padding:.55em .8em;display:flex;flex-direction:column;gap:.4em;font-size:calc(1.2*var(--u));min-width:0}
+.oido .dichos p{font:400 1.05em/1.35 var(--voz);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.oido .dichos footer{display:flex;justify-content:space-between;gap:1em;color:var(--tenue);font-weight:600;margin-top:auto}
+.oido .dichos footer .chip{color:var(--papel)}
+.oido .vivo{display:flex;gap:1em;align-items:flex-end;background:#0000003a;border-left:.35em solid var(--si);padding:.5em .9em}
+.oido .vivo b{flex:none;font:700 calc(1.15*var(--u))/1.9 var(--aparato);color:var(--si);white-space:nowrap}
+.oido .vivo.pausa{border-left-color:var(--linea)}
+.oido .vivo.pausa b{color:var(--tenue)}
+/* dos líneas, siempre las últimas: lo que sobra se corta por arriba */
+.oido .vivo p{flex:1;min-width:0;height:calc(5.2*var(--u));overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;font:400 calc(1.9*var(--u))/1.35 var(--voz)}
+.e-comparado .cab .quien{white-space:nowrap}
+.e-redaccion .cab .guia{font-size:.8em;max-width:46em;margin-top:.35em;color:var(--tenue)}
+.del-debate{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:calc(1.4*var(--u));margin-top:.5em}
+.del-debate blockquote{margin:0;border-left:.3em solid var(--b);padding:.1em 0 .1em .7em;font-size:.8em}
+.del-debate p{font:400 1em/1.3 var(--voz);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.del-debate footer{color:var(--tenue);font-size:.9em;margin-top:.25em}
+.del-debate footer .chip,.e-senado .van .chip{color:var(--papel)}
+.e-final .tablas{display:grid;grid-template-columns:minmax(min-content,2fr) minmax(0,1fr);gap:calc(3*var(--u));align-items:start}
+.e-final .tablas .sobre{margin-bottom:.2em}
+/* en el proyector, la tabla por escaño va sin el desglose: nombre y total */
+.e-final .escanos th:nth-child(n+2):not(:last-child),.e-final .escanos td:nth-child(n+2):not(:last-child){display:none}
+
 /* ============================ el escaño (teléfono) ============================ */
 .movil{font-size:17px;padding-bottom:4.6rem}
 .movil .cab{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:.8em;padding:.7rem 1rem;background:var(--caoba);border-bottom:3px solid var(--b)}
@@ -317,6 +344,22 @@ option,optgroup{background:var(--panel);color:var(--papel)}
 .acciones .boton{min-height:3.3rem;font-size:1.05rem}
 .faltas{margin:0;padding-left:1.1em;color:var(--tenue);font-size:.9rem;line-height:1.5}
 
+/* lo que se dijo en el debate: cada párrafo es un botón para aplaudir */
+.dichos .saldo{display:flex;flex-wrap:wrap;gap:.3rem 1.2rem;font-size:.9rem;color:var(--tenue)}
+.dichos .saldo .chip{color:var(--papel)}
+.dicho{display:flex;flex-direction:column;gap:.5rem;text-align:left;border:2px solid var(--linea);border-left:.4rem solid var(--b);background:var(--caoba);border-radius:.5rem;padding:.8rem .9rem;min-height:3.4rem}
+.dicho .txt{font:400 1.02rem/1.4 var(--voz)}
+.dicho .pie{display:flex;justify-content:space-between;align-items:center;gap:.8rem;font-size:.85rem;color:var(--tenue)}
+.dicho .pie b{color:var(--laton)}
+.dicho.elegido{background:#d0a95c22;border-color:var(--laton);border-left-color:var(--b)}
+.dicho:disabled{opacity:.6;cursor:default}
+.dicho.elegido:disabled{opacity:1}
+.tarjeta blockquote footer .chip{color:var(--papel);margin-left:.3em}
+.tarjeta blockquote footer b{color:var(--si);margin-left:.3em}
+.tarjeta.en-telefono .tarjeta{padding:0;background:none}
+.tarjeta.en-telefono[open] summary{margin-bottom:.6rem}
+.movil .puntaje.escanos{margin-top:-.4rem}
+
 /* ============================ la testera (equipo docente) ============================ */
 .testera{font-size:16px;padding-bottom:5rem}
 .testera .arriba{position:sticky;top:0;z-index:10;background:var(--caoba);border-bottom:1px solid var(--linea);padding:.8rem 1rem;display:flex;flex-direction:column;gap:.6rem}
@@ -372,5 +415,16 @@ option,optgroup{background:var(--panel);color:var(--papel)}
 .testera.ancho .arriba{flex-direction:row;align-items:center;gap:1.5rem}
 .testera.ancho .arriba .donde{flex:1}
 .testera.ancho .principal{min-width:20rem}
+
+/* el micrófono y la corrección de indicaciones */
+.testera .voz{border-left:.35rem solid var(--linea)}
+.testera .voz.armado{border-left-color:var(--laton)}
+.testera .voz.oyendo{border-left-color:var(--si)}
+.testera .voz .estado .chip,.testera .item .chip{color:var(--papel)}
+.testera #vozTxt{font:400 1.05rem/1.4 var(--voz);min-height:2.9em}
+.testera .corregir summary{cursor:pointer;color:var(--laton);font-weight:600;padding:.4rem 0}
+.testera .corregir>*+*{margin-top:.5rem}
+.testera .corregir textarea{font-family:var(--voz)}
+.testera .corregir select{width:auto;min-width:9rem}
 
 @media (prefers-reduced-motion:reduce){.esc,.tri-marca{transition:none}}

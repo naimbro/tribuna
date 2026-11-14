@@ -301,7 +301,7 @@ test("flujo: los dos actos completos, de la portada a la ley despachada", () => 
   assert.equal(fases.filter(f => f === "senado2").length, 6, "cinco votos revelados uno por uno, y el paso al cierre");
   assert.equal(Object.keys(sala.sorteo).length, 12);
   for (const n of [1, 2, 3, 4]) {
-    assert.equal(sala.ind[n].origen, "bancada", "la bancada entregó la indicación " + n);
+    assert.equal(sala.ind[n].origen, "partida", "nadie leyó ni escribió la indicación " + n + ": entra la de partida");
     assert.equal(sala.n[n].v.estado, "cerrada");
     assert.equal(sala.n[n].v.r.votaron, 12);
     assert.equal(sala.n[n].sen.votos.length, 5);

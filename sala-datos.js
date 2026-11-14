@@ -266,6 +266,7 @@ const LA_SALA = {
   reglas: {
     general: "Primero se vota la idea de legislar. Después se discute artículo por artículo.",
     particular: "Una indicación suprime, sustituye o agrega texto a un artículo.",
+    papel: "En la hoja: el tipo (suprimir, sustituir o agregar), el texto como quedaría en la ley y un concepto de cada módulo, aplicado al artículo. Después la leen en voz alta.",
     urgencia: "Urgencia: el Presidente fija el ritmo del Congreso. Este nudo se debate en la mitad del tiempo.",
     patrocinio: "Iniciativa exclusiva: solo el Presidente puede proponer crear un servicio público o comprometer gasto (art. 65 de la Constitución).",
     patrocinado: "El Ejecutivo patrocina la indicación. Ahora se puede votar.",
@@ -278,7 +279,11 @@ const LA_SALA = {
 
   /* ---------------- tiempos y puntaje ---------------- */
   tiempos: { defensa: 120, respuesta: 120, redaccion: 1800 },
-  puntos: { sala: 2, senado: 2, patrocinio: 1, fundamento: 1, maxFundamentos: 2 },
+  // por bancada: sala, senado, patrocinio y fundamentos. Por escaño: apuesta y aplauso.
+  puntos: { sala: 2, senado: 2, patrocinio: 1, fundamento: 1, maxFundamentos: 2, apuesta: 3, aplauso: 2 },
+  aplausos: 3,  // por estudiante, por cada bancada que habla en un nudo
+  // la redacción es en papel: esto es lo que tiene que traer la hoja
+  formato: ["El tipo: suprimir, sustituir o agregar.", "El texto, como quedaría en la ley.", "Un concepto del módulo de Democracia y uno del módulo de IA, aplicados al artículo."],
   paso: 0.14,   // cuánto mueve el triángulo cada indicación aprobada
   tarea: "Para el jueves: tu bancada defiende su indicación y responde otra. Lleguen con un concepto de cada módulo."
 };

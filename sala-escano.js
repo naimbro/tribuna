@@ -1,13 +1,14 @@
 /* =====================================================================
    LA SALA — el escaño: el teléfono de cada estudiante (escano.html).
-   Entra con el código o el QR, queda en una bancada, lee el expediente de su nudo, redacta la
-   indicación con su bancada y vota. Solo escribe su propio documento (jugadores/{uid}).
+   Entra con el código o el QR, queda en una bancada, lee el expediente de su nudo, vota,
+   aplaude lo que se dice en el debate y apuesta. La indicación se redacta en papel (el formulario
+   queda como alternativa). Solo escribe su propio documento (jugadores/{uid}).
    ===================================================================== */
 import { D, L, LOCAL, $, e, VOTO, ESTADO, conectar, urlDe, codigoPedido, pintar, nota, relojTexto,
-  hojaVigente, hojaIndicacion, chip, tablaPuntaje, fraseVoto, crearHemiciclo, escanosConVoto } from "./sala-comun.js?v=20261113a";
+  hojaVigente, hojaIndicacion, chip, tablaPuntaje, tablaEscanosHTML, fraseVoto, crearHemiciclo, escanosConVoto } from "./sala-comun.js?v=20261114a";
 
 const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false };
-const U = { pestana: "sala", expN: 0, F: null, base: 0, sucio: false, rellenar: false, prensaVista: 0, sentado: false };
+const U = { pestana: "sala", expN: 0, F: null, base: 0, sucio: false, rellenar: false, prensaVista: 0, sentado: false, conForm: false };
 const vista = $("vista");
 let hemi = null;
 
@@ -49,6 +50,18 @@ const opciones = (n, mod) => {
 };
 
 /* ---------------- la redacción ---------------- */
+// Se redacta en papel y se lee en voz alta. El formulario del teléfono queda plegado, por si una
+// bancada prefiere entregarla escrita.
+function redaccion() {
+  const n = miNudo();
+  if (!n) return tarjetaBancada();
+  return `<section class="tarjeta"><p class="rot">Nudo ${n.n}. ${e(n.articulos)}</p><h2>Redacten en papel</h2><p>${e(n.pregunta)}</p>
+      <ul>${D.formato.map(x => `<li>${e(x)}</li>`).join("")}</ul>
+      <p class="guia">Al terminar, alguien de la bancada la lee en voz alta frente a la sala. Lo que lea queda en el comparado.</p></section>
+    ${hojaVigente(n, { mas: true })}
+    <details class="tarjeta"><summary>Conceptos para este nudo</summary><p class="rot">Democracia</p>${catalogoHTML(n.n, "dem")}<p class="rot">IA</p>${catalogoHTML(n.n, "ia")}</details>
+    <details class="tarjeta en-telefono" id="conForm"${U.conForm ? " open" : ""}><summary>Escribirla también en el teléfono</summary>${formulario()}</details>`;
+}
 function formulario() {
   const n = miNudo();
   if (!n) return tarjetaBancada();
@@ -107,7 +120,7 @@ function guardarInd(lista) {
 
 /* ---------------- la pestaña Sala, fase por fase ---------------- */
 const FASES = {
-  portada: () => `<section class="tarjeta"><h2>Estás en la sala</h2><p>Mira el proyector. Aquí vas a redactar y votar.</p><p class="idea">${e(D.ideaCentral)}</p></section>`,
+  portada: () => `<section class="tarjeta"><h2>Estás en la sala</h2><p>Mira el proyector. Aquí vas a votar, aplaudir lo que se diga y apostar.</p><p class="idea">${e(D.ideaCentral)}</p></section>`,
   cuenta: () => FASES.portada(),
   general: () => `<section class="tarjeta"><p class="rot">Votación en general</p><h2>¿Se aprueba la idea de legislar?</h2>
     <p>${e(D.reglas.general)}</p>${botonesVoto("g", 0, yo().g)}</section>`,
@@ -122,10 +135,11 @@ const FASES = {
     return `<section class="tarjeta"><p class="rot">Nudo ${n.n} de ${D.nudos.length}. ${e(n.articulos)}</p><h2>${e(n.titulo)}</h2><p>${e(n.pregunta)}</p>
       <p>Redacta ${chip(n.autora)} Responde ${chip(n.impugna)}</p></section>${tarjetaBancada()}`;
   },
-  redaccion: () => formulario(),
+  redaccion: () => redaccion(),
   lectura() {
     const n = nd();
-    return `<section class="tarjeta"><p class="rot">Lectura de indicaciones</p><h2>Nudo ${n.n}: ${e(n.titulo)}</h2></section>
+    return `<section class="tarjeta"><p class="rot">Lectura de indicaciones</p><h2>Nudo ${n.n}: ${e(n.titulo)}</h2>
+      <p>${miB() === n.autora ? "Le toca a tu bancada: lean su indicación en voz alta." : `La lee en voz alta ${chip(n.autora)}`}</p></section>
       ${hojaIndicacion(n, L.indicacionDe(S.sala, S.jugadores, D, n.n))}`;
   },
   tarea() {
@@ -138,7 +152,7 @@ const FASES = {
   votacion() {
     const n = nd();
     return `<section class="tarjeta"><p class="rot">Nudo ${n.n}: votación nominal</p><h2>${e(n.pregunta)}</h2>${botonesVoto("v", n.n, (yo().v || {})[n.n])}</section>
-      ${hojaIndicacion(n, (S.sala.ind || {})[n.n], { fundamentos: false })}`;
+      ${hojaIndicacion(n, (S.sala.ind || {})[n.n], { fundamentos: false })}${dichos(n)}`;
   },
   resultado() {
     const n = nd(), r = (L.deNudo(S.sala, n.n).v || {}).r, mio = ((L.deNudo(S.sala, n.n).v || {}).votos || {})[S.yo.uid];
@@ -160,7 +174,7 @@ const FASES = {
     return `<section class="tarjeta"><p class="rot">Nudo ${n.n}: el Senado simulado</p>
       <h2>${s.r ? (s.r.aprueba ? "El Senado simulado aprueba" : "El Senado simulado rechaza") : "Los senadores votan uno por uno"}</h2>
       <p>${mia ? `Apostaste que ${mia === "ap" ? "la aprueban" : "la rechazan"}.${s.r ? (s.r.aprueba === (mia === "ap") ? " Acertaste." : " No acertaste.") : ""}` : "No apostaste en este nudo."}</p>
-      <ul class="senado-lista">${D.senadores.map(fila).join("")}</ul></section>`;
+      <ul class="senado-lista">${D.senadores.map(fila).join("")}</ul></section>${s.r ? misPuntos(n) : ""}`;
   },
   inadmisible() {
     const n = nd();
@@ -171,7 +185,7 @@ const FASES = {
     const n = nd(), est = L.estadoNudo(S.sala, n.n);
     return `<section class="tarjeta"><p class="rot">Nudo ${n.n}: ${e(n.titulo)}</p><h2>${ESTADO[est]}</h2>
       <p>${L.enLaLey(est) ? "La indicación entra a la ley." : "Queda el texto del Mensaje."}</p>
-      <p class="rot">Qué quieren los actores reales</p><p>${e(n.actores)}</p><p class="fte">${e(n.actoresFuente)}</p></section>`;
+      <p class="rot">Qué quieren los actores reales</p><p>${e(n.actores)}</p><p class="fte">${e(n.actoresFuente)}</p></section>${misPuntos(n)}`;
   },
   veto: () => `<section class="tarjeta"><p class="rot">El Ejecutivo</p><h2>${S.sala.vetado ? "Veto al nudo " + S.sala.vetado : "¿Promulga o veta?"}</h2><p>${e(D.reglas.veto)}</p><p>${e(D.reglas.insistencia)}</p></section>${leyHTML()}`,
   insistencia() {
@@ -185,7 +199,10 @@ const FASES = {
   },
   final() {
     const p = L.puntaje(S.sala, D), lugar = p.findIndex(x => x.b === miB()), b = L.bancada(D, miB());
-    return `<section class="tarjeta"><h2>La ley que despachó este curso</h2>${b ? `<p>${e(b.nombre)}: ${p[lugar].total} puntos, lugar ${lugar + 1} de ${p.length}.</p>` : ""}</section>${leyHTML()}${tablaPuntaje(S.sala)}`;
+    const t = L.tablaEscanos(S.sala, S.jugadores, D), yoT = t.findIndex(x => x.uid === S.yo.uid);
+    return `<section class="tarjeta"><h2>La ley que despachó este curso</h2>${b ? `<p>${e(b.nombre)}: ${p[lugar].total} puntos, lugar ${lugar + 1} de ${p.length}.</p>` : ""}
+      ${yoT >= 0 && t[0].total > 0 ? `<p>Tú: ${t[yoT].total} ${t[yoT].total === 1 ? "punto" : "puntos"} por apuestas y aplausos, lugar ${yoT + 1} de ${t.length}.</p>` : ""}</section>
+      ${leyHTML()}${tablaPuntaje(S.sala)}${t.length && t[0].total > 0 ? `<h3 class="sep">Quién leyó mejor a la sala</h3>${tablaEscanosHTML(S.sala, S.jugadores, 5)}` : ""}`;
   }
 };
 function misIndicaciones() {
@@ -200,8 +217,36 @@ function enDebate() {
   return `<section class="tarjeta"><p class="rot">Nudo ${n.n} de ${D.nudos.length}. ${e(n.articulos)}</p><h2>${e(n.titulo)}</h2>
       <p>${e(miRol(n))}</p>${habla ? `<p>Tiene la palabra ${chip(habla)} <span class="reloj" id="reloj"></span></p>` : ""}</section>
     ${meToca ? `<section class="tarjeta pedido"><h2>El presidente les pide un fundamento</h2><p>Funden su posición en un concepto del módulo de ${e(D.modulos[p.mod])}. No basta con nombrarlo: aplíquenlo al artículo.</p>${catalogoHTML(n.n, p.mod)}</section>` : ""}
-    ${hojaIndicacion(n, (S.sala.ind || {})[n.n])}
+    ${dichos(n)}${hojaIndicacion(n, (S.sala.ind || {})[n.n])}
     ${meToca ? "" : `<details class="tarjeta"><summary>Conceptos para este nudo</summary><p class="rot">Democracia</p>${catalogoHTML(n.n, "dem")}<p class="rot">IA</p>${catalogoHTML(n.n, "ia")}</details>`}`;
+}
+// Lo que oyó el micrófono en el debate de este nudo, párrafo por párrafo. Tocar uno lo aplaude:
+// tres por bancada, nunca a la propia, hasta que cierra la votación.
+function dichos(n) {
+  const s = S.sala, ps = L.debateDe(s, n.n);
+  if (!ps.length) return "";
+  const b = miB(), mias = (yo().apl || {})[n.n] || [], abierta = !L.deNudo(s, n.n).apl;
+  const quedan = x => L.quedanAplausos(mias, s, n.n, D, b, x);
+  const saldo = [...new Set(ps.map(p => p.b))].filter(x => x !== b).map(x => `<span>${chip(x)}te ${quedan(x) === 1 ? "queda 1" : "quedan " + quedan(x)}</span>`).join("");
+  return `<section class="tarjeta dichos"><p class="rot">Lo que se dijo</p><h2>Aplaude lo mejor</h2>
+    <p class="guia">${abierta ? `Tres aplausos por bancada. Si aplaudes el párrafo que los senadores elijan como el mejor, sumas ${D.puntos.aplauso} puntos.` : "Los aplausos de este nudo ya se cerraron."}</p>
+    ${abierta && saldo ? `<p class="saldo">${saldo}</p>` : ""}
+    ${ps.map(p => {
+      const mio = mias.includes(p.id), propio = p.b === b, puede = abierta && !propio && (mio || quedan(p.b) > 0);
+      return `<button class="dicho${mio ? " elegido" : ""}" style="--b:${L.bancada(D, p.b).color}" data-a="aplaudir" data-id="${e(p.id)}" aria-pressed="${mio}"${puede ? "" : " disabled"}>
+        <span class="txt">${e(p.texto)}</span><span class="pie">${chip(p.b)}<b>${mio ? "Aplaudido" : propio ? "Tu bancada" : puede ? "Aplaudir" : ""}</b></span></button>`; }).join("")}</section>`;
+}
+// Cuando el Senado simulado ya votó: lo mejor de cada bancada y lo que sumaste en este nudo.
+function misPuntos(n) {
+  const x = L.deNudo(S.sala, n.n), s = x.sen;
+  if (!s || !s.r) return "";
+  const ps = Object.fromEntries(L.debateDe(S.sala, n.n).map(p => [p.id, p])), mias = ((x.apl || {}).de || {})[S.yo.uid] || [];
+  const mejores = [n.autora, n.impugna].map(b => ps[(s.mejores || {})[b]]).filter(Boolean), pts = L.puntosEscano(S.sala, D, S.yo.uid).nudos[n.n] || { apuesta: 0, aplausos: 0 };
+  const piso = [n.autora, n.impugna].filter(b => (s.piso || {})[b] === true);
+  return `<section class="tarjeta"><p class="rot">Tus puntos en este nudo</p><h2>${pts.apuesta + pts.aplausos} ${pts.apuesta + pts.aplausos === 1 ? "punto" : "puntos"}</h2>
+    <p>${pts.apuesta} por la apuesta y ${pts.aplausos} por los aplausos.</p>
+    ${mejores.map(p => `<blockquote><p>${e(p.texto)}</p><footer>Lo mejor de ${chip(p.b)}${mias.includes(p.id) ? "<b>Lo aplaudiste.</b>" : ""}</footer></blockquote>`).join("")}
+    ${piso.length ? `<p class="guia">El Senado simulado validó el fundamento de ${piso.map(chip).join(" ")}</p>` : ""}</section>`;
 }
 const leyHTML = () => `<ul class="ley-lista">${L.leyDespachada(S.sala, D).map(x => `<li class="e-${x.estado}"><b>Nudo ${x.n}. ${e(x.titulo)}</b><span>${ESTADO[x.estado]}</span></li>`).join("")}</ul>`;
 
@@ -250,12 +295,18 @@ vista.addEventListener("click", ev => {
   const a = b.dataset.a, n = +b.dataset.n || 0;
   if (a === "votar") escribir(b.dataset.campo === "g" ? { g: b.dataset.v } : { [b.dataset.campo]: { [n]: b.dataset.v } });
   else if (a === "apostar") escribir({ ap: { [n]: b.dataset.v } });
+  else if (a === "aplaudir") {
+    const k = S.sala.nudo, l = L.aplaudir((yo().apl || {})[k], b.dataset.id, S.sala, k, D, miB());
+    if (l) escribir({ apl: { [k]: l } });
+    else nota("Ya usaste tus aplausos para esa bancada. Toca uno de los tuyos para retirarlo.");
+  }
   else if (a === "guardar") guardarInd(false);
   else if (a === "entregar") guardarInd(true);
   else if (a === "cargar") { U.F = null; U.sucio = false; vista.__html = null; render(); }
   else if (a === "exp") { U.expN = n; render(); }
   else if (a === "vistaPrensa") { U.prensaVista = Date.now(); render(); }
 });
+vista.addEventListener("toggle", ev => { if (ev.target.id === "conForm") U.conForm = ev.target.open; }, true);
 // mientras escriben no se repinta: solo se actualiza lo que falta y el botón de entregar
 vista.addEventListener("input", ev => {
   if (!ev.target.closest("#fInd")) return;

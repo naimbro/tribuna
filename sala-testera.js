@@ -3,14 +3,17 @@
    Tres secciones: Presidente (conduce), Ejecutivo (urgencia, patrocinio, veto) y Secretaría
    (indicaciones, filtraciones, puntaje). La cuenta que creó la sala escribe los cambios; el
    resto del equipo deja órdenes que ejecuta el motor del hemiciclo (sala-comun.js).
+   En el teléfono de quien creó la sala, además, es el único micrófono (sala-voz.js).
    ===================================================================== */
 import { D, L, LOCAL, $, e, VOTO, ESTADO, TIPO, conectar, urlDe, codigoPedido, recordar, reciente, salaNueva, pintar, nota,
-  relojTexto, despachar, iniciarMotor, chip, tablaPuntaje } from "./sala-comun.js?v=20261113a";
+  relojTexto, despachar, iniciarMotor, chip, tablaPuntaje, tablaEscanosHTML } from "./sala-comun.js?v=20261114a";
+import { crearVoz } from "./sala-voz.js?v=20261114a";
 
 const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false };
-const U = { pestana: "presidente", notas: {}, latido: 0, oyendo: false };
+const U = { pestana: "presidente", notas: {}, latido: 0, oyendo: false, ed: {}, edN: 0 };
 const vista = $("vista");
-let motor = null, ultimoSig = 0;
+let motor = null, ultimoSig = 0, voz = null;
+const ORIGEN = { partida: "la de partida", dictada: "la que leyó la bancada", secretaria: "corregida por la Secretaría", bancada: "la que la bancada escribió en el teléfono" };
 
 const FASE_NOMBRE = { portada: "Portada", cuenta: "La cuenta del proyecto", general: "Votación en general", generalR: "Resultado en general",
   sorteo: "Sorteo de bancadas", nudos: "Presentación del nudo", redaccion: "Redacción de indicaciones", lectura: "Lectura de la indicación", tarea: "Tarea para el jueves",
@@ -43,15 +46,20 @@ function presidente() {
   const s = S.sala, n = s.nudo && L.actoDe(s.fase) === 2 ? s.nudo : 0, sen = n ? L.deNudo(s, n).sen : null;
   const bancadas = f => D.bancadas.map(f).join("");
   const fases = [...L.FASES_1, "apertura", ...D.nudos.flatMap(x => L.FASES_NUDO.map(f => f + ":" + x.n)), "veto", "final"];
-  return `<section><h2>La palabra</h2><div class="fila">${bancadas(b => `<button class="b${s.palabra === b.n ? " on" : ""}" style="--b:${b.color}" data-a="palabra" data-b="${b.n}">${e(b.nombre)}</button>`)}
+  const fund = Object.fromEntries(L.puntaje(s, D).map(p => [p.b, p.fundamentos / D.puntos.fundamento]));
+  const oidos = s.nudo ? L.dichoDe(s, s.nudo, L.actoDe(s.fase) === 1 ? ["lectura"] : L.FASES_DEBATE) : [];
+  return `${voz ? voz.html() : ""}<section><h2>La palabra</h2><div class="fila">${bancadas(b => `<button class="b${s.palabra === b.n ? " on" : ""}" style="--b:${b.color}" data-a="palabra" data-b="${b.n}">${e(b.nombre)}</button>`)}
       <button data-a="palabra" data-b="0">Nadie</button></div>
       <div class="fila"><span class="lbl">Reloj</span><button data-a="reloj" data-dur="120">2:00</button><button data-a="reloj" data-dur="60">1:00</button><button data-a="reloj" data-dur="30">0:30</button><button data-a="reloj" data-dur="0">Parar</button></div></section>
-    <section><h2>Pedir un fundamento</h2><p class="ayuda">La bancada debe fundar su posición en un concepto y aplicarlo. Si lo hace bien, valídalo: vale 1 punto, máximo 2 por bancada.</p>
+    ${oidos.length ? `<section><h2>Lo que se oyó en este nudo</h2><p class="ayuda">Si el micrófono tomó algo que no era de la bancada, bórralo: los senadores leen todo lo que queda aquí.</p>
+      <div class="lista">${oidos.map(p => `<div class="item alto"><span>${chip(p.b)}<span class="cita">${e(p.texto)}</span></span>
+        <span class="botones"><button data-a="borrarDicho" data-id="${e(p.id)}">Borrar</button></span></div>`).join("")}</div></section>` : ""}
+    <section><h2>Fundamentos</h2><p class="ayuda">Vale 1 punto, máximo 2 por bancada. Con el micrófono activo, el Senado simulado lo valida solo si la bancada citó un artículo y aplicó un concepto de cada módulo. Con estos botones lo pides, lo sumas o lo quitas a mano.</p>
       ${s.pedido ? `<p class="estado">Pedido a ${chip(s.pedido.b)}: módulo de ${e(D.modulos[s.pedido.mod])}. <button class="texto" data-a="pedir" data-b="0">Retirar</button></p>` : ""}
       <table class="ctl"><tbody>${bancadas(b => `<tr><td>${chip(b.n)}</td>
         <td><button data-a="pedir" data-b="${b.n}" data-mod="dem">Democracia</button><button data-a="pedir" data-b="${b.n}" data-mod="ia">IA</button></td>
-        <td class="val"><button data-a="validar" data-b="${b.n}" data-d="-1" aria-label="Quitar un fundamento a ${e(b.nombre)}">−</button><b>${(s.val || {})[b.n] || 0} de ${D.puntos.maxFundamentos}</b><button data-a="validar" data-b="${b.n}" data-d="1" aria-label="Validar un fundamento de ${e(b.nombre)}">Validar</button></td></tr>`)}</tbody></table></section>
-    ${n ? `<section><h2>Nota para el Senado simulado</h2><p class="ayuda">Los cinco senadores leen la indicación, sus fundamentos y esta nota. Escribe en dos líneas qué pasó en el debate del nudo ${n}.</p>
+        <td class="val"><button data-a="validar" data-b="${b.n}" data-d="-1" aria-label="Quitar un fundamento a ${e(b.nombre)}">−</button><b>${fund[b.n] || 0} de ${D.puntos.maxFundamentos}</b><button data-a="validar" data-b="${b.n}" data-d="1" aria-label="Validar un fundamento de ${e(b.nombre)}">Validar</button></td></tr>`)}</tbody></table></section>
+    ${n ? `<section><h2>Nota para el Senado simulado</h2><p class="ayuda">Los cinco senadores leen la indicación, lo que oyó el micrófono y esta nota. Es opcional: sirve si el micrófono no estuvo activo o se perdió algo del debate del nudo ${n}.</p>
       <textarea id="inNota" rows="3" maxlength="${L.MAX.nota}" placeholder="Por ejemplo: la autora citó el artículo 6; la respuesta mostró que nadie fiscaliza.">${e(U.notas[n] ?? L.deNudo(s, n).nota ?? "")}</textarea>
       <div class="fila"><button data-a="nota" data-n="${n}">Guardar la nota</button>
       ${sen && sen.estado === "pedir" ? '<button data-a="senadoEnsayo">Usar votos de ensayo</button>' : ""}</div>
@@ -77,15 +85,21 @@ function ejecutivo() {
 /* ---------------- Secretaría ---------------- */
 function secretaria() {
   const s = S.sala, pub = s.filt || [], enPantalla = s.filtVer ? s.filtVer.id : "";
-  return `<section><h2>Indicaciones</h2><div class="lista">${D.nudos.map(n => {
-      const of = (s.ind || {})[n.n], bor = L.borradorDe(s, S.jugadores, n.autora), x = of || bor;
-      const estado = of ? (of.origen === "partida" ? "En el comparado: la de partida" : "En el comparado: la de la bancada") : bor ? (bor.lista ? "Entregada por " + bor.nombre : "Borrador de " + bor.nombre) : "Sin texto";
+  return `<section><h2>Indicaciones</h2><p class="ayuda">Las bancadas redactan en papel y la leen en voz alta en la lectura: con el micrófono activo, lo leído pasa solo al comparado. Aquí puedes corregirlo.</p><div class="lista">${D.nudos.map(n => {
+      const of = (s.ind || {})[n.n], bor = L.borradorDe(s, S.jugadores, n.autora), dic = L.indDictada(s, D, n.n), x = of || bor || dic;
+      const estado = of ? "En el comparado: " + (ORIGEN[of.origen] || ORIGEN.bancada) : bor ? (bor.lista ? "Entregada por " + bor.nombre : "Borrador de " + bor.nombre) : dic ? "Leída, sin recibir" : "Sin texto";
+      const ed = U.ed[n.n] || { tipo: x ? x.tipo : n.partida.tipo, texto: x ? x.texto : "" };
       return `<div class="item alto"><span><b>Nudo ${n.n}.</b> ${chip(n.autora)} <i>${e(estado)}</i>${x ? `<span class="cita">${e(TIPO[x.tipo] || "Sin tipo")}. ${e(x.texto)}</span>` : ""}</span>
-        <span class="botones">${bor ? `<button data-a="recibir" data-n="${n.n}">Recibir la de la bancada</button>` : ""}<button data-a="partida" data-n="${n.n}">Cargar la de partida</button></span></div>`; }).join("")}</div></section>
+        <span class="botones">${dic && !(of && of.origen === "dictada" && of.texto === dic.texto) ? `<button data-a="dictada" data-n="${n.n}">Usar lo que leyeron</button>` : ""}${bor ? `<button data-a="recibir" data-n="${n.n}">Recibir la del teléfono</button>` : ""}<button data-a="partida" data-n="${n.n}">Cargar la de partida</button></span>
+        <details class="corregir" data-n="${n.n}"${U.edN === n.n ? " open" : ""}><summary>Corregir el texto</summary>
+          <div class="fila"><label class="lbl" for="edTipo${n.n}">Tipo</label><select id="edTipo${n.n}" data-ed="${n.n}">${L.TIPOS.map(t => `<option value="${t}"${ed.tipo === t ? " selected" : ""}>${TIPO[t]}</option>`).join("")}</select></div>
+          <textarea id="edTexto${n.n}" data-ed="${n.n}" rows="4" maxlength="${L.MAX.texto}" aria-label="Texto de la indicación del nudo ${n.n}">${e(ed.texto)}</textarea>
+          <div class="fila"><button data-a="indicar" data-n="${n.n}">Guardar en el comparado</button></div></details></div>`; }).join("")}</div></section>
     <section><h2>Filtraciones</h2><p class="ayuda">Al publicar una, aparece en el proyector y en los teléfonos.</p><div class="lista">${D.filtraciones.map(f => `<div class="item alto"><span><b>${e(f.titular)}</b>
         <span class="cita">${e(f.detalle)} ${e(f.fuente)}. Sirve para el nudo ${f.nudo}.</span></span>
         <span class="botones">${enPantalla === f.id ? '<button class="on" data-a="filtrar" data-id="">Quitar de la pantalla</button>' : `<button data-a="filtrar" data-id="${f.id}">${pub.includes(f.id) ? "Mostrar otra vez" : "Publicar"}</button>`}</span></div>`).join("")}</div></section>
-    <section><h2>Puntaje</h2>${tablaPuntaje(s)}</section>
+    <section><h2>Puntaje por bancada</h2>${tablaPuntaje(s)}</section>
+    <section><h2>Puntaje por escaño</h2><p class="ayuda">${D.puntos.apuesta} puntos por acertar la apuesta y ${D.puntos.aplauso} por haber aplaudido el párrafo que los senadores eligieron como el mejor de cada bancada.</p>${tablaEscanosHTML(s, S.jugadores, 12)}</section>
     <section><h2>La sala</h2><p class="estado">Código <b>${e(S.codigo)}</b>. ${(k => k === 1 ? "1 escaño ocupado" : k + " escaños ocupados")(L.sentados(s, S.jugadores).length)}.</p>
       <p class="enlaces"><a target="_blank" href="${e(urlDe("sala.html", S.codigo))}">Abrir el hemiciclo</a><a target="_blank" href="${e(urlDe("escano.html", S.codigo, LOCAL ? { yo: "ana" } : {}))}">Abrir un escaño</a></p>
       <div class="fila"><label class="lbl" for="inBots">Escaños de ensayo</label><input id="inBots" type="number" min="0" max="40" value="${s.bots || 0}"><button data-a="bots">Aplicar</button></div>
@@ -133,13 +147,33 @@ document.addEventListener("click", async ev => {
   else if (a === "partida") await hacer({ t: "partida", n: +d.n });
   else if (a === "filtrar") await hacer({ t: "filtrar", id: d.id || null });
   else if (a === "bots") await hacer({ t: "bots", k: +$("inBots").value });
+  else if (a === "vozArmar") voz.armar(!voz.estado().armado);
+  else if (a === "vozProbar") voz.probar(!voz.estado().probando);
+  else if (a === "vozReabrir") voz.reabrir();
+  else if (a === "borrarDicho") await hacer({ t: "borrarDicho", id: d.id });
+  else if (a === "dictada") { if (await hacer({ t: "dictada", n: +d.n })) { delete U.ed[+d.n]; nota("Lo que leyó la bancada quedó en el comparado."); } }
+  else if (a === "indicar") {
+    const n = +d.n;
+    if (await hacer({ t: "indicar", n, tipo: $("edTipo" + n).value, texto: $("edTexto" + n).value })) { delete U.ed[n]; U.edN = 0; nota("Guardado en el comparado."); }
+    else nota("Falta el texto de la indicación.");
+  }
   else if (a === "docentes" && S.dueno) {
     const lista = $("inDocentes").value.split(/[\s,;]+/).map(x => x.trim().toLowerCase()).filter(x => x.includes("@")).slice(0, 10);
     try { await S.canal.cambiarSala(S.codigo, { docentes: lista }); nota("Equipo guardado."); } catch (x) { console.warn(x); nota("No se pudo guardar."); }
   }
   if (S.dueno) render();
 });
-vista.addEventListener("input", ev => { if (ev.target.id === "inNota" && S.sala) U.notas[S.sala.nudo] = ev.target.value; });
+vista.addEventListener("input", ev => {
+  if (ev.target.id === "inNota" && S.sala) U.notas[S.sala.nudo] = ev.target.value;
+  // lo que la Secretaría va corrigiendo se guarda aparte: un repintado no se lo lleva
+  const n = +ev.target.dataset.ed || 0;
+  if (n) U.ed[n] = { tipo: $("edTipo" + n).value, texto: $("edTexto" + n).value };
+});
+vista.addEventListener("toggle", ev => {
+  const d = ev.target.closest && ev.target.closest("details.corregir"); if (!d) return;
+  const n = +d.dataset.n;
+  if (d.open) U.edN = n; else if (U.edN === n) U.edN = 0;
+}, true);
 $("pestanas").addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) { U.pestana = b.dataset.p; render(); window.scrollTo(0, 0); } });
 window.addEventListener("resize", () => S.sala && render());
 
@@ -167,7 +201,9 @@ function abrir() {
     S.dueno = sala.profeUid === S.yo.uid;
     S.docente = S.dueno || (sala.docentes || []).map(x => String(x).toLowerCase()).includes(String(S.yo.email).toLowerCase());
     if (S.dueno) { recordar(S.codigo); if (!motor) motor = iniciarMotor(S, { principal: false }); }
+    if (!voz) voz = crearVoz(S, () => S.sala && render());
     render();
+    voz.sincronizar();
     if (motor) motor();
   });
   S.canal.escucharEscanos(S.codigo, lista => { S.jugadores = lista; if (S.sala) { render(); if (motor) motor(); } });

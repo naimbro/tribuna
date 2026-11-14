@@ -4,7 +4,7 @@
    escaños de ensayo y llama al Senado simulado) y los dibujos: hemiciclo, triángulo y comparado.
    D = el contenido (sala-datos.js); L = la lógica pura (sala-logica.js).
    ===================================================================== */
-import { abrirCanal } from "./sala-canal.js?v=20261113a";
+import { abrirCanal } from "./sala-canal.js?v=20261114a";
 
 export const D = LA_SALA, L = SalaLogica;
 export const P = new URLSearchParams(location.search);
@@ -121,18 +121,19 @@ export function iniciarMotor(S, { principal }) {
     for (const j of S.jugadores.filter(x => x.bot && !x.fuera)) {
       const x = L.botHace(S.sala, j, S.jugadores, D, Date.now());
       if (!x) continue;
-      const k = [j.uid, S.sala.fase, S.sala.nudo, S.sala.t || 0].join("|");
+      const k = [j.uid, S.sala.fase, S.sala.nudo, S.sala.t || 0, L.debateDe(S.sala, S.sala.nudo).length].join("|");
       if (botsPend.has(k)) continue;
       botsPend.add(k);
       setTimeout(() => S.canal.escribirEscano(S.codigo, j.uid, x).catch(err => console.warn("escaño de ensayo:", err)), 300 + Math.random() * 2200);
     }
   }
-  async function unSenador(sen, n, ind, apunte) {
+  // dicho: lo que oyó el micrófono en el debate del nudo (vacío si no hubo micrófono)
+  async function unSenador(sen, n, ind, apunte, dicho) {
     const abst = { id: sen.id, voto: "a", frase: "No alcanzó a votar.", falla: true };
     const intentos = (async () => {
       for (let i = 0; i < 2; i++) {
         try {
-          const r = L.leerSenador(L.jsonDe(await S.canal.pedirLLM(L.promptSenador(sen, n, ind, D, apunte), "jurado")));
+          const r = L.leerSenador(L.jsonDe(await S.canal.pedirLLM(L.promptSenador(sen, n, ind, D, apunte, dicho), "jurado")), { nd: L.nudoDe(D, n), dicho });
           if (r) return { id: sen.id, ...r };
         } catch (x) { console.warn("senador " + sen.id + ":", x); }
       }
@@ -144,16 +145,19 @@ export function iniciarMotor(S, { principal }) {
     const n = S.sala.nudo, s = L.deNudo(S.sala, n).sen;
     if (!s || s.estado !== "pedir" || senT === s.t) return;
     senT = s.t;
-    const ind = (S.sala.ind || {})[n];
+    const ind = (S.sala.ind || {})[n], dicho = L.debateDe(S.sala, n);
     let votos = null;
     if (ind && await S.canal.conIA()) {
-      votos = await Promise.all(D.senadores.map(sen => unSenador(sen, n, ind, L.deNudo(S.sala, n).nota || "")));
+      votos = await Promise.all(D.senadores.map(sen => unSenador(sen, n, ind, L.deNudo(S.sala, n).nota || "", dicho)));
       if (votos.every(v => v.falla)) votos = null;
     }
     if (!votos) votos = L.senadoresDeEnsayo(n, D);
     const ahora = L.deNudo(S.sala, n).sen;
     if (!ahora || ahora.t !== s.t) return;                       // se repitió la votación mientras leían
-    await S.canal.cambiarSala(S.codigo, { ["n." + n + ".sen.estado"]: "listo", ["n." + n + ".sen.votos"]: votos });
+    // lo que dijeron del debate: el mejor párrafo de cada bancada y si cumplió el piso común
+    const juicio = L.juicioSenado(votos, L.nudoDe(D, n), dicho);
+    await S.canal.cambiarSala(S.codigo, { ["n." + n + ".sen.estado"]: "listo", ["n." + n + ".sen.votos"]: votos.map(({ mejor, piso, ...v }) => v),
+      ["n." + n + ".sen.mejores"]: juicio.mejores, ["n." + n + ".sen.piso"]: juicio.piso });
   }
   async function paso() {
     if (!S.dueno || !S.sala || ocupado) return;
@@ -263,7 +267,8 @@ export function hojaIndicacion(nd, ind, { estado = "", fundamentos = true } = {}
   if (!ind) return `<article class="hoja indicacion vacia" style="--b:${b.color}">
     <p class="rot">Indicación de ${e(b.nombre)}</p><p class="falta">Todavía no llega a la Secretaría.</p></article>`;
   const sello = estado && estado !== "pendiente" ? `<span class="sello s-${estado}">${ESTADO[estado]}</span>` : "";
-  const origen = ind.origen === "partida" ? "Indicación de partida, cargada por la Secretaría" : ind.origen === "borrador" ? `Borrador de ${e(b.nombre)}` : `Indicación de ${e(b.nombre)}`;
+  const origen = ind.origen === "partida" ? "Indicación de partida, cargada por la Secretaría" : ind.origen === "borrador" ? `Borrador de ${e(b.nombre)}`
+    : ind.origen === "dictada" ? `Indicación de ${e(b.nombre)}, leída en la sala` : `Indicación de ${e(b.nombre)}`;
   const fund = fundamentos ? conceptoHTML(ind.dem, ind.demFrase) + conceptoHTML(ind.ia, ind.iaFrase) : "";
   return `<article class="hoja indicacion ${estado ? "e-" + estado : ""}" style="--b:${b.color}">
     <p class="rot">${origen}</p>
@@ -278,5 +283,18 @@ export const chip = b => { const x = L.bancada(D, b); return x ? `<span class="c
 export function tablaPuntaje(sala) {
   return `<table class="puntaje"><thead><tr><th>Bancada</th><th>Sala</th><th>Senado</th><th>Patrocinio</th><th>Fundamentos</th><th>Total</th></tr></thead><tbody>${
     L.puntaje(sala, D).map(p => `<tr><td>${chip(p.b)}</td><td>${p.sala}</td><td>${p.senado}</td><td>${p.patrocinio}</td><td>${p.fundamentos}</td><td class="tot">${p.total}</td></tr>`).join("")}</tbody></table>`;
+}
+// Los escaños que más puntos llevan (apuestas y aplausos), con el color de su bancada.
+export function tablaEscanosHTML(sala, jugadores, max = 5) {
+  const t = L.tablaEscanos(sala, jugadores, D).filter(x => x.total > 0).slice(0, max);
+  if (!t.length) return `<p class="tenue">Todavía nadie suma puntos.</p>`;
+  const color = b => (L.bancada(D, b) || { color: "var(--b0)" }).color;
+  return `<table class="puntaje escanos"><thead><tr><th>Escaño</th><th>Apuestas</th><th>Aplausos</th><th>Total</th></tr></thead><tbody>${
+    t.map(x => `<tr><td><span class="chip" style="--b:${color(x.b)}">${e(x.nombre)}</span></td><td>${x.apuesta}</td><td>${x.aplausos}</td><td class="tot">${x.total}</td></tr>`).join("")}</tbody></table>`;
+}
+// Cuántos aplausos lleva cada párrafo del nudo n: la foto si ya se cerró la votación, o lo que hay ahora.
+export function aplausosDelNudo(S, n) {
+  const foto = (L.deNudo(S.sala, n).apl || {}).de;
+  return L.cuentaAplausos(foto || L.aplausosDe(S.sala, S.jugadores, n, D));
 }
 export const fraseVoto = r => `${r.f} a favor, ${r.c} en contra, ${r.a} ${r.a === 1 ? "abstención" : "abstenciones"}`;

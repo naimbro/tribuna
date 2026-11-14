@@ -1,13 +1,15 @@
 /* =====================================================================
    LA SALA — el hemiciclo: la pantalla del proyector (sala.html).
-   Solo muestra: el comparado, los escaños que se encienden y el triángulo del poder. Si la abre
-   la cuenta que creó la sala, además hace de motor (ver sala-comun.js) y avanza con la flecha →.
+   Solo muestra: el comparado, los escaños que se encienden, el triángulo del poder y lo que oye
+   el micrófono del profesor (vivo/voz y los párrafos de la sala). Si la abre la cuenta que creó
+   la sala, además hace de motor (ver sala-comun.js) y avanza con la flecha →.
    ===================================================================== */
 import { D, L, P, LOCAL, $, e, VOTO, ESTADO, conectar, urlDe, codigoPedido, recordar, reciente, salaNueva, pintar, nota,
   relojTexto, relojVencido, qrDe, despachar, motorPrincipal, crearHemiciclo, escanosConVoto, crearTriangulo, repartoTexto,
-  hojaVigente, comparado, chip, tablaPuntaje, fraseVoto, vertice } from "./sala-comun.js?v=20261113a";
+  hojaVigente, comparado, chip, tablaPuntaje, tablaEscanosHTML, aplausosDelNudo, fraseVoto, vertice } from "./sala-comun.js?v=20261114a";
 
-const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false };
+const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false, voz: null };
+let micPintado = false;
 const raiz = $("sala"), escena = $("escena");
 let hemi = null, tri = null, motor = null, oyendo = false;
 const FOCO_HEMI = ["general", "generalR", "votacion", "resultado", "insistencia", "insistenciaR"];
@@ -31,7 +33,7 @@ const ESCENAS = {
         ${qr ? `<div class="qr">${qr}</div>` : ""}
         <p class="dir">${e(corta)}</p>
         <p class="cod">Código <b>${e(S.codigo)}</b></p>
-        ${LOCAL ? `<p class="ensayo"><a target="_blank" href="${e(urlDe("testera.html", S.codigo))}">Abrir la testera</a><a target="_blank" href="${e(urlDe("escano.html", S.codigo, { yo: "ana" }))}">Abrir un escaño</a></p>` : ""}
+        ${LOCAL ? `<p class="ensayo"><a target="_blank" href="${e(urlDe("testera.html", S.codigo, { simular: 1 }))}">Abrir la testera (micrófono simulado)</a><a target="_blank" href="${e(urlDe("escano.html", S.codigo, { yo: "ana" }))}">Abrir un escaño</a></p>` : ""}
       </div>
     </div>`;
   },
@@ -67,18 +69,19 @@ const ESCENAS = {
       ${hojaVigente(n)}</div></div>`;
   },
   redaccion() {
-    return `<div class="e-redaccion"><div class="cab"><h2>Las bancadas redactan</h2><span class="reloj" id="reloj"></span></div>
+    return `<div class="e-redaccion"><div class="cab"><div><h2>Las bancadas redactan en papel</h2><p class="guia">${e(D.reglas.papel)}</p></div><span class="reloj" id="reloj"></span></div>
       <div class="filas">${D.nudos.map(n => {
         const ind = L.indicacionDe(S.sala, S.jugadores, D, n.n), lista = ind && (ind.origen !== "borrador");
         return `<article class="${lista ? "lista" : ""}" style="--b:${L.bancada(D, n.autora).color}">
           <div class="quien"><b>Nudo ${n.n}</b>${e(n.titulo)}${chip(n.autora)}</div>
           <p class="hoy">${e(n.vigente.simple)}</p>
-          <p class="ind">${ind ? `<b>${e(ind.tipo ? ind.tipo[0].toUpperCase() + ind.tipo.slice(1) : "Borrador")}.</b> ${e(ind.texto)}` : "<i>Todavía no escriben.</i>"}</p>
-          <span class="estado">${lista ? "Entregada" : ind ? "Redactando" : "Pendiente"}</span></article>`; }).join("")}</div></div>`;
+          <p class="ind">${ind ? `<b>${e(ind.tipo ? ind.tipo[0].toUpperCase() + ind.tipo.slice(1) : "Borrador")}.</b> ${e(ind.texto)}` : `<i>La lee en voz alta ${e(L.bancada(D, n.autora).nombre)}.</i>`}</p>
+          <span class="estado">${lista ? "Entregada" : ind ? "Redactando" : "En papel"}</span></article>`; }).join("")}</div></div>`;
   },
   lectura() {
     const n = nd();
-    return `<div class="e-comparado">${titulo(n)}${comparado(n, L.indicacionDe(S.sala, S.jugadores, D, n.n))}</div>`;
+    return `<div class="e-comparado"><div class="cab"><div>${titulo(n)}</div><p class="quien">Lee su indicación ${chip(n.autora)}</p></div>
+      ${comparado(n, L.indicacionDe(S.sala, S.jugadores, D, n.n))}${oido(n, false)}</div>`;
   },
   tarea() {
     return `<div class="e-lista"><p class="sobre">Fin del acto 1</p><h2>Para el jueves</h2><p class="guia">${e(D.tarea)}</p>
@@ -123,7 +126,7 @@ const ESCENAS = {
       const contraste = sala === s.r.aprueba ? "La sala y el Senado simulado coinciden."
         : sala ? "La sala la aprobó, pero fuera de esta sala no sobreviviría." : "La sala la rechazó, pero el Senado simulado la habría aprobado.";
       pie = `<div class="fallo">${sello(s.r.aprueba ? "El Senado simulado aprueba" : "El Senado simulado rechaza", s.r.aprueba ? "si" : "no")}
-        <p class="guia">${s.r.f} a favor, ${s.r.c} en contra.${s.r.f === s.r.c ? " Con empate no se aprueba." : ""} ${contraste}${ap.n ? ` Acertaron ${ap.acertaron} de ${ap.n} apuestas.` : ""}</p></div>`;
+        <p class="guia">${s.r.f} a favor, ${s.r.c} en contra.${s.r.f === s.r.c ? " Con empate no se aprueba." : ""} ${contraste}${ap.n ? ` Acertaron ${ap.acertaron} de ${ap.n} apuestas.` : ""}</p>${delDebate(n, s)}</div>`;
     }
     return `<div class="e-senado"><p class="sobre">Nudo ${n.n}: el Senado simulado</p>${senadores(n.n, visto, s.votos)}${pie}</div>`;
   },
@@ -160,7 +163,9 @@ const ESCENAS = {
     const ley = L.leyDespachada(S.sala, D), dif = ley.filter(x => x.distinto).length;
     return `<div class="e-final"><h2>La ley que despachó este curso</h2>${filasLey()}
       <p class="linea">${e(repartoTexto(S.sala))}${dif ? ` En ${dif} ${dif === 1 ? "nudo" : "nudos"}, la sala y el Senado simulado votaron distinto.` : ""}</p>
-      ${tablaPuntaje(S.sala)}</div>`;
+      ${L.tablaEscanos(S.sala, S.jugadores, D).some(x => x.total > 0)
+        ? `<div class="tablas"><div>${tablaPuntaje(S.sala)}</div><div><p class="sobre">Quién leyó mejor a la sala</p>${tablaEscanosHTML(S.sala, S.jugadores, 5)}</div></div>`
+        : tablaPuntaje(S.sala)}</div>`;
   }
 };
 const vert = vertice;
@@ -169,7 +174,32 @@ function debate(verbo, b) {
   return `<div class="e-debate"><div class="cab"><div>${`<p class="sobre">Nudo ${n.n}: ${e(n.titulo)}</p>`}<h2>${verbo} ${chip(b)}</h2></div><span class="reloj" id="reloj"></span></div>
     ${(S.sala.urg || {})[n.n] ? '<p class="marca-regla suelta">Con urgencia: la mitad del tiempo</p>' : ""}
     ${p ? `<p class="pedido">El presidente pide a ${chip(p.b)} fundar su posición en un concepto del módulo de ${e(D.modulos[p.mod])}.</p>` : ""}
-    ${comparado(n, (S.sala.ind || {})[n.n])}</div>`;
+    ${comparado(n, (S.sala.ind || {})[n.n], { breve: micVivo() || L.debateDe(S.sala, n.n).length > 0 })}${oido(n, true)}</div>`;
+}
+// ¿está vivo el micrófono del profesor? (late cada 5 s mientras está activo)
+const micVivo = () => !!(S.voz && S.voz.activo && Date.now() - (S.voz.t || 0) < 16000);
+// Lo que se oye: los últimos párrafos cerrados, con sus aplausos, y la línea que se está diciendo.
+// La línea viva se escribe aparte (vivo()), para no repintar la escena cada 700 ms.
+function oido(n, conParrafos) {
+  const ps = conParrafos ? L.debateDe(S.sala, n.n).slice(-3) : [], c = ps.length ? aplausosDelNudo(S, n.n) : {};
+  if (!micVivo() && !ps.length) return "";
+  return `<div class="oido">${ps.length ? `<div class="dichos">${ps.map(p => `<article style="--b:${L.bancada(D, p.b).color}"><p>${e(p.texto)}</p>
+      <footer>${chip(p.b)}<span>${c[p.id] || 0} ${c[p.id] === 1 ? "aplauso" : "aplausos"}</span></footer></article>`).join("")}</div>` : ""}
+    <div class="vivo${micVivo() ? "" : " pausa"}"><b>${micVivo() ? "Se oye" : "Micrófono apagado"}</b><p><span id="vivoTxt"></span></p></div></div>`;
+}
+function vivo() {
+  const p = $("vivoTxt"), s = S.sala, v = S.voz;
+  if (!p || !s) return;
+  p.textContent = micVivo() && v.texto && v.b === s.palabra ? v.texto : "";
+}
+// Después del último voto: qué fundamentos validó el Senado y cuál fue el mejor párrafo de cada bancada.
+function delDebate(n, s) {
+  const ps = Object.fromEntries(L.debateDe(S.sala, n.n).map(p => [p.id, p])), bs = [n.autora, n.impugna];
+  const mejores = bs.map(b => ps[(s.mejores || {})[b]]).filter(Boolean);
+  if (!mejores.length) return "";
+  const piso = bs.filter(b => (s.piso || {})[b] === true);
+  return `<div class="del-debate">${mejores.map(p => `<blockquote style="--b:${L.bancada(D, p.b).color}"><p>${e(p.texto)}</p><footer>Lo mejor de ${chip(p.b)}</footer></blockquote>`).join("")}</div>
+    ${Object.keys(s.piso || {}).length ? `<p class="van">${piso.length ? "Fundamento validado: " + piso.map(chip).join(" ") : "Ninguna bancada cumplió el piso: citar un artículo y aplicar un concepto de cada módulo."}</p>` : ""}`;
 }
 function senadores(n, visto, votos) {
   return `<div class="senadores">${D.senadores.map((sen, i) => {
@@ -190,7 +220,7 @@ function cinta() {
   const donde = f === "portada" ? "" : acto === 1 ? "Acto 1: la comisión" : n ? `Acto 2: la Sala. Nudo ${n.n} de ${D.nudos.length}` : "Acto 2: la Sala";
   const k = L.sentados(s, S.jugadores).length;
   $("cintaFase").textContent = donde;
-  $("cintaDer").innerHTML = `Código <b>${e(S.codigo)}</b><span>${k} ${k === 1 ? "escaño" : "escaños"}</span>${S.dueno ? "" : '<span class="solo-mira" title="Esta pantalla no es la que creó la sala: solo muestra">solo muestra</span>'}`;
+  $("cintaDer").innerHTML = `${micVivo() ? '<span class="mic-on">Micrófono activo</span>' : ""}Código <b>${e(S.codigo)}</b><span>${k} ${k === 1 ? "escaño" : "escaños"}</span>${S.dueno ? "" : '<span class="solo-mira" title="Esta pantalla no es la que creó la sala: solo muestra">solo muestra</span>'}`;
 }
 function pies() {
   const s = S.sala, c = L.porBancada(s.sorteo), hay = Object.keys(s.sorteo || {}).length;
@@ -218,8 +248,9 @@ function render() {
   raiz.dataset.fase = s.fase;
   raiz.dataset.foco = FOCO_HEMI.includes(s.fase) ? "hemi" : "escena";
   raiz.dataset.acto = L.actoDe(s.fase);
+  micPintado = micVivo();
   pintar(escena, (ESCENAS[s.fase] || (() => ""))());
-  cinta(); pies(); avisos(); relojes();
+  cinta(); pies(); avisos(); relojes(); vivo();
   hemi.pintar(escanosConVoto(S));
   tri.pintar(salaVisible());
 }
@@ -263,6 +294,9 @@ function abrir() {
     if (motor) motor();
   });
   S.canal.escucharEscanos(S.codigo, lista => { S.jugadores = lista; if (S.sala) { render(); if (motor) motor(); } });
+  // la voz en vivo: solo se repinta la escena si el micrófono se prendió o se apagó
+  S.canal.escucharVoz(S.codigo, v => { S.voz = v; if (S.sala && micVivo() !== micPintado) render(); else vivo(); });
+  setInterval(() => { if (S.sala && micVivo() !== micPintado) render(); }, 4000);
 }
 let ultimaTecla = 0;
 document.addEventListener("keydown", ev => {
