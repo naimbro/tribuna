@@ -7,7 +7,7 @@
    Solo funciona en la cuenta que creó la sala: es la única que puede escribir la sala y vivo/voz.
    Con ?simular=1 no usa el micrófono: «oye» un guion armado con el contenido del nudo.
    ===================================================================== */
-import { D, L, P, e, despachar, nota, chip } from "./sala-comun.js?v=20261114a";
+import { D, L, P, e, despachar, nota, chip } from "./sala-comun.js?v=20261114b";
 
 export const SIMULAR = P.get("simular") === "1";
 const FALLOS = {

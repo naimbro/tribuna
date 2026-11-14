@@ -6,10 +6,10 @@
    ===================================================================== */
 import { D, L, P, LOCAL, $, e, VOTO, ESTADO, conectar, urlDe, codigoPedido, recordar, reciente, salaNueva, pintar, nota,
   relojTexto, relojVencido, qrDe, despachar, motorPrincipal, crearHemiciclo, escanosConVoto, crearTriangulo, repartoTexto,
-  hojaVigente, comparado, chip, tablaPuntaje, tablaEscanosHTML, aplausosDelNudo, fraseVoto, vertice } from "./sala-comun.js?v=20261114a";
+  hojaVigente, comparado, chip, tablaPuntaje, tablaEscanosHTML, aplausosDelNudo, fraseVoto, vertice } from "./sala-comun.js?v=20261114b";
 
 const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false, voz: null };
-let micPintado = false;
+let micPintado = false, qrCurso = false;      // qrCurso: quien conduce pidió ver ya el QR del curso
 const raiz = $("sala"), escena = $("escena");
 let hemi = null, tri = null, motor = null, oyendo = false;
 const FOCO_HEMI = ["general", "generalR", "votacion", "resultado", "insistencia", "insistenciaR"];
@@ -22,17 +22,23 @@ const conteo = r => `<div class="conteo"><span class="k f"><b>${r.f}</b>${VOTO.f
 /* ---------------- las escenas ---------------- */
 const ESCENAS = {
   portada() {
-    const url = urlDe("escano.html", S.codigo), qr = qrDe(url), corta = url.replace(/^https?:\/\//, "").replace(/\?.*$/, "");
+    // primero el QR de quien conduce (abre la testera en su teléfono); después, el del curso
+    // (en el ensayo local no hay teléfono que escanee: solo se ve con &qr=profe, para revisar la pantalla)
+    const profe = L.qrDePortada(S.sala, { dueno: S.dueno, local: LOCAL && P.get("qr") !== "profe", saltar: qrCurso }) === "profe";
+    const url = urlDe(profe ? "testera.html" : "escano.html", S.codigo), qr = qrDe(url), corta = url.replace(/^https?:\/\//, "").replace(/\?.*$/, "");
     return `<div class="e-portada">
       <div class="txt">
         <h1>La Sala</h1>
         <p class="bajada">Hoy el curso es el Senado. Se discute, artículo por artículo, la ley de inteligencia artificial.</p>
         <p class="idea">${e(D.ideaCentral)}</p>
       </div>
-      <div class="entra">
+      <div class="entra${profe ? " profe" : ""}">
+        ${profe ? '<p class="para">Para quien conduce</p>' : ""}
         ${qr ? `<div class="qr">${qr}</div>` : ""}
-        <p class="dir">${e(corta)}</p>
-        <p class="cod">Código <b>${e(S.codigo)}</b></p>
+        ${profe ? `<p class="dir">Escanéalo con tu teléfono: abre la testera y el micrófono de esta sala.</p>
+          <p class="dir">Cuando tu teléfono entre, aquí aparece el QR del curso. <button class="texto" data-a="qrCurso">Mostrarlo ya (tecla Q)</button></p>`
+          : `<p class="dir">${e(corta)}</p>
+        <p class="cod">Código <b>${e(S.codigo)}</b></p>`}
         ${LOCAL ? `<p class="ensayo"><a target="_blank" href="${e(urlDe("testera.html", S.codigo, { simular: 1 }))}">Abrir la testera (micrófono simulado)</a><a target="_blank" href="${e(urlDe("escano.html", S.codigo, { yo: "ana" }))}">Abrir un escaño</a></p>` : ""}
       </div>
     </div>`;
@@ -298,9 +304,11 @@ function abrir() {
   S.canal.escucharVoz(S.codigo, v => { S.voz = v; if (S.sala && micVivo() !== micPintado) render(); else vivo(); });
   setInterval(() => { if (S.sala && micVivo() !== micPintado) render(); }, 4000);
 }
+escena.addEventListener("click", ev => { if (ev.target.closest('[data-a="qrCurso"]')) { qrCurso = true; render(); } });
 let ultimaTecla = 0;
 document.addEventListener("keydown", ev => {
   if (!S.dueno || !S.sala || (ev.target.closest && ev.target.closest("input, textarea"))) return;
+  if (ev.key === "q" || ev.key === "Q") { qrCurso = !qrCurso; return render(); }
   if (!["ArrowRight", "PageDown"].includes(ev.key) || Date.now() - ultimaTecla < 450) return;
   ultimaTecla = Date.now();
   despachar(S, { t: "sig" });

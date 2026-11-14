@@ -5,7 +5,7 @@
    queda como alternativa). Solo escribe su propio documento (jugadores/{uid}).
    ===================================================================== */
 import { D, L, LOCAL, $, e, VOTO, ESTADO, conectar, urlDe, codigoPedido, pintar, nota, relojTexto,
-  hojaVigente, hojaIndicacion, chip, tablaPuntaje, tablaEscanosHTML, fraseVoto, crearHemiciclo, escanosConVoto } from "./sala-comun.js?v=20261114a";
+  hojaVigente, hojaIndicacion, chip, tablaPuntaje, tablaEscanosHTML, fraseVoto, crearHemiciclo, escanosConVoto } from "./sala-comun.js?v=20261114b";
 
 const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false };
 const U = { pestana: "sala", expN: 0, F: null, base: 0, sucio: false, rellenar: false, prensaVista: 0, sentado: false, conForm: false };

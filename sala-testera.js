@@ -6,11 +6,11 @@
    En el teléfono de quien creó la sala, además, es el único micrófono (sala-voz.js).
    ===================================================================== */
 import { D, L, LOCAL, $, e, VOTO, ESTADO, TIPO, conectar, urlDe, codigoPedido, recordar, reciente, salaNueva, pintar, nota,
-  relojTexto, despachar, iniciarMotor, chip, tablaPuntaje, tablaEscanosHTML } from "./sala-comun.js?v=20261114a";
-import { crearVoz } from "./sala-voz.js?v=20261114a";
+  relojTexto, despachar, iniciarMotor, chip, tablaPuntaje, tablaEscanosHTML } from "./sala-comun.js?v=20261114b";
+import { crearVoz } from "./sala-voz.js?v=20261114b";
 
 const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false };
-const U = { pestana: "presidente", notas: {}, latido: 0, oyendo: false, ed: {}, edN: 0 };
+const U = { pestana: "presidente", notas: {}, latido: 0, oyendo: false, ed: {}, edN: 0, avisado: false };
 const vista = $("vista");
 let motor = null, ultimoSig = 0, voz = null;
 const ORIGEN = { partida: "la de partida", dictada: "la que leyó la bancada", secretaria: "corregida por la Secretaría", bancada: "la que la bancada escribió en el teléfono" };
@@ -114,7 +114,8 @@ function secretaria() {
 function render() {
   const s = S.sala;
   if (!s) return;
-  if (!S.dueno && !S.docente) return mensaje(`<h1>La testera</h1><p>La cuenta ${e(S.yo.email)} no es del equipo docente de la sala ${e(S.codigo)}.</p><p>Pide a quien la creó que agregue tu correo en Secretaría.</p>`);
+  if (!S.dueno && !S.docente) return mensaje(`<h1>La testera</h1><p>La cuenta ${e(S.yo.email)} no es del equipo docente de la sala ${e(S.codigo)}.</p><p>Pide a quien la creó que agregue tu correo en Secretaría.</p>
+    <p>¿Vienes a ocupar tu escaño? <a class="boton" href="${e(urlDe("escano.html", S.codigo))}">Entrar como estudiante</a></p>`);
   $("pestanas").hidden = false;
   pintar($("arriba"), cabecera());
   const ancho = window.matchMedia("(min-width: 1000px)").matches;
@@ -201,6 +202,8 @@ function abrir() {
     S.dueno = sala.profeUid === S.yo.uid;
     S.docente = S.dueno || (sala.docentes || []).map(x => String(x).toLowerCase()).includes(String(S.yo.email).toLowerCase());
     if (S.dueno) { recordar(S.codigo); if (!motor) motor = iniciarMotor(S, { principal: false }); }
+    // la testera de quien conduce, abierta en un teléfono: la portada del proyector ya puede mostrar el QR del curso
+    if (S.dueno && !sala.telefono && !U.avisado && window.matchMedia("(pointer: coarse)").matches) { U.avisado = true; hacer({ t: "telefono" }); }
     if (!voz) voz = crearVoz(S, () => S.sala && render());
     render();
     voz.sincronizar();

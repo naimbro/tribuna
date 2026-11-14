@@ -4,7 +4,7 @@
    escaños de ensayo y llama al Senado simulado) y los dibujos: hemiciclo, triángulo y comparado.
    D = el contenido (sala-datos.js); L = la lógica pura (sala-logica.js).
    ===================================================================== */
-import { abrirCanal } from "./sala-canal.js?v=20261114a";
+import { abrirCanal } from "./sala-canal.js?v=20261114b";
 
 export const D = LA_SALA, L = SalaLogica;
 export const P = new URLSearchParams(location.search);

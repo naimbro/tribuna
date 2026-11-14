@@ -58,8 +58,11 @@ presidente, y nadie suma por aplausos.
 1. Abre `sala.html` en el notebook del proyector, entra con Google y crea la sala. **La cuenta que
    crea la sala es la que la conduce**: esa pestaña es además el motor (ejecuta las órdenes del resto
    del equipo, sienta a quien llega tarde y llama al Senado simulado). Tiene que quedar abierta y a la vista.
-2. Abre `testera.html?sala=CÓDIGO` con la misma cuenta, en tu teléfono (Android con Chrome). El
-   botón grande avanza la sesión; en el hemiciclo también avanza la flecha →.
+2. La portada muestra primero un QR «Para quien conduce»: escanéalo con tu teléfono (Android con
+   Chrome) y entra con la misma cuenta. Abre la testera de esa sala. Apenas tu teléfono entra, la
+   portada cambia sola al QR del curso; la tecla Q lo cambia a mano. Si un estudiante alcanza a
+   escanear el tuyo, la testera le ofrece ir a su escaño. El botón grande de la testera avanza la
+   sesión; en el hemiciclo también avanza la flecha →.
 3. En la testera, Presidente → «Probar» y después «Activar el micrófono». Activo, sigue a la
    palabra: oye a la bancada que la tiene y se cierra con «Nadie». El proyector muestra «Micrófono
    activo». El teléfono tiene que quedar cerca de quien habla, con la pantalla encendida y la testera

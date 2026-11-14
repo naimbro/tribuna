@@ -142,6 +142,10 @@ h1,h2,h3,p{margin:0}
 .e-portada .dir{font-size:calc(1.35*var(--u));color:var(--tenue)}
 .e-portada .cod{font-size:calc(2.2*var(--u))}
 .e-portada .cod b{font-size:1.5em;letter-spacing:.12em;color:var(--laton)}
+.e-portada .para{font:800 calc(1.5*var(--u))/1 var(--aparato);letter-spacing:.08em;text-transform:uppercase;color:var(--laton)}
+.e-portada .entra.profe .qr{outline:calc(.45*var(--u)) solid var(--laton)}
+.e-portada .entra.profe .dir{max-width:calc(26*var(--u));line-height:1.35}
+.e-portada .entra .texto{font-size:1em}
 .e-portada .ensayo{display:flex;flex-direction:column;gap:.4em;font-size:calc(1.5*var(--u))}
 .e-portada .ensayo a{color:var(--laton)}
 .e-mensaje{justify-content:center;align-items:flex-start;gap:calc(2*var(--u))!important;padding:0 calc(6*var(--u))}

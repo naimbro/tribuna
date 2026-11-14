@@ -660,6 +660,12 @@ Responde SOLO un JSON: {"voto": "favor" | "contra" | "abstencion", "frase": "…
     }
   }
 
+  // Qué QR muestra la portada. Primero el de quien conduce, que abre la testera (y el micrófono)
+  // en su teléfono; cuando ese teléfono ya entró, el del curso. Como en Tribuna con el micrófono.
+  // Solo en la pantalla de quien creó la sala, y nunca en el ensayo local.
+  const qrDePortada = (sala, { dueno = false, local = false, saltar = false } = {}) =>
+    (dueno && !local && !saltar && !(sala && sala.telefono) ? "profe" : "curso");
+
   // Una acción del equipo docente sobre la sala. Devuelve { cambios, efectos } o null.
   function aplicar(sala, a, ctx) {
     const { D, ahora } = ctx, c = {}, efectos = [], n = sala.nudo || 0;
@@ -757,6 +763,7 @@ Responde SOLO un JSON: {"voto": "favor" | "contra" | "abstencion", "frase": "…
         c["n." + n + ".sen"] = { estado: "listo", votos, visto: sala.fase === "senado" ? 0 : (s.visto || 0), t: ahora, mejores: j.mejores, piso: j.piso };
         return ok();
       }
+      case "telefono": if (sala.telefono) return null; c.telefono = ahora; return ok();      // la testera se abrió en un teléfono
       case "bots": c.bots = Math.max(0, Math.min(40, Math.round(+a.k || 0))); return ok();
       case "avisoFuera": c.aviso = null; return ok();
       default: return null;
@@ -780,7 +787,7 @@ Responde SOLO un JSON: {"voto": "favor" | "contra" | "abstencion", "frase": "…
     dichoDe, debateDe, tipoDicho, indDictada, aplaudir, quedanAplausos, aplausosDe, cuentaAplausos,
     resultadoSenado, promptSenador, oidoPara, jsonDe, leerSenador, juicioSenado, senadoresDeEnsayo,
     puntaje, pisoDe, puntosEscano, tablaEscanos, fraseDeEnsayo, asientos, ubicar, botHace,
-    siguiente, etiquetaSiguiente, aplicar, leyDespachada };
+    siguiente, etiquetaSiguiente, qrDePortada, aplicar, leyDespachada };
 })();
 
 if (typeof module !== "undefined") module.exports = SalaLogica;

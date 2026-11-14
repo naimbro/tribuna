@@ -231,6 +231,20 @@ test("ensayo: los escaños de ensayo aplauden lo que ya se dijo, y el guion sale
   assert.ok(L.indDictada({ voz: { p1: { n: 3, f: "lectura", b: 2, texto: L.fraseDeEnsayo(D, 3, 2, "lectura", 0), t0: 1 } } }, D, 3), "el guion de la lectura sirve como indicación");
 });
 
+test("portada: primero el QR de quien conduce; el del curso cuando su teléfono ya entró", () => {
+  const yo = { dueno: true };
+  assert.equal(L.qrDePortada({}, yo), "profe");
+  assert.equal(L.qrDePortada({}, { ...yo, saltar: true }), "curso", "quien conduce puede saltárselo");
+  assert.equal(L.qrDePortada({}, { ...yo, local: true }), "curso", "en el ensayo local no hay teléfono que escanee");
+  assert.equal(L.qrDePortada({}, { dueno: false }), "curso", "otra pantalla que solo muestra");
+  const ctx = { D, jugadores: [], ahora: 123 };
+  let sala = { fase: "portada" };
+  sala = L.aplicarRutas(sala, L.aplicar(sala, { t: "telefono" }, ctx).cambios);
+  assert.equal(sala.telefono, 123);
+  assert.equal(L.qrDePortada(sala, yo), "curso");
+  assert.equal(L.aplicar(sala, { t: "telefono" }, ctx), null, "se avisa una sola vez");
+});
+
 test("flujo a viva voz: sin teléfonos que redacten, dos actos con dictado, aplausos, juicio y puntos por escaño", () => {
   let sala = { fase: "portada", nudo: 0 }, ahora = 1000, k = 0;
   const js = Array.from({ length: 12 }, (_, i) => esc("bot" + String(i + 1).padStart(2, "0"), { bot: true }));
