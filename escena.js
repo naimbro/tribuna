@@ -95,6 +95,7 @@ function seguir() {
     E.sala = s;
     if (primera) { primera = false; oirResto(); }
     cierres(antes, s);
+    asignarTardios();
     pintar();
   });
 }
@@ -119,6 +120,7 @@ function oirResto() {
     E.publicos = l;
     if (primerPublico) { primerPublico = false; recuperar(); }
     contar();
+    asignarTardios();
   });
   setInterval(publicar, 1500);
 }
@@ -286,24 +288,58 @@ function listaDuelos(s) {
 // El mapa del compás: un punto anónimo por estudiante que ya entró, del color de su campo, donde
 // lo dejaron sus respuestas (xy de su documento). Ordenados por uid: los que caen en el mismo punto
 // se abren en espiral siempre igual.
+// Antes de formar las bancadas, cada punto lleva el color del campo más cercano; después, el de su
+// bancada final (s.reparto). Quien llegó después de formar y aún no tiene bancada, el más cercano.
+const conXY = () => E.publicos.filter(p => p && p.uid && p.xy && Number.isFinite(p.xy.x) && Number.isFinite(p.xy.y))
+  .sort((a, b) => String(a.uid).localeCompare(String(b.uid)));
+function bancadaDe(s, p) {
+  const r = s.reparto && s.reparto[p.uid];
+  if (r) return r;
+  const id = campoDe(p.xy, s.compas.campos);
+  return s.compas.campos.findIndex(c => c.id === id) + 1;
+}
 function puntosCompas(s) {
-  const color = g => ((s.grupos || []).find(x => x.n === g) || {}).color || "#7d8fa1";
   const en = v => Math.max(-10, Math.min(10, v));
-  return E.publicos.filter(p => p && p.uid && p.grupo && p.xy && Number.isFinite(p.xy.x) && Number.isFinite(p.xy.y))
-    .sort((a, b) => String(a.uid).localeCompare(String(b.uid)))
-    .map(p => ({ x: en(p.xy.x), y: en(p.xy.y), color: color(p.grupo) }));
+  return conXY().map(p => ({ x: en(p.xy.x), y: en(p.xy.y), color: (s.compas.campos[bancadaDe(s, p) - 1] || {}).color || "#7d8fa1" }));
+}
+function cuentaCompas(s) {
+  const ps = conXY();
+  return s.compas.campos.map((c, i) => ({ n: i + 1, nombre: c.nombre, color: c.color, cuantos: ps.filter(p => bancadaDe(s, p) === i + 1).length }));
+}
+// Formar las bancadas: cada uno a la más cercana con cupo (brujula.js). Se escribe una vez en la
+// sala; los teléfonos leen ahí su bancada.
+function formarBancadas() {
+  const s = E.sala;
+  if (!s || !s.compas || s.reparto) return;
+  const alumnos = conXY().map(p => ({ uid: p.uid, pos: p.xy }));
+  if (!alumnos.length) return;
+  E.canal.cambiarSala(E.codigo, { reparto: repartirConTope(alumnos, s.compas.campos).de })
+    .catch(e => aviso("No se pudieron formar las bancadas: " + (e.message || e.code) + ". Recarga la página y vuelve a intentar."));
+}
+// Con las bancadas formadas, quien entra después va a la más cercana bajo el tope. Nadie de los que
+// ya estaban se mueve.
+function asignarTardios() {
+  const s = E.sala;
+  if (!s || !s.compas || !s.reparto || E.asignando) return;
+  const nuevos = conXY().filter(p => !s.reparto[p.uid]);
+  if (!nuevos.length) return;
+  const reparto = { ...s.reparto }, tam = s.compas.campos.map((c, i) => Object.values(reparto).filter(n => n === i + 1).length);
+  for (const p of nuevos) { const n = bancadaTarde(p.xy, s.compas.campos, tam); reparto[p.uid] = n; tam[n - 1]++; }
+  E.asignando = true;
+  E.canal.cambiarSala(E.codigo, { reparto }).catch(() => {}).finally(() => { E.asignando = false; });
 }
 function pintarEspera(s) {
   const gente = E.agg ? E.agg.n : 0;
   // Con gente adentro la galería ya está abierta: su QR y el compás se quedan aunque el teléfono del
   // profesor se duerma y deje de latir (el compás no necesita el micrófono).
-  const abierta = E.conectado || gente > 0;
+  // En una clase solo de brújula (sinDuelos) no hace falta el teléfono del profesor: abierta de entrada.
+  const abierta = E.conectado || gente > 0 || !!s.sinDuelos;
   // con compás: cuántos hay en cada campo, para ver los tamaños antes de empezar
-  const campos = s.compas && abierta ? Galeria.porGrupo(E.publicos, s.grupos) : [];
+  const campos = s.compas && abierta ? cuentaCompas(s) : [];
   // y el mapa, mientras no se haya jugado ningún duelo (después vuelve la lista con resultados)
   const conMapa = campos.length > 0 && typeof mapaSvg === "function" && !s.duelos.some(d => d.jugado);
   const puntos = conMapa ? puntosCompas(s) : [];
-  if (!cambio("espera", [s.duelos, E.conectado, gente, E.tabla, campos, puntos])) return;
+  if (!cambio("espera", [s.duelos, E.conectado, gente, E.tabla, campos, puntos, !!s.reparto])) return;
   const izq = el("div"), t = tablasEl();
   izq.append(el("h1", "tema", s.tema), el("p", "del-curso", s.curso));
   if (!conMapa) izq.append(listaDuelos(s));
@@ -316,9 +352,15 @@ function pintarEspera(s) {
       ul.append(li);
     }
     if (conMapa) {
-      const caja = el("div", "compas-vivo"), mapa = el("div", "compas-mapa");
+      const caja = el("div", "compas-vivo"), mapa = el("div", "compas-mapa"), lado = el("div", "compas-lado");
       mapa.innerHTML = mapaSvg({ puntos, campos: s.compas.campos, ejes: s.compas.ejes || null, tam: 400 });   // SVG generado aquí; los textos van escapados
-      caja.append(mapa, ul);
+      lado.append(el("p", "campos-tit", s.reparto ? "Bancadas formadas" : "Por cercanía, todavía sin formar"), ul);
+      if (!s.reparto && conXY().length) {
+        const b = el("button", "boton formar", "Formar las bancadas");
+        b.onclick = () => { b.disabled = true; b.textContent = "Formando…"; formarBancadas(); };
+        lado.append(b);
+      }
+      caja.append(mapa, lado);
       izq.append(caja);
     } else izq.append(el("p", "campos-tit", "El compás de la sala"), ul);
   }
@@ -331,7 +373,7 @@ function pintarEspera(s) {
   der.append(el("p", "", !abierta ? "Escanea con tu teléfono: va a ser el micrófono"
     : s.compas ? "Entren con su teléfono y respondan el compás" : "Entren a la galería con su teléfono"),
     el("div", "codigo", E.codigo));
-  if (abierta) der.append(el("p", "gente", gente ? `${gente} en la galería` : "Micrófono conectado. Todavía no entra nadie a la galería."));
+  if (abierta) der.append(el("p", "gente", gente ? `${gente} en la galería` : s.sinDuelos ? "Todavía no entra nadie." : "Micrófono conectado. Todavía no entra nadie a la galería."));
   if (LOCAL || !qr) {
     const p = el("p");
     const enlace = (texto, url) => { const a = el("a", "enlace", texto); a.href = url; a.target = "_blank"; p.append(a, " "); };

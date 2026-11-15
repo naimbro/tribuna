@@ -309,7 +309,7 @@ function pintar() {
   raiz.setProperty("--a", d ? d.A.color : "#38bdf8");
   raiz.setProperty("--b", d ? d.B.color : "#fb7185");
   if (s.fase === "espera") {
-    if (!E.pruebaOk) return vista("prueba");
+    if (!E.pruebaOk && !s.sinDuelos) return vista("prueba");      // sin duelos no hace falta probar el micrófono
     pintarDuelos(s);
     return vista("duelos");
   }
@@ -322,6 +322,11 @@ function pintarDuelos(s) {
   $("duelosTema").textContent = s.tema;
   const lista = $("duelosLista");
   lista.replaceChildren();
+  // una clase solo de brújula: no se ofrecen duelos
+  if (s.sinDuelos) {
+    lista.append(el("p", "", "Hoy no hay duelos. La brújula, el mapa y el botón para formar las bancadas están en el proyector. Puedes guardar el teléfono."));
+    return;
+  }
   for (const d of s.duelos) {
     // con compás, el campo que defiende cada lado dice más que «A favor»
     const rot = x => (x.cargo && !d.personajes ? x.cargo : x.corto);

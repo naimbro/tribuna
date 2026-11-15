@@ -73,6 +73,8 @@ a{color:inherit}
 .compas-mapa svg{display:block;width:auto;height:min(64vh,46vw);max-width:100%}
 .compas-vivo .campos{flex-direction:column;gap:1.2em;margin:0}
 .compas-vivo .campos li{justify-content:space-between;gap:1em}
+.compas-lado .campos-tit{margin:0 0 1.4em}
+.compas-lado .formar{margin-top:2em;font-size:clamp(16px,calc(1.2*var(--u)),24px)}
 .parear{justify-self:end;text-align:center;width:min(100%,30vw)}
 .parear .qr{background:var(--papel);border-radius:14px;padding:14px;line-height:0}
 .parear .qr svg{width:100%;height:auto}

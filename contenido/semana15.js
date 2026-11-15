@@ -28,6 +28,7 @@ const SESION = {
   mocion: "Hay que crear un fiscalizador propio de la IA, en vez de encargárselo a la Agencia de Datos.",
   grupos: 4,                // solo el juego clásico
   compas: true,             // un micrófono: los campos de BRUJULA son los grupos de la galería
+  sinDuelos: true,          // el lunes solo brújula: el QR de la galería sale de inmediato y el teléfono del profesor no ofrece duelos
   favor: "A FAVOR",
   contra: "EN CONTRA"
 };
@@ -124,7 +125,11 @@ const PREGUNTAS = [
 ];
 
 /* --- Brújula corta -------------------------------------------------------
-   Los cuatro campos son las cuatro bancadas de La Sala, en su orden.
+   Los cuatro campos son las cuatro bancadas de La Sala, en su orden. `tarea`
+   es lo que el teléfono le dice a cada uno al quedar en su bancada: los nudos
+   que propone y ataca en La Sala (autora/impugna de sala-datos.js; lo revisa
+   pruebas/contenido.test.js). Las bancadas se forman con cupo
+   (repartirConTope de brujula.js) cuando el profesor lo pide en el proyector.
 
    x — ¿Cómo debe ser la regla? Flexible: se responde al daño después (−) ↔
        fuerte: se exige antes del daño (+). Es la disputa ex ante / ex post de
@@ -185,12 +190,16 @@ const BRUJULA = {
   ],
   campos: [
     { id: "habilitantes", nombre: "Habilitantes", centro: { x: -5, y: -5 }, color: "#e0a43a",
-      afirma: "Principios e incentivos. Que la inversión llegue." },
+      afirma: "Principios e incentivos. Que la inversión llegue.",
+      tarea: "Tu bancada propone el nudo 1 (¿Riesgos o habilitación?) y ataca el nudo 4 (Soberanía y plata)." },
     { id: "garantistas", nombre: "Garantistas", centro: { x: 5, y: -5 }, color: "#3fb6a8",
-      afirma: "Derechos, obligaciones previas y un fiscalizador fuerte." },
+      afirma: "Derechos, obligaciones previas y un fiscalizador fuerte.",
+      tarea: "Tu bancada propone el nudo 3 (¿Quién fiscaliza?) y ataca el nudo 1 (¿Riesgos o habilitación?)." },
     { id: "seguridad", nombre: "Orden y seguridad", centro: { x: -5, y: 5 }, color: "#6f9bf2",
-      afirma: "El Estado necesita ver para proteger." },
+      afirma: "El Estado necesita ver para proteger.",
+      tarea: "Tu bancada propone el nudo 2 (La excepción de seguridad) y ataca el nudo 3 (¿Quién fiscaliza?)." },
     { id: "soberanistas", nombre: "Soberanistas", centro: { x: 5, y: 5 }, color: "#b990f0",
-      afirma: "Cómputo, datos y reglas propias. Desconfía de las grandes tecnológicas." }
+      afirma: "Cómputo, datos y reglas propias. Desconfía de las grandes tecnológicas.",
+      tarea: "Tu bancada propone el nudo 4 (Soberanía y plata) y ataca el nudo 2 (La excepción de seguridad)." }
   ]
 };

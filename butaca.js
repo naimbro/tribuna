@@ -91,26 +91,46 @@ function responderCompas(id, k) {
   if (x.i < c.preguntas.length - 1) { x.i++; return pintarCompas(); }
   const g = Galeria.grupoDelCompas(x.resp, c, { posicion, campoDe });      // de brujula.js
   if (!g) { x.i = 0; return pintarCompas(); }
-  pintarCampo(g);
+  E.xy = g.pos;
+  // Queda contado de inmediato, sin otro botón: su punto entra al mapa del proyector. La bancada
+  // no se decide aquí: la fija el profesor al formar las bancadas (con cupo), y llega en la sala.
+  if (E.dentro) { E.rehaciendo = false; E.mio.xy = g.pos; guardar(); return pintar(); }   // rehízo la brújula antes de formar
+  vista("mensaje");
+  $("msgTxt").textContent = "Guardando tu respuesta…";
+  $("btnEntrar").hidden = true;
+  entrar(0, pintarReintento);
 }
-function pintarCampo(g) {
-  $("campoNom").textContent = g.nombre;
-  $("campoNom").style.color = g.color || "";
-  $("campoAfirma").textContent = g.afirma;
-  const d = E.sala.duelos.find(x => x.A.g === g.n || x.B.g === g.n);
-  $("campoDuelo").textContent = d
-    ? `Tu campo debate «${d.pregunta}» y va ${d.A.g === g.n ? "a favor" : "en contra"}. Cuando debaten otros campos, juegas desde la galería.`
-    : "Vas a seguir los duelos desde la galería.";
+// Si no se pudo guardar la entrada: una sola acción en pantalla, grande.
+function pintarReintento() {
+  $("campoNom").textContent = "Casi listo";
+  $("campoNom").style.color = "";
+  $("campoAfirma").textContent = "";
+  $("campoDuelo").textContent = "No se pudo guardar tu respuesta. Revisa la conexión y toca el botón.";
+  $("btnCampo").textContent = "Guardar mi respuesta";
   $("btnCampo").disabled = false;
-  $("btnCampo").onclick = () => { $("btnCampo").disabled = true; E.xy = g.pos; entrar(g.n); };
+  $("btnCampo").onclick = () => { $("btnCampo").disabled = true; entrar(0, pintarReintento); };
+  $("btnRehacer").hidden = true;
   vista("campo");
 }
-async function entrar(g) {
+async function entrar(g, siFalla) {
   const n = Galeria.nombreCorto(E.yo.nombre || String(E.yo.email || "").split("@")[0]);
   try { await E.canal.entrarGaleria(CODIGO, { nombre: n, grupo: g }); }
-  catch (e) { return mensaje("No se pudo entrar a la galería: " + (e.code || e.message || e)); }
+  catch (e) { return siFalla ? siFalla() : mensaje("No se pudo entrar a la galería: " + (e.code || e.message || e)); }
   E.jugador = { nombre: n, grupo: g };
   adentro();
+}
+// La bancada que le tocó al formarlas: la sala trae el reparto { uid: n }. Mientras su documento
+// tenga grupo 0, la toma (las reglas dejan pasar de 0 a un grupo una sola vez) y la anota también
+// en su documento público, que es el que cuenta el proyector.
+const bancada = () => grupo() || (E.sala && E.sala.reparto && E.yo ? E.sala.reparto[E.yo.uid] || 0 : 0);
+function tomarBancada() {
+  const n = E.sala && E.sala.reparto && E.yo ? E.sala.reparto[E.yo.uid] || 0 : 0;
+  if (!E.dentro || !n || grupo() || E.tomando) return;
+  E.tomando = true;
+  E.canal.entrarGaleria(CODIGO, { nombre: nombre(), grupo: n })
+    .then(() => { E.jugador = { ...E.jugador, grupo: n }; guardar(); pintar(); })
+    .catch(() => nota("No se pudo guardar tu bancada. Revisa tu conexión."))
+    .finally(() => { E.tomando = false; });
 }
 async function adentro() {
   const guardado = await E.canal.leerPublico(CODIGO).catch(() => null);
@@ -121,13 +141,14 @@ async function adentro() {
   E.canal.escucharVoz(CODIGO, v => { E.voz = v; pintarFlujo(); });
   E.canal.escucharGaleria(CODIGO, a => { E.agg = a; pintarFlujo(); });
   E.canal.escucharPuntos(CODIGO, p => { E.puntos = p; pintar(); });
+  tomarBancada();
   pintar();
 }
 
 /* ------------------------------ pintar ------------------------------ */
 function pintar() {
   const s = E.sala;
-  if (!s || !E.dentro) return;
+  if (!s || !E.dentro || E.rehaciendo) return;
   const d = duelo(), raiz = document.documentElement.style, pts = puntosMios().total;
   raiz.setProperty("--a", d ? d.A.color : "#38bdf8");
   raiz.setProperty("--b", d ? d.B.color : "#fb7185");
@@ -165,11 +186,30 @@ function tablas() {
   una("Mejor grupo en la galería", (t.grupos || []).map(g => [g.nombre, String(g.promedio).replace(".", ",")]));
 }
 function pintarEspera(s) {
-  const g = (s.grupos || []).find(x => x.n === grupo());
-  $("quien").textContent = g ? `${nombre()}, grupo ${g.corto}` : nombre();
+  const g = (s.grupos || []).find(x => x.n === bancada());
+  $("quien").textContent = g ? `${nombre()}, ${s.compas ? "bancada" : "grupo"} ${g.corto}` : nombre();
+  for (const id of ["pts1", "pts2", "pts3", "pts4"]) $(id).hidden = !!s.sinDuelos;
   const jugados = s.duelos.filter(d => d.jugado);
+  $("esperaTit").style.color = "";
+  $("esperaAfirma").hidden = true;
+  $("btnCambiar").hidden = true;
   $("esperaTit").textContent = s.fase === "fin" ? "La clase terminó" : jugados.length ? "Viene el próximo duelo" : "Ya estás en la galería";
   $("esperaTxt").textContent = s.fase === "fin" ? "Así quedó la galería." : "Cuando empiece el debate lo vas a ver aquí, lado por lado.";
+  // el compás antes del primer duelo: su bancada final (sin explicar ajustes) o, si aún no se forman, que espere
+  if (s.compas && s.fase === "espera" && !jugados.length) {
+    const campo = g && ((s.compas.campos || [])[g.n - 1] || null);
+    if (g) {
+      $("esperaTit").textContent = g.nombre;
+      $("esperaTit").style.color = g.color || "";
+      $("esperaAfirma").textContent = (campo && campo.afirma) || "";
+      $("esperaAfirma").hidden = !(campo && campo.afirma);
+      $("esperaTxt").textContent = (campo && campo.tarea) || (s.sinDuelos ? "" : "Cuando empiece el debate lo vas a ver aquí, lado por lado.");
+    } else {
+      $("esperaTit").textContent = "Listo: ya estás en el mapa";
+      $("esperaTxt").textContent = "Cuando el profesor forme las bancadas, aquí aparece la tuya.";
+      $("btnCambiar").hidden = !!s.reparto;
+    }
+  }
   const ultimo = jugados.length ? jugados[jugados.length - 1] : null, p = ultimo && puntosMios().duelos[ultimo.n];
   $("ganadoAntes").replaceChildren(...(p ? [desglose(p)] : []));
   tablas();
@@ -306,6 +346,7 @@ function enlazar() {
   for (const k of ["A", "B"]) $("ap" + k).onclick = () => { lo().apuesta = k; guardar(); pintarApuesta(duelo()); };
   $("btnAtras").onclick = () => { if (E.compas && E.compas.i > 0) { E.compas.i--; pintarCompas(); } };
   $("btnRehacer").onclick = () => { E.compas = { i: 0, resp: {} }; pintarCompas(); };
+  $("btnCambiar").onclick = () => { E.rehaciendo = true; E.compas = { i: 0, resp: {} }; pintarCompas(); };
 }
 
 /* ------------------------------ arranque ------------------------------ */
@@ -315,7 +356,8 @@ function seguir() {
     if (!s) return mensaje(`La sala ${CODIGO} no existe. Vuelve a escanear el código del proyector.`);
     if (s.modo !== "micro") return mensaje("Esta sala es de otro juego.");
     E.sala = s;
-    if (!primera) return pintar();
+    if (s.reparto && E.rehaciendo) E.rehaciendo = false;          // se formaron las bancadas mientras rehacía
+    if (!primera) { tomarBancada(); return pintar(); }
     primera = false;
     E.jugador = await E.canal.leerJugador(CODIGO).catch(() => null);
     if (E.jugador && E.jugador.equipo === "P") return adentro();

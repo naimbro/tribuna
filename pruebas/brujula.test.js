@@ -219,3 +219,49 @@ test("ladoQueAfirma: A FAVOR al grupo más cercano al campo que la pregunta afir
   assert.deepEqual(B.ladoQueAfirma({ A: 1, B: 5 }, "sin_trabas", campos, {}), { A: 1, B: 5 });
   assert.equal(B.ladoQueAfirma(null, "sin_trabas", campos, posDe), null);
 });
+
+/* ---------- bancadas fijas con cupo (galería con compás, semana 15) ---------- */
+const S15 = (() => {
+  const fs = require("fs"), vm = require("vm"), path = require("path"), ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "contenido/semana15.js"), "utf8") + "\n;this.BRUJULA = BRUJULA;", ctx);
+  return JSON.parse(JSON.stringify(ctx.BRUJULA));
+})();
+// un alumno que respondió estas opciones (índices 0..3 de p1..p5)
+const alumno = (uid, ks) => ({ uid, pos: B.posicion(Object.fromEntries(S15.preguntas.map((p, i) => [p.id, ks[i]])), S15.preguntas) });
+
+test("repartirConTope: 20 alumnos, 12 garantistas: grupos de 5 a 6 y las cuatro bancadas con gente", () => {
+  const gar = [[3, 3, 3, 1, 0], [3, 3, 3, 2, 0], [2, 3, 3, 1, 0], [3, 2, 3, 1, 1], [3, 3, 2, 0, 0], [2, 2, 3, 1, 0],
+               [3, 3, 3, 1, 1], [2, 3, 2, 1, 0], [3, 2, 2, 1, 0], [3, 3, 3, 3, 0], [2, 3, 3, 2, 1], [3, 3, 2, 1, 1]];
+  const otros = [[0, 1, 0, 0, 0], [1, 1, 0, 0, 1], [0, 2, 1, 0, 0],      // habilitantes
+                 [3, 1, 3, 3, 3], [2, 1, 3, 3, 3], [3, 0, 2, 3, 2],      // soberanistas
+                 [0, 0, 1, 2, 3], [1, 0, 0, 2, 2]];                      // orden y seguridad
+  const xs = [...gar.map((ks, i) => alumno("g" + i, ks)), ...otros.map((ks, i) => alumno("o" + i, ks))];
+  // sin cupo, la mayoría cae en Garantistas
+  assert.ok(xs.filter(a => B.campoDe(a.pos, S15.campos) === "garantistas").length >= 12);
+  const r = B.repartirConTope(xs, S15.campos);
+  assert.equal(r.tope, 6);
+  assert.equal(Object.keys(r.de).length, 20, "todos quedan en una bancada");
+  for (const t of r.tam) assert.ok(t >= 5 && t <= 6, `bancada de ${t}`);
+  assert.deepEqual([...new Set(Object.values(r.de))].sort(), [1, 2, 3, 4], "faltan bancadas");
+  // los de las otras bancadas se quedan en la suya: el ajuste lo absorben los garantistas
+  for (let i = 0; i < otros.length; i++) assert.equal(r.de["o" + i], S15.campos.findIndex(c => c.id === B.campoDe(xs[12 + i].pos, S15.campos)) + 1, "o" + i);
+  // determinista
+  assert.deepEqual(B.repartirConTope([...xs].reverse(), S15.campos).de, r.de);
+});
+
+test("repartirConTope: si ya está parejo, nadie se mueve; sin alumnos, nada", () => {
+  const xs = S15.campos.flatMap((c, i) => [0, 1, 2].map(j => ({ uid: c.id + j, pos: { x: c.centro.x + j * 0.3, y: c.centro.y } })));
+  const r = B.repartirConTope(xs, S15.campos);
+  for (const a of xs) assert.equal(r.de[a.uid], S15.campos.findIndex(c => a.uid.startsWith(c.id)) + 1);
+  assert.deepEqual(B.repartirConTope([], S15.campos).de, {});
+  assert.deepEqual(B.repartirConTope([{ uid: "x" }], S15.campos).de, {}, "sin posición no entra");
+});
+
+test("bancadaTarde: a la más cercana bajo el tope, contándose", () => {
+  const gar = S15.campos.find(c => c.id === "garantistas").centro;
+  assert.equal(B.bancadaTarde(gar, S15.campos, [5, 5, 5, 5]), 2);                 // tope ceil(21/4)+1 = 7
+  assert.equal(B.bancadaTarde(gar, S15.campos, [5, 7, 4, 4]), 1, "Garantistas llena: la siguiente más cercana");
+  assert.equal(B.bancadaTarde(null, S15.campos, [3, 3, 1, 3]), 1, "sin posición: la primera bajo el tope");
+  assert.equal(B.bancadaTarde(gar, [], []), null);
+});

@@ -76,7 +76,8 @@ const Duelo = (() => {
     if (!campos.length) return null;
     return JSON.parse(JSON.stringify({
       preguntas: c.BRUJULA.preguntas.map(p => ({ id: p.id, texto: p.texto, opciones: p.opciones })),
-      campos: campos.map(x => ({ id: x.id, nombre: x.nombre, centro: { x: x.centro.x, y: x.centro.y }, color: x.color || "#9aa1b9", afirma: x.afirma || "" })),
+      campos: campos.map(x => ({ id: x.id, nombre: x.nombre, centro: { x: x.centro.x, y: x.centro.y }, color: x.color || "#9aa1b9", afirma: x.afirma || "",
+        ...(x.tarea ? { tarea: plano(x.tarea) } : {}) })),
       // los rótulos de los ejes, para el mapa del proyector
       ejes: ejesDe(c.BRUJULA.ejes) }));
   }
@@ -89,7 +90,9 @@ const Duelo = (() => {
     const S = (c && c.SESION) || {};
     return { modo: "micro", curso: S.curso || "", semana: S.semana || 0, tema: S.tema || "", fase: "espera", duelos,
       grupos: gruposDe(c), compas: compasDe(c), duelo: null, turno: null, t0turno: null, tiempo: CERO(), t0duelo: null, veredicto: null, paso: 0,
-      sintesis: null, quiz: null, usadas: [], creada: ahora, actualizado: ahora };
+      sintesis: null, quiz: null, usadas: [], creada: ahora, actualizado: ahora,
+      // una clase solo de brújula (semana 15): el QR de la galería sale de inmediato y no se ofrecen duelos
+      ...(S.sinDuelos ? { sinDuelos: true } : {}) };
   }
   const dueloDe = s => (s && s.duelos || []).find(d => d.n === s.duelo) || null;
 

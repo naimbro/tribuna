@@ -175,6 +175,48 @@ function formarGruposEnK(alumnos, campos, k) {
   return { grupos: salida, de };
 }
 
+/* --- Bancadas fijas con cupo (galería con compás) --------------------------
+   Los campos del contenido SÍ son los grupos, con su nombre: cada alumno va al campo más cercano
+   que tenga cupo (asignarCupos con los centros fijos). Tope por campo: ceil(n/k) + 1. Piso:
+   floor(n/k); si un campo queda bajo el piso, recibe a quien menos se aleja de su propio campo,
+   sacado de un campo que esté sobre el piso. Determinista. Devuelve { de: { uid: 1…k }, tam }. */
+function repartirConTope(alumnos, campos) {
+  const xs = (alumnos || []).filter(a => a && a.uid && a.pos && Number.isFinite(a.pos.x) && Number.isFinite(a.pos.y));
+  const k = (campos || []).length;
+  if (!xs.length || !k) return { de: {}, tam: (campos || []).map(() => 0), tope: 0, piso: 0 };
+  const n = xs.length, tope = Math.ceil(n / k) + 1, piso = Math.floor(n / k), centros = campos.map(c => c.centro);
+  const grupos = asignarCupos(xs, centros, campos.map(() => tope));
+  for (;;) {
+    const bajo = grupos.reduce((m, g, gi) => (g.length < piso && (m < 0 || g.length < grupos[m].length) ? gi : m), -1);
+    if (bajo < 0) break;
+    let mejor = null;
+    grupos.forEach((g, gi) => {
+      if (gi === bajo || g.length <= piso) return;
+      for (const m of g) {
+        const costo = distancia(m.pos, centros[bajo]) - distancia(m.pos, centros[gi]);
+        if (!mejor || costo < mejor.costo - 1e-9 || (Math.abs(costo - mejor.costo) < 1e-9 && String(m.uid) < String(mejor.m.uid))) mejor = { m, gi, costo };
+      }
+    });
+    if (!mejor) break;
+    grupos[mejor.gi] = grupos[mejor.gi].filter(x => x !== mejor.m);
+    grupos[bajo].push(mejor.m);
+  }
+  const de = {};
+  grupos.forEach((g, i) => g.forEach(m => { de[m.uid] = i + 1; }));
+  return { de, tam: grupos.map(g => g.length), tope, piso };
+}
+// Quien llega con las bancadas ya formadas: a la más cercana que no esté en el tope (contándolo a
+// él); si todas lo están, a la más chica. Nadie de los que ya estaban se mueve. tam: tamaños de 1…k.
+function bancadaTarde(pos, campos, tam) {
+  const k = (campos || []).length;
+  if (!k) return null;
+  const n = (tam || []).reduce((a, b) => a + (b || 0), 0) + 1, tope = Math.ceil(n / k) + 1, t = i => (tam && tam[i]) || 0;
+  const orden = campos.map((c, i) => i);
+  if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) orden.sort((a, b) => distancia(pos, campos[a].centro) - distancia(pos, campos[b].centro) || a - b);
+  const i = orden.find(j => t(j) < tope);
+  return (i !== undefined ? i : orden.reduce((m, j) => (t(j) < t(m) ? j : m), orden[0])) + 1;
+}
+
 // Quien llega tarde (o no terminó la brújula): al grupo más chico de su campo; si su campo no
 // tiene grupos, al más cercano a su posición; sin posición, al más chico de todos.
 function asignarTarde(pos, campo, grupos) {
@@ -275,4 +317,4 @@ function ofrecerBrujula(bj, tieneMio) {
   return !!(bj && bj.activa && !tieneMio && ["responder", "grupos"].includes(bj.fase));
 }
 
-if (typeof module !== "undefined") module.exports = { TAM_GRUPO, MAX_GRUPOS, posicion, campoDe, formarGrupos, formarGruposEnK, asignarTarde, emparejarLejanos, ladoQueAfirma, mapaSvg, accionBrujula, ofrecerBrujula };
+if (typeof module !== "undefined") module.exports = { TAM_GRUPO, MAX_GRUPOS, posicion, campoDe, formarGrupos, formarGruposEnK, repartirConTope, bancadaTarde, asignarTarde, emparejarLejanos, ladoQueAfirma, mapaSvg, accionBrujula, ofrecerBrujula };
