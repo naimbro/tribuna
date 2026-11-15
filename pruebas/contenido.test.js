@@ -402,6 +402,54 @@ test("semana 14: brújula corta, cinco jueces, preguntas con campo y los estudio
   assert.equal(s.SESION.mocion, s.PREGUNTAS[0].texto, "la moción del syllabus es la primera pregunta");
 });
 
+test("semana 15: brújula de 5 preguntas cuyos campos son las bancadas de La Sala, y equilibrada", () => {
+  const s = cargarSesion("contenido/semana15.js");
+  const b = s.BRUJULA;
+  assert.equal(s.SESION.semana, 15);
+  assert.equal(s.SESION.compas, true);
+  assert.equal(b.preguntas.length, 5);
+  for (const p of b.preguntas) {
+    assert.equal(p.opciones.length, 4, p.id);
+    assert.ok(p.texto.length <= 120, `${p.id}: enunciado de ${p.texto.length} caracteres`);
+    for (const o of p.opciones) {
+      assert.ok(o.texto.length <= 50, `${p.id}: opción de ${o.texto.length} caracteres: ${o.texto}`);
+      assert.ok(typeof o.x === "number" || typeof o.y === "number", `${p.id}: opción sin eje`);
+      // sin centro tibio: ninguna opción cae en 0 en un eje que puntúa
+      for (const k of ["x", "y"]) if (typeof o[k] === "number") assert.notEqual(o[k], 0, `${p.id}: opción en el centro`);
+    }
+  }
+  // los campos son las bancadas de La Sala: mismos ids, nombres, colores y orden (grupo n = bancada n)
+  const sala = {};
+  vm.createContext(sala);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "sala-datos.js"), "utf8") + "\n;this.LA_SALA = LA_SALA;", sala);
+  const plano = v => JSON.parse(JSON.stringify(v));               // dos contextos de vm: se comparan los valores
+  assert.deepEqual(plano(b.campos.map(c => [c.id, c.nombre, c.color])), plano(sala.LA_SALA.bancadas.map(x => [x.id, x.nombre, x.color])));
+  for (const c of b.campos) assert.ok(c.afirma && c.centro, c.id);
+  // equilibrio: las 4^5 combinaciones se reparten parejo y ninguna queda empatada entre dos campos
+  const cuenta = Object.fromEntries(b.campos.map(c => [c.id, 0]));
+  let empates = 0;
+  (function rec(i, r) {
+    if (i === b.preguntas.length) {
+      const pos = B.posicion(r, b.preguntas);
+      const ds = b.campos.map(c => Math.hypot(pos.x - c.centro.x, pos.y - c.centro.y)).sort((u, v) => u - v);
+      if (ds[1] - ds[0] < 1e-9) empates++;
+      cuenta[B.campoDe(pos, b.campos)]++;
+      return;
+    }
+    for (let k = 0; k < 4; k++) rec(i + 1, { ...r, [b.preguntas[i].id]: k });
+  })(0, {});
+  assert.equal(empates, 0, "hay combinaciones a igual distancia de dos campos");
+  for (const c of b.campos) assert.ok(cuenta[c.id] >= 0.2 * 1024 && cuenta[c.id] <= 0.3 * 1024, `${c.id}: ${cuenta[c.id]} de 1024`);
+  // los dos duelos (que el lunes no se juegan) enfrentan bancadas opuestas, como en La Sala
+  const D = require("../duelo.js");
+  const ds = D.duelosDe(s);
+  assert.equal(ds.length, 2);
+  assert.deepEqual(ds.map(d => [d.A.cargo, d.B.cargo]), [["Garantistas", "Orden y seguridad"], ["Soberanistas", "Habilitantes"]]);
+  assert.equal(s.SESION.mocion, s.PREGUNTAS[0].texto);
+  for (const p of s.PREGUNTAS) for (const k of ["favor", "contra"])
+    assert.ok(p[k] && p[k].length >= 30 && p[k].length <= 200, `${k} de «${p.texto.slice(0, 30)}…»`);
+});
+
 // Tribuna con un solo micrófono: toda semana del catálogo tiene que dar duelos jugables.
 test("todas las semanas del catálogo producen duelos válidos para el juego de un micrófono", () => {
   const Duelo = require("../duelo.js");

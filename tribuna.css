@@ -67,6 +67,12 @@ a{color:inherit}
 .campos{list-style:none;margin:1vh 0 0;padding:0;display:flex;flex-wrap:wrap;gap:.5em 1.8em;font-size:clamp(16px,calc(1.3*var(--u)),25px)}
 .campos li{display:flex;align-items:baseline;gap:.45em;font-weight:700}
 .campos b{font:800 1.2em/1 var(--aparato);color:var(--papel);font-variant-numeric:tabular-nums}
+/* el compás en vivo: el mapa de la sala y, al lado, cuántos hay en cada campo */
+.compas-vivo{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:3vw;align-items:center}
+.compas-mapa{line-height:0}
+.compas-mapa svg{display:block;width:auto;height:min(64vh,46vw);max-width:100%}
+.compas-vivo .campos{flex-direction:column;gap:1.2em;margin:0}
+.compas-vivo .campos li{justify-content:space-between;gap:1em}
 .parear{justify-self:end;text-align:center;width:min(100%,30vw)}
 .parear .qr{background:var(--papel);border-radius:14px;padding:14px;line-height:0}
 .parear .qr svg{width:100%;height:auto}

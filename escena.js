@@ -283,13 +283,30 @@ function listaDuelos(s) {
   }
   return ol;
 }
+// El mapa del compás: un punto anónimo por estudiante que ya entró, del color de su campo, donde
+// lo dejaron sus respuestas (xy de su documento). Ordenados por uid: los que caen en el mismo punto
+// se abren en espiral siempre igual.
+function puntosCompas(s) {
+  const color = g => ((s.grupos || []).find(x => x.n === g) || {}).color || "#7d8fa1";
+  const en = v => Math.max(-10, Math.min(10, v));
+  return E.publicos.filter(p => p && p.uid && p.grupo && p.xy && Number.isFinite(p.xy.x) && Number.isFinite(p.xy.y))
+    .sort((a, b) => String(a.uid).localeCompare(String(b.uid)))
+    .map(p => ({ x: en(p.xy.x), y: en(p.xy.y), color: color(p.grupo) }));
+}
 function pintarEspera(s) {
   const gente = E.agg ? E.agg.n : 0;
+  // Con gente adentro la galería ya está abierta: su QR y el compás se quedan aunque el teléfono del
+  // profesor se duerma y deje de latir (el compás no necesita el micrófono).
+  const abierta = E.conectado || gente > 0;
   // con compás: cuántos hay en cada campo, para ver los tamaños antes de empezar
-  const campos = s.compas && E.conectado ? Galeria.porGrupo(E.publicos, s.grupos) : [];
-  if (!cambio("espera", [s.duelos, E.conectado, gente, E.tabla, campos])) return;
+  const campos = s.compas && abierta ? Galeria.porGrupo(E.publicos, s.grupos) : [];
+  // y el mapa, mientras no se haya jugado ningún duelo (después vuelve la lista con resultados)
+  const conMapa = campos.length > 0 && typeof mapaSvg === "function" && !s.duelos.some(d => d.jugado);
+  const puntos = conMapa ? puntosCompas(s) : [];
+  if (!cambio("espera", [s.duelos, E.conectado, gente, E.tabla, campos, puntos])) return;
   const izq = el("div"), t = tablasEl();
-  izq.append(el("h1", "tema", s.tema), el("p", "del-curso", s.curso), listaDuelos(s));
+  izq.append(el("h1", "tema", s.tema), el("p", "del-curso", s.curso));
+  if (!conMapa) izq.append(listaDuelos(s));
   if (campos.length) {
     const ul = el("ul", "campos");
     for (const g of campos) {
@@ -298,22 +315,27 @@ function pintarEspera(s) {
       li.append(n, el("b", "", String(g.cuantos)));
       ul.append(li);
     }
-    izq.append(el("p", "campos-tit", "El compás de la sala"), ul);
+    if (conMapa) {
+      const caja = el("div", "compas-vivo"), mapa = el("div", "compas-mapa");
+      mapa.innerHTML = mapaSvg({ puntos, campos: s.compas.campos, ejes: s.compas.ejes || null, tam: 400 });   // SVG generado aquí; los textos van escapados
+      caja.append(mapa, ul);
+      izq.append(caja);
+    } else izq.append(el("p", "campos-tit", "El compás de la sala"), ul);
   }
   if (t) izq.append(t);
   const base = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}`;
   const urlMicro = `${base}micro.html?sala=${E.codigo}&semana=${s.semana}${EXTRA}`, urlGaleria = `${base}galeria.html?sala=${E.codigo}${EXTRA}`;
   // primero se empareja el teléfono del profesor; con él conectado, el QR pasa a ser el de la galería
-  const der = el("aside", "parear"), qr = qrDe(E.conectado ? urlGaleria : urlMicro);
+  const der = el("aside", "parear"), qr = qrDe(abierta ? urlGaleria : urlMicro);
   if (qr) der.append(qr);
-  der.append(el("p", "", !E.conectado ? "Escanea con tu teléfono: va a ser el micrófono"
+  der.append(el("p", "", !abierta ? "Escanea con tu teléfono: va a ser el micrófono"
     : s.compas ? "Entren con su teléfono y respondan el compás" : "Entren a la galería con su teléfono"),
     el("div", "codigo", E.codigo));
-  if (E.conectado) der.append(el("p", "gente", gente ? `${gente} en la galería` : "Micrófono conectado. Todavía no entra nadie a la galería."));
+  if (abierta) der.append(el("p", "gente", gente ? `${gente} en la galería` : "Micrófono conectado. Todavía no entra nadie a la galería."));
   if (LOCAL || !qr) {
     const p = el("p");
     const enlace = (texto, url) => { const a = el("a", "enlace", texto); a.href = url; a.target = "_blank"; p.append(a, " "); };
-    if (!E.conectado) enlace("Abrir el micrófono en otra pestaña", urlMicro + (LOCAL ? "&simular=1" : ""));
+    if (!abierta) enlace("Abrir el micrófono en otra pestaña", urlMicro + (LOCAL ? "&simular=1" : ""));
     else if (LOCAL) for (const yo of ["Ana", "Beto", "Caro"]) enlace("Butaca de " + yo, `${urlGaleria}&yo=${yo.toLowerCase()}`);
     else enlace("Abrir la galería", urlGaleria);
     der.append(p);

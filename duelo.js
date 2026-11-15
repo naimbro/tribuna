@@ -76,7 +76,13 @@ const Duelo = (() => {
     if (!campos.length) return null;
     return JSON.parse(JSON.stringify({
       preguntas: c.BRUJULA.preguntas.map(p => ({ id: p.id, texto: p.texto, opciones: p.opciones })),
-      campos: campos.map(x => ({ id: x.id, nombre: x.nombre, centro: { x: x.centro.x, y: x.centro.y }, color: x.color || "#9aa1b9", afirma: x.afirma || "" })) }));
+      campos: campos.map(x => ({ id: x.id, nombre: x.nombre, centro: { x: x.centro.x, y: x.centro.y }, color: x.color || "#9aa1b9", afirma: x.afirma || "" })),
+      // los rótulos de los ejes, para el mapa del proyector
+      ejes: ejesDe(c.BRUJULA.ejes) }));
+  }
+  function ejesDe(e) {
+    const ok = k => e && e[k] && e[k].min && e[k].max;
+    return ok("x") && ok("y") ? { x: { min: plano(e.x.min), max: plano(e.x.max) }, y: { min: plano(e.y.min), max: plano(e.y.max) } } : null;
   }
   // (la sala no puede llamar `personajes` a esa lista: ese campo activa las reglas de cupos del juego clásico)
   function salaNueva(c, duelos, ahora) {

@@ -560,6 +560,9 @@ test("compás: la sala lleva las preguntas y los campos, para que la butaca no n
   assert.deepEqual(s.compas.preguntas[1].opciones[3], { texto: C14.BRUJULA.preguntas[1].opciones[3].texto, y: 8 });
   assert.deepEqual(s.compas.campos.map(c => c.id), ["avatar_ya", "asesor", "agentes", "urna"]);
   assert.ok(s.compas.campos.every(c => c.nombre && c.afirma && /^#[0-9a-f]{6}$/i.test(c.color) && typeof c.centro.x === "number" && typeof c.centro.y === "number"));
+  // los rótulos de los ejes, para el mapa del proyector (solo min y max)
+  assert.deepEqual(s.compas.ejes, { x: { min: "que acierte", max: "que delibere y responda" }, y: { min: "escucharme", max: "actuar por mí" } });
+  assert.equal(D.salaNueva({ ...C14, BRUJULA: { ...C14.BRUJULA, ejes: undefined } }, [], 1).compas.ejes, null);
   assert.ok(!("brujula" in s), "ese campo activa las reglas de la brújula del juego clásico");
   assert.ok(JSON.stringify(s).length < 12000, "la sala tiene que seguir siendo un documento chico");
   // una clase sin compás no lo lleva
