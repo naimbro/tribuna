@@ -184,7 +184,7 @@ const FASES = {
   cierre() {
     const n = nd(), est = L.estadoNudo(S.sala, n.n);
     return `<section class="tarjeta"><p class="rot">Nudo ${n.n}: ${e(n.titulo)}</p><h2>${ESTADO[est]}</h2>
-      <p>${L.enLaLey(est) ? "La indicación entra a la ley." : "Queda el texto del Mensaje."}</p>
+      <p>${L.enLaLey(est) ? "La indicación entra a la ley." : "Queda el texto de la Cámara."}</p>
       <p class="rot">Qué quieren los actores reales</p><p>${e(n.actores)}</p><p class="fte">${e(n.actoresFuente)}</p></section>${misPuntos(n)}`;
   },
   veto: () => `<section class="tarjeta"><p class="rot">El Ejecutivo</p><h2>${S.sala.vetado ? "Veto al nudo " + S.sala.vetado : "¿Promulga o veta?"}</h2><p>${e(D.reglas.veto)}</p><p>${e(D.reglas.insistencia)}</p></section>${leyHTML()}`,

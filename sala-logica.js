@@ -134,7 +134,7 @@ const SalaLogica = (() => {
     const d = Math.min(paso, pos[desde]);
     return { ...pos, [desde]: pos[desde] - d, [hacia]: pos[hacia] + d };
   }
-  // La ruta del marcador: parte en el centro (el texto del Mensaje) y se mueve una vez por cada
+  // La ruta del marcador: parte en el centro (el texto de la Cámara) y se mueve una vez por cada
   // indicación que queda en la ley. Una indicación vetada sin insistencia no mueve nada.
   function triangulo(sala, D) {
     const ruta = [{ ...CENTRO }], pasos = [];
@@ -457,7 +457,7 @@ Responde SOLO un JSON: {"voto": "favor" | "contra" | "abstencion", "frase": "…
         : [`respondemos que ${nd.vigente.simple} y eso alcanza`,
           `la indicación le quita poder a ${con(nd.mueve.desde)} y no dice quién responde`,
           `${ia.nombre} enseña lo contrario de lo que sostiene la otra bancada`,
-          `pedimos rechazarla y mantener el texto del mensaje`];
+          `pedimos rechazarla y mantener el texto de la Cámara`];
     return min(guion[(i || 0) % guion.length]);
   }
 

@@ -240,7 +240,7 @@ export const vertice = id => D.vertices.find(v => v.id === id).con;      // «el
 // en palabras: hacia dónde se movió el reparto
 export function repartoTexto(sala) {
   const t = L.triangulo(sala, D);
-  if (!t.pasos.length) return "El reparto sigue donde lo dejó el Mensaje.";
+  if (!t.pasos.length) return "El reparto sigue donde lo dejó el texto de la Cámara.";
   const d = k => t.pos[k] - L.CENTRO[k], orden = Object.keys(L.CENTRO).sort((a, b) => d(b) - d(a));
   const gana = orden.filter(k => d(k) > 0.01), pierde = orden.filter(k => d(k) < -0.01);
   if (!gana.length) return "Las indicaciones aprobadas se compensan: el reparto volvió al punto de partida.";

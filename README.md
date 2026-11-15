@@ -93,8 +93,8 @@ En línea también se puede ensayar: Secretaría → «Escaños de ensayo». Ant
 ### Archivos
 
 - `sala-datos.js`: **todo el contenido** (artículos, citas, bancadas, conceptos, senadores,
-  filtraciones, reglas). El articulado es el del Mensaje de mayo de 2024 y así se rotula en pantalla;
-  cuando llegue el oficio de la Cámara, se corrige aquí y en ninguna otra parte. Ninguna cifra, cita o
+  filtraciones, reglas). El articulado es el que despachó la Cámara (oficio 20.843), el mismo del anexo de la guía impresa;
+  si cambia en el Senado, se corrige aquí y en ninguna otra parte. Ninguna cifra, cita o
   atribución sale de fuera del dossier del 12-nov-2026, el articulado, el syllabus o `contenido/semana307.js`.
 - `sala-logica.js`: lógica pura (conteo, quórum, dos tercios, admisibilidad, triángulo, puntaje,
   sorteo, flujo; párrafos, dictado, aplausos y juicio del Senado sobre lo dicho). Pruebas:

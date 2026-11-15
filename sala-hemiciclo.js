@@ -147,7 +147,7 @@ const ESCENAS = {
     const linea = x.inadm ? "No se votó: faltó el patrocinio del Ejecutivo."
       : `Sala: ${x.v.r.aprobada ? "aprobada" : "rechazada"}, ${x.v.r.f} a ${x.v.r.c}.${x.sen && x.sen.r ? ` Senado simulado: ${x.sen.r.aprueba ? "aprueba" : "rechaza"}, ${x.sen.r.f} a ${x.sen.r.c}.` : ""}`;
     return `<div class="e-comparado cierre">${titulo(n)}${comparado(n, (S.sala.ind || {})[n.n], { estado: est, fundamentos: false, breve: true })}
-      <p class="linea">${e(linea)} ${L.enLaLey(est) ? `El poder se mueve hacia ${e(vert(n.mueve.hacia))}, desde ${e(vert(n.mueve.desde))}.` : "El texto del Mensaje queda como estaba."}</p>
+      <p class="linea">${e(linea)} ${L.enLaLey(est) ? `El poder se mueve hacia ${e(vert(n.mueve.hacia))}, desde ${e(vert(n.mueve.desde))}.` : "El texto de la Cámara queda como estaba."}</p>
       <div class="actores"><b>Qué quieren los actores reales</b><p>${e(n.actores)}</p><span>${e(n.actoresFuente)}</span></div></div>`;
   },
   veto() {
@@ -216,7 +216,7 @@ function senadores(n, visto, votos) {
 function filasLey() {
   return `<div class="ley-filas">${L.leyDespachada(S.sala, D).map(x => `<article class="e-${x.estado}${S.sala.vetado === x.n && S.sala.fase === "veto" ? " en-veto" : ""}">
     <span class="num">${x.n}</span><div><b>${e(x.titulo)}</b>
-    <p>${x.queda ? `Queda la indicación de ${e(L.bancada(D, L.nudoDe(D, x.n).autora).nombre)}: ${e((x.ind || {}).texto || "")}` : "Queda el texto del Mensaje."}</p></div>
+    <p>${x.queda ? `Queda la indicación de ${e(L.bancada(D, L.nudoDe(D, x.n).autora).nombre)}: ${e((x.ind || {}).texto || "")}` : "Queda el texto de la Cámara."}</p></div>
     <span class="sello s-${x.estado}">${ESTADO[x.estado]}</span></article>`).join("")}</div>`;
 }
 
@@ -233,7 +233,7 @@ function pies() {
   pintar($("hemiPie"), hay ? D.bancadas.map(b => `<span class="chip${s.palabra === b.n ? " habla" : ""}" style="--b:${b.color}">${e(b.nombre)} <i>${c[b.n]}</i></span>`).join("")
     : '<span class="tenue">Los escaños se ocupan a medida que entran.</span>');
   const t = L.triangulo(salaVisible(), D), u = t.pasos[t.pasos.length - 1];
-  pintar($("triPie"), u ? `Nudo ${u.n}: hacia ${e(vert(u.hacia))}, desde ${e(vert(u.desde))}.` : "Punto de partida: el texto del Mensaje.");
+  pintar($("triPie"), u ? `Nudo ${u.n}: hacia ${e(vert(u.hacia))}, desde ${e(vert(u.desde))}.` : "Punto de partida: el texto de la Cámara.");
 }
 function avisos() {
   const s = S.sala, a = s.aviso, f = s.filtVer ? D.filtraciones.find(x => x.id === s.filtVer.id) : null;

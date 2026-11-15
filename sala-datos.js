@@ -4,9 +4,11 @@
    Taller integrador de CSC00155, 16 y 19 de noviembre de 2026.
 
    REGLA DE ESTE ARCHIVO: ninguna cifra, cita o atribución sale de fuera del dossier del
-   12-nov-2026, del articulado del Mensaje, del syllabus del curso o de contenido/semana307.js.
-   Si falta un dato, se omite. Para corregir algo cuando llegue el oficio de la Cámara, se
-   corrige aquí y en ninguna otra parte.
+   12-nov-2026, del articulado (el texto despachado por la Cámara, oficio N° 20.843 del
+   13-oct-2025, que es el anexo de la guía impresa semana15_proyecto_ley_ia.pdf; y el Mensaje de
+   mayo de 2024, solo donde se rotula como tal), del syllabus del curso o de contenido/semana307.js.
+   Si falta un dato, se omite. Si el texto cambia en el Senado, se corrige aquí y en ninguna otra parte.
+   Desde el 15-nov-2026 los artículos citados siguen la numeración de la Cámara (19 artículos).
 
    Las citas marcadas `textual: true` van entre comillas en pantalla; las demás son resumen.
    ===================================================================== */
@@ -16,8 +18,8 @@ const LA_SALA = {
   boletin: "16821-19",
   proyecto: "Proyecto de ley que regula los sistemas de inteligencia artificial",
   // el rótulo que acompaña SIEMPRE al articulado en pantalla
-  rotuloTexto: "Texto del Mensaje (mayo de 2024)",
-  avisoTexto: "Es el texto que envió el Ejecutivo en 2024. El que despachó la Cámara puede tener otra numeración.",
+  rotuloTexto: "Texto despachado por la Cámara (oficio 20.843, octubre de 2025)",
+  avisoTexto: "Es el texto que aprobó en general la comisión del Senado: el mismo del anexo de la guía impresa.",
 
   /* ---------------- la cuenta del proyecto (apertura del lunes) ---------------- */
   cuenta: [
@@ -52,21 +54,21 @@ const LA_SALA = {
   /* ---------------- los cuatro nudos ---------------- */
   nudos: [
     {
-      n: 1, titulo: "¿Riesgos o habilitación?", articulos: "Arts. 5 a 8, 20 y 21",
+      n: 1, titulo: "¿Riesgos o habilitación?", articulos: "Arts. 6 a 12",
       pregunta: "¿Se reemplaza la clasificación por riesgo por principios, certificación voluntaria y sandboxes?",
       autora: 1, impugna: 2,
       vigente: {
-        rotulo: "Artículo 5. Clasificación de los sistemas de IA",
-        texto: "Los usos de los sistemas de IA se clasificarán, de acuerdo con su riesgo, en las siguientes categorías: a) Sistemas de IA de riesgo inaceptable […] su introducción en el mercado o puesta en servicio se encuentra prohibida. b) Sistemas de IA de alto riesgo […] c) Sistemas de IA de riesgo limitado […] d) Sistemas de IA sin riesgo evidente […]",
-        simple: "Hoy hay cuatro niveles de riesgo. Lo inaceptable se prohíbe. Lo de alto riesgo cumple reglas previas (art. 8).",
+        rotulo: "Artículo 6. Clasificación de los usos de sistemas de IA",
+        texto: "Los usos de los sistemas de IA se clasifican, de acuerdo con su riesgo, en las siguientes categorías: 1. Usos de riesgo inaceptable […] Se prohíbe la distribución, introducción en el mercado o puesta en servicio de sistemas de IA destinados a tales usos. 2. Usos de alto riesgo […] 3. Uso de riesgo limitado […] 4. Usos sin riesgo evidente […]",
+        simple: "Hoy hay cuatro niveles de riesgo. Lo inaceptable se prohíbe (art. 7). Lo de alto riesgo cumple reglas previas (art. 9).",
         mas: [
-          "Art. 8: los sistemas de alto riesgo deben tener gestión de riesgos, gobernanza de datos, documentación técnica, registros, transparencia, supervisión humana y ciberseguridad.",
-          "Art. 20: los órganos del Estado «podrán proporcionar un espacio controlado que fomente la innovación y facilite el desarrollo, la prueba y la validación de sistemas innovadores de IA».",
-          "Art. 21: quien participa de buena fe en un espacio de pruebas queda exento de multas, pero responde por los daños a terceros."
+          "Art. 7: siete usos prohibidos, entre ellos la manipulación subliminal, la calificación social y la identificación biométrica en tiempo real en espacios públicos.",
+          "Art. 9: los usos de alto riesgo deben tener gestión de riesgos, gobernanza de datos, documentación técnica, registros, supervisión humana, precisión y ciberseguridad.",
+          "Art. 12: quien respeta la ley en un espacio controlado de pruebas queda exento de multas, pero responde por los daños a terceros."
         ]
       },
       partida: { tipo: "sustituir",
-        texto: "Sustitúyese la clasificación por riesgo de los artículos 5 a 8 por principios, certificación voluntaria y espacios controlados de prueba (sandboxes)." },
+        texto: "Sustitúyese la clasificación por riesgo de los artículos 6 a 11 por principios, certificación voluntaria y espacios controlados de prueba (sandboxes)." },
       mueve: { hacia: "empresas", desde: "ciudadanos" },
       pelea: [
         { quien: "Rojo Edwards", cargo: "Presidente de la comisión", textual: true,
@@ -81,50 +83,50 @@ const LA_SALA = {
       sugeridos: ["i7_frenar", "i7_instrumentos", "i7_finra", "i3_backlash"]
     },
     {
-      n: 2, titulo: "La excepción de seguridad", articulos: "Arts. 6 e), 2 a) y 12",
+      n: 2, titulo: "La excepción de seguridad", articulos: "Arts. 7 n° 5, 2 a) y 15",
       pregunta: "¿La identificación biométrica remota en tiempo real pasa de prohibida a alto riesgo?",
       autora: 3, impugna: 4,
       vigente: {
-        rotulo: "Artículo 6, letra e). Riesgo inaceptable",
-        texto: "Sistemas de identificación biométrica remota en espacios de acceso público en tiempo real […] Esta prohibición no será aplicable, en caso de que el sistema de IA sea utilizado estrictamente por las autoridades y órganos encargados de la seguridad pública y organismos de persecución penal, con el objetivo de prevenir, investigar, detectar y, eventualmente, sancionar la comisión de crímenes o simples delitos […]",
-        simple: "Hoy está prohibida, salvo para las policías y la persecución penal.",
+        rotulo: "Artículo 7, número 5. Riesgo inaceptable",
+        texto: "Identificación biométrica remota en tiempo real en espacios de acceso público: sistemas de IA utilizados para el análisis de imágenes de video en espacios de acceso público que emplean sistemas de identificación biométrica remota en tiempo real.",
+        simple: "Hoy está prohibida sin excepciones. El Mensaje de 2024 exceptuaba a las policías; el texto de la Cámara ya no.",
         mas: [
-          "Art. 2: la ley no se aplica a los sistemas de IA «desarrollados y utilizados con fines de defensa nacional». Una resolución reservada del Ministerio de Defensa los lista.",
-          "Art. 12: el deber de avisar que se interactúa con una IA no se aplica a los sistemas «autorizados por la ley para fines de detección, prevención, investigación o enjuiciamiento penal»."
+          "Art. 2, letra a): la ley no se aplica a los sistemas de IA «desarrollados y utilizados con fines de defensa nacional». Una resolución reservada del Ministerio de Defensa los lista.",
+          "Art. 15: quienes aplican la ley deben resguardar la confidencialidad de lo que obtienen de un sistema de IA para proteger, entre otras cosas, «el interés público y la seguridad nacional» y «la integridad de las causas penales»."
         ]
       },
       partida: { tipo: "sustituir",
-        texto: "La identificación biométrica remota en tiempo real en espacios de acceso público deja de ser de riesgo inaceptable (artículo 6, letra e) y pasa a ser de alto riesgo (artículo 7)." },
+        texto: "La identificación biométrica remota en tiempo real en espacios de acceso público deja de ser de riesgo inaceptable (artículo 7, número 5) y pasa a ser de alto riesgo (artículo 8), con las reglas del artículo 9." },
       mueve: { hacia: "estado", desde: "ciudadanos" },
       pelea: [
-        { quien: "El Mensaje", cargo: "Artículo 6, letra e)", textual: true,
+        { quien: "El Mensaje de 2024", cargo: "La excepción que la Cámara no mantuvo", textual: true,
           cita: "Esta prohibición no será aplicable, en caso de que el sistema de IA sea utilizado estrictamente por las autoridades y órganos encargados de la seguridad pública",
-          fuente: "Texto del Mensaje (mayo de 2024)" },
+          fuente: "Texto del Mensaje (mayo de 2024), artículo 6, letra e)" },
         { quien: "Johannes Kaiser", cargo: "Líder del PNL", textual: false,
           cita: "Advierte de un «Estado de supervigilancia». Pide derechos de las personas, no regular el funcionamiento.",
           fuente: "La Tercera, 20-sep-2026" }
       ],
-      actores: "El Mensaje ya exceptúa a las policías de la prohibición. Kaiser advierte de un «Estado de supervigilancia». Celis pide «fiscalización humana del uso de la inteligencia artificial».",
-      actoresFuente: "Texto del Mensaje; La Tercera, 20-sep-2026; sesión del 26-oct-2026",
+      actores: "El Mensaje de 2024 exceptuaba a las policías de la prohibición; el texto de la Cámara no. Kaiser advierte de un «Estado de supervigilancia». Celis pide «fiscalización humana del uso de la inteligencia artificial».",
+      actoresFuente: "Texto del Mensaje y oficio de la Cámara; La Tercera, 20-sep-2026; sesión del 26-oct-2026",
       sugeridos: ["i12_smartsampa", "i12_ice", "i12_ijop", "i12_navalny", "i12_explicacion", "d9_foucault", "d9_levitsky", "d9_bermeo"]
     },
     {
-      n: 3, titulo: "¿Quién fiscaliza?", articulos: "Arts. 14, 19 y 30",
+      n: 3, titulo: "¿Quién fiscaliza?", articulos: "Arts. 8, 9, 16 y 18",
       pregunta: "¿Se crea un fiscalizador propio de IA en vez de encargarlo a la Agencia de Datos?",
       autora: 2, impugna: 3,
       requierePatrocinio: true,
       vigente: {
-        rotulo: "Artículo 19. Fiscalización y cumplimiento",
-        texto: "La fiscalización y el cumplimiento de las disposiciones de esta ley y su reglamento corresponderá a la Agencia.",
-        simple: "Hoy fiscaliza la Agencia de Protección de Datos Personales. El Consejo Asesor solo aconseja.",
+        rotulo: "Artículo 16. Infracciones (encabezado)",
+        texto: "Para efectos del ejercicio de las atribuciones de la Agencia de Protección de Datos Personales, se considerará como infracción: 1. Gravísima […] 2. Grave […] 3. Leve […]",
+        simple: "Hoy sanciona la Agencia de Protección de Datos Personales y la ANCI puede pedir fiscalizaciones. No se crea un organismo propio de IA.",
         mas: [
-          "Art. 19: la Agencia puede pedir información a cualquier operador, determinar infracciones, sancionar y resolver reclamos de las personas afectadas.",
-          "Art. 14: el Consejo Asesor Técnico es «una instancia de carácter consultiva y permanente». Lo preside la ministra o ministro de Ciencia. Lo integran ocho representantes del Estado, tres académicos, dos de la industria y dos de la sociedad civil.",
-          "Art. 30: un reglamento del Ministerio de Ciencia fija la lista de sistemas de alto riesgo y de riesgo limitado."
+          "Art. 9 (último inciso): la APDP y la ANCI «podrán requerir a los operadores de estos sistemas procedimientos específicos de fiscalización» cuando haya indicios de incumplimiento.",
+          "Art. 8: define el alto riesgo por su efecto, «un riesgo significativo de afectación de los derechos fundamentales», pero no lista cuáles son esos usos.",
+          "Arts. 18 y 19: quien sufre un daño puede demandar civilmente la cesación y la indemnización, en procedimiento sumario."
         ]
       },
       partida: { tipo: "sustituir",
-        texto: "Créase un organismo fiscalizador propio de inteligencia artificial. Reemplaza a la Agencia de Protección de Datos Personales en la fiscalización de esta ley (artículo 19)." },
+        texto: "Créase un organismo fiscalizador propio de inteligencia artificial. Reemplaza a la Agencia de Protección de Datos Personales en la fiscalización de esta ley (artículos 9 y 16)." },
       mueve: { hacia: "ciudadanos", desde: "empresas" },
       pelea: [
         { quien: "Ricardo Celis", cargo: "Senador (PPD)", textual: true,
@@ -139,20 +141,20 @@ const LA_SALA = {
       sugeridos: ["i12_rendicion", "i12_robodebt", "i12_subsidios", "d13_burrell", "i5_oligarquia"]
     },
     {
-      n: 4, titulo: "Soberanía y plata", articulos: "Arts. 2 c), 22 y 25",
+      n: 4, titulo: "Soberanía y plata", articulos: "Arts. 2 n° 3, 13 y 17",
       pregunta: "¿Se condiciona el incentivo tributario a cómputo y datos en Chile, con multas proporcionales a las ventas?",
       autora: 4, impugna: 1,
       vigente: {
-        rotulo: "Artículo 25. Sanciones (extracto)",
+        rotulo: "Artículo 17. Sanciones (extracto)",
         texto: "Multas de hasta 5.000 UTM (leves), 10.000 UTM (graves) y 20.000 UTM (gravísimas). Para fijarlas se considera, entre otras cosas, «el tamaño y volumen de las ventas anuales del operador».",
         simple: "Hoy las multas tienen un tope fijo. La ley alcanza a empresas extranjeras si su sistema se usa en Chile.",
         mas: [
-          "Art. 2, letra c): la ley se aplica a los proveedores e implementadores «domiciliados en el extranjero, cuando la información de salida generada por el sistema de IA se utilice en Chile».",
-          "Art. 22: las empresas de menor tamaño tienen acceso prioritario a los espacios de prueba, capacitación y un lugar en el Consejo Asesor."
+          "Art. 2, número 3: la ley se aplica a los proveedores e implementadores «domiciliados en el extranjero, cuando la información de salida generada por el sistema de IA se utilice en Chile».",
+          "Art. 13: las empresas de menor tamaño tienen acceso prioritario a los espacios controlados de prueba y apoyo en capacitación, «con arreglo a la disponibilidad presupuestaria existente»."
         ]
       },
       partida: { tipo: "agregar",
-        texto: "El incentivo tributario a las empresas tecnológicas se condiciona a tener cómputo y datos en Chile. Las multas del artículo 25 pasan a ser proporcionales a las ventas del operador." },
+        texto: "El incentivo tributario a las empresas tecnológicas se condiciona a tener cómputo y datos en Chile. Las multas del artículo 17 pasan a ser proporcionales a las ventas del operador." },
       mueve: { hacia: "estado", desde: "empresas" },
       pelea: [
         { quien: "Rojo Edwards", cargo: "Presidente de la comisión", textual: true,
