@@ -157,8 +157,12 @@ h1,h2,h3,p{margin:0}
 .e-lista table{border-collapse:collapse;font-size:1.05em}
 .e-lista td{padding:.5em 1.2em .5em 0;border-top:1px solid var(--linea)}
 .e-lista .num{font-weight:800;color:var(--laton);font-size:1.3em}
-.e-voto{justify-content:center}
+.e-voto{justify-content:safe center}
 #sala[data-foco="hemi"] .e-voto h2{font-size:calc(2.5*var(--u))}
+/* en la columna angosta el sello y el conteo cabían en dos líneas y se cortaban: aquí van en una */
+#sala[data-foco="hemi"] .e-voto .veredicto{font-size:calc(3.2*var(--u))}
+#sala[data-foco="hemi"] .e-voto .conteo .k b{font-size:calc(3.4*var(--u))}
+#sala[data-foco="hemi"] .e-voto .guia{font-size:.95em}
 
 .e-bancadas .bancadas{display:grid;grid-template-columns:1fr 1fr;gap:calc(1.4*var(--u));flex:1;min-height:0}
 .e-bancadas article{background:var(--panel);border-top:.45em solid var(--b);padding:.9em 1.1em;display:flex;flex-direction:column;gap:.35em}
