@@ -15,7 +15,7 @@ let hemi = null, tri = null, motor = null, oyendo = false;
 const FOCO_HEMI = ["general", "generalR", "votacion", "resultado", "insistencia", "insistenciaR"];
 
 const nd = () => L.nudoDe(D, S.sala.nudo);
-const titulo = n => `<p class="sobre">Nudo ${n.n} de ${D.nudos.length} <span>${e(n.articulos)}</span></p><h2>${e(n.titulo)}</h2>`;
+const titulo = n => `<p class="sobre">Punto ${n.n} de ${D.nudos.length} <span>${e(n.articulos)}</span></p><h2>${e(n.titulo)}</h2>`;
 const sello = (txt, cls) => `<p class="veredicto ${cls}">${e(txt)}</p>`;
 const conteo = r => `<div class="conteo"><span class="k f"><b>${r.f}</b>${VOTO.f}</span><span class="k c"><b>${r.c}</b>${VOTO.c}</span><span class="k a"><b>${r.a}</b>${VOTO.a}</span></div>`;
 
@@ -63,8 +63,8 @@ const ESCENAS = {
     const c = L.porBancada(S.sala.sorteo);
     return `<div class="e-bancadas"><h2>Las cuatro bancadas</h2><div class="bancadas">${D.bancadas.map(b => `
       <article style="--b:${b.color}"><h3>${e(b.nombre)}</h3><p class="pos">${e(b.posicion)}</p>
-        <p class="rol">Redacta el nudo ${b.autora}: ${e(L.nudoDe(D, b.autora).titulo)}</p>
-        <p class="rol">Responde el nudo ${b.impugna}: ${e(L.nudoDe(D, b.impugna).titulo)}</p>
+        <p class="rol">Redacta el punto ${b.autora}: ${e(L.nudoDe(D, b.autora).titulo)}</p>
+        <p class="rol">Responde el punto ${b.impugna}: ${e(L.nudoDe(D, b.impugna).titulo)}</p>
         <p class="cuantos">${c[b.n]} ${c[b.n] === 1 ? "escaño" : "escaños"}</p></article>`).join("")}</div></div>`;
   },
   nudos() {
@@ -79,7 +79,7 @@ const ESCENAS = {
       <div class="filas">${D.nudos.map(n => {
         const ind = L.indicacionDe(S.sala, S.jugadores, D, n.n), lista = ind && (ind.origen !== "borrador");
         return `<article class="${lista ? "lista" : ""}" style="--b:${L.bancada(D, n.autora).color}">
-          <div class="quien"><b>Nudo ${n.n}</b>${e(n.titulo)}${chip(n.autora)}</div>
+          <div class="quien"><b>Punto ${n.n}</b>${e(n.titulo)}${chip(n.autora)}</div>
           <p class="hoy">${e(n.vigente.simple)}</p>
           <p class="ind">${ind ? `<b>${e(ind.tipo ? ind.tipo[0].toUpperCase() + ind.tipo.slice(1) : "Borrador")}.</b> ${e(ind.texto)}` : `<i>La lee en voz alta ${e(L.bancada(D, n.autora).nombre)}.</i>`}</p>
           <span class="estado">${lista ? "Entregada" : ind ? "Redactando" : "En papel"}</span></article>`; }).join("")}</div></div>`;
@@ -91,7 +91,7 @@ const ESCENAS = {
   },
   tarea() {
     return `<div class="e-lista"><p class="sobre">Fin del acto 1</p><h2>Para el jueves</h2><p class="guia">${e(D.tarea)}</p>
-      <table class="roles"><tbody>${D.bancadas.map(b => `<tr><td>${chip(b.n)}</td><td>defiende el nudo ${b.autora}</td><td>responde el nudo ${b.impugna}</td></tr>`).join("")}</tbody></table></div>`;
+      <table class="roles"><tbody>${D.bancadas.map(b => `<tr><td>${chip(b.n)}</td><td>defiende el punto ${b.autora}</td><td>responde el punto ${b.impugna}</td></tr>`).join("")}</tbody></table></div>`;
   },
   apertura() {
     return `<div class="e-lista"><p class="sobre">Acto 2</p><h2>Se abre la Sala</h2>
@@ -109,18 +109,18 @@ const ESCENAS = {
   respuesta() { return debate("Responde", nd().impugna); },
   votacion() {
     const n = nd(), r = L.contar(L.votosDe(S.sala, S.jugadores, "v", n.n), L.sentados(S.sala, S.jugadores).length);
-    return `<div class="e-voto"><p class="sobre">Nudo ${n.n}: votación nominal</p><h2>${e(n.pregunta)}</h2>
+    return `<div class="e-voto"><p class="sobre">Punto ${n.n}: votación nominal</p><h2>${e(n.pregunta)}</h2>
       ${conteo(r)}<p class="van">Han votado ${r.votaron} de ${r.escanos}</p></div>`;
   },
   resultado() {
     const n = nd(), r = (L.deNudo(S.sala, n.n).v || {}).r || L.contar({}, 0);
-    if (!r.quorum) return `<div class="e-voto"><p class="sobre">Nudo ${n.n}</p>${sello("Sin quórum", "no")}${conteo(r)}<p class="guia">${e(D.reglas.quorum)}</p></div>`;
-    return `<div class="e-voto"><p class="sobre">Nudo ${n.n}: ${e(n.titulo)}</p>${sello(r.aprobada ? "Aprobada" : "Rechazada", r.aprobada ? "si" : "no")}
+    if (!r.quorum) return `<div class="e-voto"><p class="sobre">Punto ${n.n}</p>${sello("Sin quórum", "no")}${conteo(r)}<p class="guia">${e(D.reglas.quorum)}</p></div>`;
+    return `<div class="e-voto"><p class="sobre">Punto ${n.n}: ${e(n.titulo)}</p>${sello(r.aprobada ? "Aprobada" : "Rechazada", r.aprobada ? "si" : "no")}
       ${conteo(r)}<p class="guia">${r.f === r.c ? "Con empate no se aprueba. " : ""}Gana la sala ${chip(r.aprobada ? n.autora : n.impugna)}</p></div>`;
   },
   apuesta() {
     const n = nd(), k = Object.keys(L.apuestasDe(S.sala, S.jugadores, n.n)).length;
-    return `<div class="e-senado"><p class="sobre">Nudo ${n.n}: el Senado simulado</p><h2>¿Sobreviviría fuera de esta sala?</h2>
+    return `<div class="e-senado"><p class="sobre">Punto ${n.n}: el Senado simulado</p><h2>¿Sobreviviría fuera de esta sala?</h2>
       <p class="guia">Cinco senadores simulados votan la misma indicación. Apuesta en tu teléfono: ¿la aprueban o la rechazan?</p>
       ${senadores(n.n, 0)}<p class="van">${k} ${k === 1 ? "apuesta" : "apuestas"}. ${e(D.senadoAviso)}</p></div>`;
   },
@@ -134,11 +134,11 @@ const ESCENAS = {
       pie = `<div class="fallo">${sello(s.r.aprueba ? "El Senado simulado aprueba" : "El Senado simulado rechaza", s.r.aprueba ? "si" : "no")}
         <p class="guia">${s.r.f} a favor, ${s.r.c} en contra.${s.r.f === s.r.c ? " Con empate no se aprueba." : ""} ${contraste}${ap.n ? ` Acertaron ${ap.acertaron} de ${ap.n} apuestas.` : ""}</p>${delDebate(n, s)}</div>`;
     }
-    return `<div class="e-senado"><p class="sobre">Nudo ${n.n}: el Senado simulado</p>${senadores(n.n, visto, s.votos)}${pie}</div>`;
+    return `<div class="e-senado"><p class="sobre">Punto ${n.n}: el Senado simulado</p>${senadores(n.n, visto, s.votos)}${pie}</div>`;
   },
   inadmisible() {
     const n = nd();
-    return `<div class="e-voto ancho"><p class="sobre">Nudo ${n.n}: ${e(n.titulo)}</p>${sello("Inadmisible", "no")}
+    return `<div class="e-voto ancho"><p class="sobre">Punto ${n.n}: ${e(n.titulo)}</p>${sello("Inadmisible", "no")}
       <p class="guia">${e(D.reglas.inadmisible.replace("Inadmisible: la", "La"))}</p><p class="guia">${e(D.reglas.patrocinio)}</p>
       <p class="van">La bancada ${e(L.bancada(D, n.autora).nombre)} todavía puede conseguir el patrocinio del Ejecutivo.</p></div>`;
   },
@@ -157,18 +157,18 @@ const ESCENAS = {
   },
   insistencia() {
     const m = S.sala.vetado, r = L.dosTercios(L.votosDe(S.sala, S.jugadores, "ins", m));
-    return `<div class="e-voto"><p class="sobre">Veto al nudo ${m}: ${e(L.nudoDe(D, m).titulo)}</p><h2>¿Insiste la sala?</h2>
+    return `<div class="e-voto"><p class="sobre">Veto al punto${m}: ${e(L.nudoDe(D, m).titulo)}</p><h2>¿Insiste la sala?</h2>
       <p class="guia">Para mantener la indicación hacen falta dos tercios.</p>${conteo(r)}<p class="van">Han votado ${r.votaron}</p></div>`;
   },
   insistenciaR() {
     const m = S.sala.vetado, r = (L.deNudo(S.sala, m).ins || {}).r || L.dosTercios({});
-    return `<div class="e-voto"><p class="sobre">Veto al nudo ${m}</p>${sello(r.insiste ? "La sala insiste" : "El veto se mantiene", r.insiste ? "si" : "no")}
+    return `<div class="e-voto"><p class="sobre">Veto al punto${m}</p>${sello(r.insiste ? "La sala insiste" : "El veto se mantiene", r.insiste ? "si" : "no")}
       ${conteo(r)}<p class="guia">Hacían falta ${r.necesarios} votos a favor. Hubo ${r.f}.</p></div>`;
   },
   final() {
     const ley = L.leyDespachada(S.sala, D), dif = ley.filter(x => x.distinto).length;
     return `<div class="e-final"><h2>La ley que despachó este curso</h2>${filasLey()}
-      <p class="linea">${e(repartoTexto(S.sala))}${dif ? ` En ${dif} ${dif === 1 ? "nudo" : "nudos"}, la sala y el Senado simulado votaron distinto.` : ""}</p>
+      <p class="linea">${e(repartoTexto(S.sala))}${dif ? ` En ${dif} ${dif === 1 ? "punto" : "puntos"}, la sala y el Senado simulado votaron distinto.` : ""}</p>
       ${L.tablaEscanos(S.sala, S.jugadores, D).some(x => x.total > 0)
         ? `<div class="tablas"><div>${tablaPuntaje(S.sala)}</div><div><p class="sobre">Quién leyó mejor a la sala</p>${tablaEscanosHTML(S.sala, S.jugadores, 5)}</div></div>`
         : tablaPuntaje(S.sala)}</div>`;
@@ -177,7 +177,7 @@ const ESCENAS = {
 const vert = vertice;
 function debate(verbo, b) {
   const n = nd(), p = S.sala.pedido;
-  return `<div class="e-debate"><div class="cab"><div>${`<p class="sobre">Nudo ${n.n}: ${e(n.titulo)}</p>`}<h2>${verbo} ${chip(b)}</h2></div><span class="reloj" id="reloj"></span></div>
+  return `<div class="e-debate"><div class="cab"><div>${`<p class="sobre">Punto ${n.n}: ${e(n.titulo)}</p>`}<h2>${verbo} ${chip(b)}</h2></div><span class="reloj" id="reloj"></span></div>
     ${(S.sala.urg || {})[n.n] ? '<p class="marca-regla suelta">Con urgencia: la mitad del tiempo</p>' : ""}
     ${p ? `<p class="pedido">El presidente pide a ${chip(p.b)} fundar su posición en un concepto del módulo de ${e(D.modulos[p.mod])}.</p>` : ""}
     ${comparado(n, (S.sala.ind || {})[n.n], { breve: micVivo() || L.debateDe(S.sala, n.n).length > 0 })}${oido(n, true)}</div>`;
@@ -223,7 +223,7 @@ function filasLey() {
 /* ---------------- lo que rodea a la escena ---------------- */
 function cinta() {
   const s = S.sala, f = s.fase, acto = L.actoDe(f), n = s.nudo ? L.nudoDe(D, s.nudo) : null;
-  const donde = f === "portada" ? "" : acto === 1 ? "Acto 1: la comisión" : n ? `Acto 2: la Sala. Nudo ${n.n} de ${D.nudos.length}` : "Acto 2: la Sala";
+  const donde = f === "portada" ? "" : acto === 1 ? "Acto 1: la comisión" : n ? `Acto 2: la Sala. Punto ${n.n} de ${D.nudos.length}` : "Acto 2: la Sala";
   const k = L.sentados(s, S.jugadores).length;
   $("cintaFase").textContent = donde;
   $("cintaDer").innerHTML = `${micVivo() ? '<span class="mic-on">Micrófono activo</span>' : ""}Código <b>${e(S.codigo)}</b><span>${k} ${k === 1 ? "escaño" : "escaños"}</span>${S.dueno ? "" : '<span class="solo-mira" title="Esta pantalla no es la que creó la sala: solo muestra">solo muestra</span>'}`;
@@ -233,7 +233,7 @@ function pies() {
   pintar($("hemiPie"), hay ? D.bancadas.map(b => `<span class="chip${s.palabra === b.n ? " habla" : ""}" style="--b:${b.color}">${e(b.nombre)} <i>${c[b.n]}</i></span>`).join("")
     : '<span class="tenue">Los escaños se ocupan a medida que entran.</span>');
   const t = L.triangulo(salaVisible(), D), u = t.pasos[t.pasos.length - 1];
-  pintar($("triPie"), u ? `Nudo ${u.n}: hacia ${e(vert(u.hacia))}, desde ${e(vert(u.desde))}.` : "Punto de partida: el texto de la Cámara.");
+  pintar($("triPie"), u ? `Punto ${u.n}: hacia ${e(vert(u.hacia))}, desde ${e(vert(u.desde))}.` : "Punto de partida: el texto de la Cámara.");
 }
 function avisos() {
   const s = S.sala, a = s.aviso, f = s.filtVer ? D.filtraciones.find(x => x.id === s.filtVer.id) : null;

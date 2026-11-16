@@ -34,8 +34,8 @@ function tarjetaBancada() {
   const b = L.bancada(D, miB());
   if (!b) return `<section class="tarjeta"><h2>Todavía no tienes bancada</h2><p>Las bancadas se sortean en un momento.</p></section>`;
   return `<section class="tarjeta bancada" style="--b:${b.color}"><p class="rot">Tu bancada</p><h2>${e(b.nombre)}</h2><p>${e(b.posicion)}</p>
-    <ul><li>Redactan y defienden el nudo ${b.autora}: <b>${e(L.nudoDe(D, b.autora).titulo)}</b></li>
-    <li>Responden el nudo ${b.impugna}: <b>${e(L.nudoDe(D, b.impugna).titulo)}</b></li></ul></section>`;
+    <ul><li>Redactan y defienden el punto ${b.autora}: <b>${e(L.nudoDe(D, b.autora).titulo)}</b></li>
+    <li>Responden el punto ${b.impugna}: <b>${e(L.nudoDe(D, b.impugna).titulo)}</b></li></ul></section>`;
 }
 function miRol(n) {
   const b = miB();
@@ -46,7 +46,7 @@ function catalogoHTML(n, mod) {
 }
 const opciones = (n, mod) => {
   const cs = L.catalogo(D, n, mod), grupo = (t, l) => (l.length ? `<optgroup label="${t}">${l.map(c => `<option value="${c.id}">${e(c.nombre)} (${e(c.fuente)})</option>`).join("")}</optgroup>` : "");
-  return `<option value="">Elige uno…</option>${grupo("Sugeridos para este nudo", cs.filter(c => c.sugerido))}${grupo("Semanas 9 a 14", cs.filter(c => !c.sugerido && c.sem >= 9))}${grupo("Semanas 2 a 7", cs.filter(c => !c.sugerido && c.sem < 9))}`;
+  return `<option value="">Elige uno…</option>${grupo("Sugeridos para este punto", cs.filter(c => c.sugerido))}${grupo("Semanas 9 a 14", cs.filter(c => !c.sugerido && c.sem >= 9))}${grupo("Semanas 2 a 7", cs.filter(c => !c.sugerido && c.sem < 9))}`;
 };
 
 /* ---------------- la redacción ---------------- */
@@ -55,11 +55,11 @@ const opciones = (n, mod) => {
 function redaccion() {
   const n = miNudo();
   if (!n) return tarjetaBancada();
-  return `<section class="tarjeta"><p class="rot">Nudo ${n.n}. ${e(n.articulos)}</p><h2>Redacten en papel</h2><p>${e(n.pregunta)}</p>
+  return `<section class="tarjeta"><p class="rot">Punto ${n.n}. ${e(n.articulos)}</p><h2>Redacten en papel</h2><p>${e(n.pregunta)}</p>
       <ul>${D.formato.map(x => `<li>${e(x)}</li>`).join("")}</ul>
       <p class="guia">Al terminar, alguien de la bancada la lee en voz alta frente a la sala. Lo que lea queda en el comparado.</p></section>
     ${hojaVigente(n, { mas: true })}
-    <details class="tarjeta"><summary>Conceptos para este nudo</summary><p class="rot">Democracia</p>${catalogoHTML(n.n, "dem")}<p class="rot">IA</p>${catalogoHTML(n.n, "ia")}</details>
+    <details class="tarjeta"><summary>Conceptos para este punto</summary><p class="rot">Democracia</p>${catalogoHTML(n.n, "dem")}<p class="rot">IA</p>${catalogoHTML(n.n, "ia")}</details>
     <details class="tarjeta en-telefono" id="conForm"${U.conForm ? " open" : ""}><summary>Escribirla también en el teléfono</summary>${formulario()}</details>`;
 }
 function formulario() {
@@ -71,7 +71,7 @@ function formulario() {
   let nueva = !!bor && bor.t > U.base && bor.por !== S.yo.uid;
   if (!U.F || (nueva && !U.sucio)) { U.F = bor ? L.limpiarInd(bor) : L.limpiarInd({}); U.base = bor ? bor.t : 0; U.sucio = false; U.rellenar = true; nueva = false; }
   const estado = !bor ? "Tu bancada todavía no guarda nada." : `${bor.lista ? "Entregada" : "Borrador"}. Última versión: ${e(bor.por === S.yo.uid ? "la tuya" : bor.nombre)}.`;
-  return `<section class="tarjeta"><p class="rot">Nudo ${n.n}. ${e(n.articulos)}</p><h2>${e(n.titulo)}</h2><p>${e(n.pregunta)}</p>
+  return `<section class="tarjeta"><p class="rot">Punto ${n.n}. ${e(n.articulos)}</p><h2>${e(n.titulo)}</h2><p>${e(n.pregunta)}</p>
       <p class="estado ${bor && bor.lista ? "ok" : ""}">${estado}</p>
       ${nueva ? `<p class="alerta">${e(bor.nombre)} guardó una versión más nueva. <button class="texto" data-a="cargar">Cargarla</button></p>` : ""}</section>
     <form class="indicacion" id="fInd" autocomplete="off">
@@ -132,13 +132,13 @@ const FASES = {
   sorteo: () => tarjetaBancada(),
   nudos() {
     const n = nd();
-    return `<section class="tarjeta"><p class="rot">Nudo ${n.n} de ${D.nudos.length}. ${e(n.articulos)}</p><h2>${e(n.titulo)}</h2><p>${e(n.pregunta)}</p>
+    return `<section class="tarjeta"><p class="rot">Punto ${n.n} de ${D.nudos.length}. ${e(n.articulos)}</p><h2>${e(n.titulo)}</h2><p>${e(n.pregunta)}</p>
       <p>Redacta ${chip(n.autora)} Responde ${chip(n.impugna)}</p></section>${tarjetaBancada()}`;
   },
   redaccion: () => redaccion(),
   lectura() {
     const n = nd();
-    return `<section class="tarjeta"><p class="rot">Lectura de indicaciones</p><h2>Nudo ${n.n}: ${e(n.titulo)}</h2>
+    return `<section class="tarjeta"><p class="rot">Lectura de indicaciones</p><h2>Punto ${n.n}: ${e(n.titulo)}</h2>
       <p>${miB() === n.autora ? "Le toca a tu bancada: lean su indicación en voz alta." : `La lee en voz alta ${chip(n.autora)}`}</p></section>
       ${hojaIndicacion(n, L.indicacionDe(S.sala, S.jugadores, D, n.n))}`;
   },
@@ -151,18 +151,18 @@ const FASES = {
   respuesta: () => enDebate(),
   votacion() {
     const n = nd();
-    return `<section class="tarjeta"><p class="rot">Nudo ${n.n}: votación nominal</p><h2>${e(n.pregunta)}</h2>${botonesVoto("v", n.n, (yo().v || {})[n.n])}</section>
+    return `<section class="tarjeta"><p class="rot">Punto ${n.n}: votación nominal</p><h2>${e(n.pregunta)}</h2>${botonesVoto("v", n.n, (yo().v || {})[n.n])}</section>
       ${hojaIndicacion(n, (S.sala.ind || {})[n.n], { fundamentos: false })}${dichos(n)}`;
   },
   resultado() {
     const n = nd(), r = (L.deNudo(S.sala, n.n).v || {}).r, mio = ((L.deNudo(S.sala, n.n).v || {}).votos || {})[S.yo.uid];
     if (!r) return "";
-    return `<section class="tarjeta"><p class="rot">Nudo ${n.n}: ${e(n.titulo)}</p><h2>${!r.quorum ? "Sin quórum" : r.aprobada ? "Aprobada" : "Rechazada"}</h2>${conteo(r)}
+    return `<section class="tarjeta"><p class="rot">Punto ${n.n}: ${e(n.titulo)}</p><h2>${!r.quorum ? "Sin quórum" : r.aprobada ? "Aprobada" : "Rechazada"}</h2>${conteo(r)}
       <p>${mio ? "Tu voto: " + VOTO[mio].toLowerCase() + "." : "No alcanzaste a votar."}</p>${r.quorum ? "" : `<p>${e(D.reglas.quorum)}</p>`}</section>`;
   },
   apuesta() {
     const n = nd(), mia = (yo().ap || {})[n.n];
-    return `<section class="tarjeta"><p class="rot">Nudo ${n.n}: el Senado simulado</p><h2>¿Qué harán los cinco senadores?</h2>
+    return `<section class="tarjeta"><p class="rot">Punto ${n.n}: el Senado simulado</p><h2>¿Qué harán los cinco senadores?</h2>
       <p>${e(D.senadoAviso)} Votan la misma indicación, cada uno con su criterio.</p>
       <div class="votos dos"><button class="voto v-f${mia === "ap" ? " elegido" : ""}" data-a="apostar" data-n="${n.n}" data-v="ap">La aprueban</button>
       <button class="voto v-c${mia === "re" ? " elegido" : ""}" data-a="apostar" data-n="${n.n}" data-v="re">La rechazan</button></div>
@@ -171,31 +171,31 @@ const FASES = {
   senado() {
     const n = nd(), x = L.deNudo(S.sala, n.n), s = x.sen || {}, visto = s.estado === "listo" ? s.visto || 0 : 0, mia = ((x.ap || {}).de || {})[S.yo.uid];
     const fila = (sen, i) => { const v = i < visto ? s.votos[i] : null; return `<li class="${v ? "v-" + v.voto : ""}"><b>${e(sen.nombre)}</b>${v ? `<span class="voto-s">${VOTO[v.voto]}</span><p>${e(v.frase)}</p>` : "<span class='tenue'>todavía no vota</span>"}</li>`; };
-    return `<section class="tarjeta"><p class="rot">Nudo ${n.n}: el Senado simulado</p>
+    return `<section class="tarjeta"><p class="rot">Punto ${n.n}: el Senado simulado</p>
       <h2>${s.r ? (s.r.aprueba ? "El Senado simulado aprueba" : "El Senado simulado rechaza") : "Los senadores votan uno por uno"}</h2>
-      <p>${mia ? `Apostaste que ${mia === "ap" ? "la aprueban" : "la rechazan"}.${s.r ? (s.r.aprueba === (mia === "ap") ? " Acertaste." : " No acertaste.") : ""}` : "No apostaste en este nudo."}</p>
+      <p>${mia ? `Apostaste que ${mia === "ap" ? "la aprueban" : "la rechazan"}.${s.r ? (s.r.aprueba === (mia === "ap") ? " Acertaste." : " No acertaste.") : ""}` : "No apostaste en este punto."}</p>
       <ul class="senado-lista">${D.senadores.map(fila).join("")}</ul></section>${s.r ? misPuntos(n) : ""}`;
   },
   inadmisible() {
     const n = nd();
-    return `<section class="tarjeta"><p class="rot">Nudo ${n.n}: ${e(n.titulo)}</p><h2>Inadmisible</h2><p>${e(D.reglas.inadmisible)}</p><p>${e(D.reglas.patrocinio)}</p>
+    return `<section class="tarjeta"><p class="rot">Punto ${n.n}: ${e(n.titulo)}</p><h2>Inadmisible</h2><p>${e(D.reglas.inadmisible)}</p><p>${e(D.reglas.patrocinio)}</p>
       ${miB() === n.autora ? "<p class='alerta'>Tu bancada todavía puede convencer al Ejecutivo de patrocinarla.</p>" : ""}</section>`;
   },
   cierre() {
     const n = nd(), est = L.estadoNudo(S.sala, n.n);
-    return `<section class="tarjeta"><p class="rot">Nudo ${n.n}: ${e(n.titulo)}</p><h2>${ESTADO[est]}</h2>
+    return `<section class="tarjeta"><p class="rot">Punto ${n.n}: ${e(n.titulo)}</p><h2>${ESTADO[est]}</h2>
       <p>${L.enLaLey(est) ? "La indicación entra a la ley." : "Queda el texto de la Cámara."}</p>
       <p class="rot">Qué quieren los actores reales</p><p>${e(n.actores)}</p><p class="fte">${e(n.actoresFuente)}</p></section>${misPuntos(n)}`;
   },
-  veto: () => `<section class="tarjeta"><p class="rot">El Ejecutivo</p><h2>${S.sala.vetado ? "Veto al nudo " + S.sala.vetado : "¿Promulga o veta?"}</h2><p>${e(D.reglas.veto)}</p><p>${e(D.reglas.insistencia)}</p></section>${leyHTML()}`,
+  veto: () => `<section class="tarjeta"><p class="rot">El Ejecutivo</p><h2>${S.sala.vetado ? "Veto al punto" + S.sala.vetado : "¿Promulga o veta?"}</h2><p>${e(D.reglas.veto)}</p><p>${e(D.reglas.insistencia)}</p></section>${leyHTML()}`,
   insistencia() {
     const m = S.sala.vetado, n = L.nudoDe(D, m);
-    return `<section class="tarjeta"><p class="rot">Veto al nudo ${m}: ${e(n.titulo)}</p><h2>¿Insiste la sala?</h2><p>${e(D.reglas.insistencia)}</p>
+    return `<section class="tarjeta"><p class="rot">Veto al punto${m}: ${e(n.titulo)}</p><h2>¿Insiste la sala?</h2><p>${e(D.reglas.insistencia)}</p>
       ${botonesVoto("ins", m, (yo().ins || {})[m], { f: "Insistir", c: "Aceptar el veto", a: "Abstención" })}</section>${hojaIndicacion(n, (S.sala.ind || {})[m], { fundamentos: false })}`;
   },
   insistenciaR() {
     const m = S.sala.vetado, r = (L.deNudo(S.sala, m).ins || {}).r;
-    return r ? `<section class="tarjeta"><p class="rot">Veto al nudo ${m}</p><h2>${r.insiste ? "La sala insiste" : "El veto se mantiene"}</h2>${conteo(r)}<p>Hacían falta ${r.necesarios} votos a favor.</p></section>` : "";
+    return r ? `<section class="tarjeta"><p class="rot">Veto al punto${m}</p><h2>${r.insiste ? "La sala insiste" : "El veto se mantiene"}</h2>${conteo(r)}<p>Hacían falta ${r.necesarios} votos a favor.</p></section>` : "";
   },
   final() {
     const p = L.puntaje(S.sala, D), lugar = p.findIndex(x => x.b === miB()), b = L.bancada(D, miB());
@@ -208,17 +208,17 @@ const FASES = {
 function misIndicaciones() {
   const b = L.bancada(D, miB()), ind = S.sala.ind || {};
   if (!b) return tarjetaBancada();
-  return `<h3 class="sep">La que defienden (nudo ${b.autora})</h3>${hojaIndicacion(L.nudoDe(D, b.autora), ind[b.autora])}
-    <h3 class="sep">La que responden (nudo ${b.impugna})</h3>${hojaIndicacion(L.nudoDe(D, b.impugna), ind[b.impugna])}`;
+  return `<h3 class="sep">La que defienden (punto ${b.autora})</h3>${hojaIndicacion(L.nudoDe(D, b.autora), ind[b.autora])}
+    <h3 class="sep">La que responden (punto ${b.impugna})</h3>${hojaIndicacion(L.nudoDe(D, b.impugna), ind[b.impugna])}`;
 }
 function enDebate() {
   const n = nd(), p = S.sala.pedido, b = miB(), meToca = p && p.b === b;
   const habla = S.sala.fase === "defensa" ? n.autora : S.sala.fase === "respuesta" ? n.impugna : 0;
-  return `<section class="tarjeta"><p class="rot">Nudo ${n.n} de ${D.nudos.length}. ${e(n.articulos)}</p><h2>${e(n.titulo)}</h2>
+  return `<section class="tarjeta"><p class="rot">Punto ${n.n} de ${D.nudos.length}. ${e(n.articulos)}</p><h2>${e(n.titulo)}</h2>
       <p>${e(miRol(n))}</p>${habla ? `<p>Tiene la palabra ${chip(habla)} <span class="reloj" id="reloj"></span></p>` : ""}</section>
     ${meToca ? `<section class="tarjeta pedido"><h2>El presidente les pide un fundamento</h2><p>Funden su posición en un concepto del módulo de ${e(D.modulos[p.mod])}. No basta con nombrarlo: aplíquenlo al artículo.</p>${catalogoHTML(n.n, p.mod)}</section>` : ""}
     ${dichos(n)}${hojaIndicacion(n, (S.sala.ind || {})[n.n])}
-    ${meToca ? "" : `<details class="tarjeta"><summary>Conceptos para este nudo</summary><p class="rot">Democracia</p>${catalogoHTML(n.n, "dem")}<p class="rot">IA</p>${catalogoHTML(n.n, "ia")}</details>`}`;
+    ${meToca ? "" : `<details class="tarjeta"><summary>Conceptos para este punto</summary><p class="rot">Democracia</p>${catalogoHTML(n.n, "dem")}<p class="rot">IA</p>${catalogoHTML(n.n, "ia")}</details>`}`;
 }
 // Lo que oyó el micrófono en el debate de este nudo, párrafo por párrafo. Tocar uno lo aplaude:
 // tres por bancada, nunca a la propia, hasta que cierra la votación.
@@ -229,7 +229,7 @@ function dichos(n) {
   const quedan = x => L.quedanAplausos(mias, s, n.n, D, b, x);
   const saldo = [...new Set(ps.map(p => p.b))].filter(x => x !== b).map(x => `<span>${chip(x)}te ${quedan(x) === 1 ? "queda 1" : "quedan " + quedan(x)}</span>`).join("");
   return `<section class="tarjeta dichos"><p class="rot">Lo que se dijo</p><h2>Aplaude lo mejor</h2>
-    <p class="guia">${abierta ? `Tres aplausos por bancada. Si aplaudes el párrafo que los senadores elijan como el mejor, sumas ${D.puntos.aplauso} puntos.` : "Los aplausos de este nudo ya se cerraron."}</p>
+    <p class="guia">${abierta ? `Tres aplausos por bancada. Si aplaudes el párrafo que los senadores elijan como el mejor, sumas ${D.puntos.aplauso} puntos.` : "Los aplausos de este punto ya se cerraron."}</p>
     ${abierta && saldo ? `<p class="saldo">${saldo}</p>` : ""}
     ${ps.map(p => {
       const mio = mias.includes(p.id), propio = p.b === b, puede = abierta && !propio && (mio || quedan(p.b) > 0);
@@ -243,18 +243,18 @@ function misPuntos(n) {
   const ps = Object.fromEntries(L.debateDe(S.sala, n.n).map(p => [p.id, p])), mias = ((x.apl || {}).de || {})[S.yo.uid] || [];
   const mejores = [n.autora, n.impugna].map(b => ps[(s.mejores || {})[b]]).filter(Boolean), pts = L.puntosEscano(S.sala, D, S.yo.uid).nudos[n.n] || { apuesta: 0, aplausos: 0 };
   const piso = [n.autora, n.impugna].filter(b => (s.piso || {})[b] === true);
-  return `<section class="tarjeta"><p class="rot">Tus puntos en este nudo</p><h2>${pts.apuesta + pts.aplausos} ${pts.apuesta + pts.aplausos === 1 ? "punto" : "puntos"}</h2>
+  return `<section class="tarjeta"><p class="rot">Aquí sumaste</p><h2>${pts.apuesta + pts.aplausos} ${pts.apuesta + pts.aplausos === 1 ? "punto" : "puntos"}</h2>
     <p>${pts.apuesta} por la apuesta y ${pts.aplausos} por los aplausos.</p>
     ${mejores.map(p => `<blockquote><p>${e(p.texto)}</p><footer>Lo mejor de ${chip(p.b)}${mias.includes(p.id) ? "<b>Lo aplaudiste.</b>" : ""}</footer></blockquote>`).join("")}
     ${piso.length ? `<p class="guia">El Senado simulado validó el fundamento de ${piso.map(chip).join(" ")}</p>` : ""}</section>`;
 }
-const leyHTML = () => `<ul class="ley-lista">${L.leyDespachada(S.sala, D).map(x => `<li class="e-${x.estado}"><b>Nudo ${x.n}. ${e(x.titulo)}</b><span>${ESTADO[x.estado]}</span></li>`).join("")}</ul>`;
+const leyHTML = () => `<ul class="ley-lista">${L.leyDespachada(S.sala, D).map(x => `<li class="e-${x.estado}"><b>Punto ${x.n}. ${e(x.titulo)}</b><span>${ESTADO[x.estado]}</span></li>`).join("")}</ul>`;
 
 /* ---------------- expediente y prensa ---------------- */
 function expediente() {
   const mio = miNudo(), n = L.nudoDe(D, U.expN || (S.sala.nudo && L.actoDe(S.sala.fase) === 2 ? S.sala.nudo : mio ? mio.n : 1));
   const voz = p => `<blockquote><p>${p.textual ? "«" + e(p.cita) + "»" : e(p.cita)}</p><footer><b>${e(p.quien)}</b>, ${e(p.cargo)}. ${e(p.fuente)}</footer></blockquote>`;
-  return `<div class="selector">${D.nudos.map(x => `<button data-a="exp" data-n="${x.n}" class="${x.n === n.n ? "elegido" : ""}">Nudo ${x.n}${mio && mio.n === x.n ? " (el tuyo)" : ""}</button>`).join("")}</div>
+  return `<div class="selector">${D.nudos.map(x => `<button data-a="exp" data-n="${x.n}" class="${x.n === n.n ? "elegido" : ""}">Punto ${x.n}${mio && mio.n === x.n ? " (el tuyo)" : ""}</button>`).join("")}</div>
     <section class="tarjeta"><p class="rot">${e(n.articulos)}</p><h2>${e(n.titulo)}</h2><p>${e(n.pregunta)}</p><p>Redacta ${chip(n.autora)} Responde ${chip(n.impugna)}</p></section>
     ${hojaVigente(n, { mas: true })}
     <section class="tarjeta"><p class="rot">La pelea</p>${n.pelea.map(voz).join("")}</section>

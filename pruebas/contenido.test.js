@@ -425,11 +425,17 @@ test("semana 15: brújula de 5 preguntas cuyos campos son las bancadas de La Sal
   const plano = v => JSON.parse(JSON.stringify(v));               // dos contextos de vm: se comparan los valores
   assert.deepEqual(plano(b.campos.map(c => [c.id, c.nombre, c.color])), plano(sala.LA_SALA.bancadas.map(x => [x.id, x.nombre, x.color])));
   for (const c of b.campos) assert.ok(c.afirma && c.centro, c.id);
-  // lo que el teléfono dice al quedar en la bancada: los nudos que propone y ataca en La Sala
+  // lo que el teléfono dice al quedar en la bancada: el punto en que escribe la propuesta y el punto
+  // en que rebate la de la bancada autora. Al alumno se le dice «punto», nunca «nudo».
   const nudo = n => sala.LA_SALA.nudos.find(x => x.n === n);
-  for (const x of sala.LA_SALA.bancadas)
-    assert.equal(b.campos.find(c => c.id === x.id).tarea,
-      `Tu bancada propone el nudo ${x.autora} (${nudo(x.autora).titulo}) y ataca el nudo ${x.impugna} (${nudo(x.impugna).titulo}).`, x.id);
+  const deQuien = n => { const a = sala.LA_SALA.bancadas.find(x => x.n === nudo(n).autora); return (a.id === "seguridad" ? "de " : "de los ") + a.nombre; };
+  for (const x of sala.LA_SALA.bancadas) {
+    const tarea = b.campos.find(c => c.id === x.id).tarea;
+    assert.equal(tarea,
+      `Tu bancada escribe la propuesta de cambio a la ley sobre ${nudo(x.autora).titulo} (punto ${x.autora}) y la trae el jueves para leerla en su turno. ` +
+      `En el punto ${x.impugna}, ${nudo(x.impugna).titulo}, rebate la propuesta ${deQuien(x.impugna)}.`, x.id);
+    assert.ok(!/nudo/i.test(tarea), `${x.id}: la frase dice «nudo»`);
+  }
   assert.equal(s.SESION.sinDuelos, true, "el lunes no se ofrecen duelos");
   // equilibrio: las 4^5 combinaciones se reparten parejo y ninguna queda empatada entre dos campos
   const cuenta = Object.fromEntries(b.campos.map(c => [c.id, 0]));
@@ -455,7 +461,7 @@ test("semana 15: brújula de 5 preguntas cuyos campos son las bancadas de La Sal
   // la sala lleva la marca de «sin duelos» y la frase de cada bancada, para la butaca
   const sala15 = D.salaNueva(s, ds, 1);
   assert.equal(sala15.sinDuelos, true);
-  assert.ok(sala15.compas.campos.every(c => /^Tu bancada propone el nudo \d/.test(c.tarea)), "falta la tarea en la sala");
+  assert.ok(sala15.compas.campos.every(c => /^Tu bancada escribe la propuesta .+\(punto \d\)/.test(c.tarea)), "falta la tarea en la sala");
   assert.equal(D.salaNueva(cargarSesion("contenido/semana14.js"), [], 1).sinDuelos, undefined, "las otras clases no la llevan");
   for (const p of s.PREGUNTAS) for (const k of ["favor", "contra"])
     assert.ok(p[k] && p[k].length >= 30 && p[k].length <= 200, `${k} de «${p.texto.slice(0, 30)}…»`);

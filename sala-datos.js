@@ -269,7 +269,7 @@ const LA_SALA = {
     general: "Primero se vota la idea de legislar. Después se discute artículo por artículo.",
     particular: "Una indicación suprime, sustituye o agrega texto a un artículo.",
     papel: "En la hoja: el tipo (suprimir, sustituir o agregar), el texto como quedaría en la ley y un concepto de cada módulo, aplicado al artículo. Después la leen en voz alta.",
-    urgencia: "Urgencia: el Presidente fija el ritmo del Congreso. Este nudo se debate en la mitad del tiempo.",
+    urgencia: "Urgencia: el Presidente fija el ritmo del Congreso. Este punto se debate en la mitad del tiempo.",
     patrocinio: "Iniciativa exclusiva: solo el Presidente puede proponer crear un servicio público o comprometer gasto (art. 65 de la Constitución).",
     patrocinado: "El Ejecutivo patrocina la indicación. Ahora se puede votar.",
     inadmisible: "Inadmisible: la indicación crea un organismo y no tiene patrocinio del Ejecutivo. No se vota.",

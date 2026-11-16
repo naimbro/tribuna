@@ -703,7 +703,7 @@ Responde SOLO un JSON: {"voto": "favor" | "contra" | "abstencion", "frase": "…
       case "urgencia": {
         if (!nudoDe(D, a.n)) return null;
         c["urg." + a.n] = !!a.on;
-        if (a.on) c.aviso = { txt: D.reglas.urgencia.replace("Este nudo", "El nudo " + a.n), t: ahora };
+        if (a.on) c.aviso = { txt: D.reglas.urgencia.replace("Este punto", "El punto " + a.n), t: ahora };
         return ok();
       }
       case "patrocinio": c.pat = !!a.on; c.aviso = { txt: a.on ? D.reglas.patrocinado : D.reglas.patrocinio, t: ahora }; return ok();
