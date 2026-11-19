@@ -64,7 +64,7 @@ function presidente() {
       <div class="fila"><button data-a="nota" data-n="${n}">Guardar la nota</button>
       ${sen && sen.estado === "pedir" ? '<button data-a="senadoEnsayo">Usar votos de ensayo</button>' : ""}</div>
       ${sen ? `<p class="estado">${sen.estado === "listo" ? "Los senadores ya votaron." + ((sen.votos || []).some(v => v.ensayo) ? " Son votos de ensayo." : "") : "Los senadores están leyendo."}</p>` : ""}</section>` : ""}
-    <section><h2>Ir a otro momento</h2><div class="fila"><select id="selIr" aria-label="Momento de la sesión">${fases.map(f => { const [x, m] = f.split(":"); return `<option value="${f}"${x === s.fase && (+m || 0) === (m ? s.nudo : 0) ? " selected" : ""}>${e(FASE_NOMBRE[x])}${m ? ", nudo " + m : ""}</option>`; }).join("")}</select>
+    <section><h2>Ir a otro momento</h2><div class="fila"><select id="selIr" aria-label="Momento de la sesión">${fases.map(f => { const [x, m] = f.split(":"); return `<option value="${f}"${(U.ir ? U.ir === f : x === s.fase && (+m || 0) === (m ? s.nudo : 0)) ? " selected" : ""}>${e(FASE_NOMBRE[x])}${m ? ", nudo " + m : ""}</option>`; }).join("")}</select>
       <button data-a="ir">Ir</button></div><p class="ayuda">Para corregir o repetir. Ir a una votación la abre de nuevo.</p></section>`;
 }
 
@@ -144,7 +144,7 @@ document.addEventListener("click", async ev => {
   else if (a === "validar") await hacer({ t: "validar", b: +d.b, d: +d.d });
   else if (a === "nota") { const txt = $("inNota").value; U.notas[+d.n] = txt; if (await hacer({ t: "nota", n: +d.n, txt })) nota("Nota guardada."); }
   else if (a === "senadoEnsayo") await hacer({ t: "senadoEnsayo" });
-  else if (a === "ir") { const [fase, n] = $("selIr").value.split(":"); if (!(await hacer({ t: "ir", fase, nudo: +n || 0 }))) nota("Todavía no se puede ir a ese momento."); }
+  else if (a === "ir") { const [fase, n] = $("selIr").value.split(":"); U.ir = ""; if (!(await hacer({ t: "ir", fase, nudo: +n || 0 }))) nota("Todavía no se puede ir a ese momento."); }
   else if (a === "urgencia") await hacer({ t: "urgencia", n: +d.n, on: !!d.on });
   else if (a === "patrocinio") await hacer({ t: "patrocinio", on: !!d.on });
   else if (a === "vetar") await hacer({ t: "vetar", n: +d.n });
@@ -182,6 +182,7 @@ document.addEventListener("click", async ev => {
 vista.addEventListener("input", ev => {
   if (ev.target.id === "inNota" && S.sala) U.notas[S.sala.nudo] = ev.target.value;
   if (ev.target.id === "inCompas") U.compas = ev.target.value;
+  if (ev.target.id === "selIr") U.ir = ev.target.value;   // la elección sobrevive a los repintados
   // lo que la Secretaría va corrigiendo se guarda aparte: un repintado no se lo lleva
   const n = +ev.target.dataset.ed || 0;
   if (n) U.ed[n] = { tipo: $("edTipo" + n).value, texto: $("edTexto" + n).value };
