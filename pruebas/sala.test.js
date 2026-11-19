@@ -72,6 +72,44 @@ test("sortear: bancadas equilibradas, y quien ya tiene bancada la conserva", () 
   assert.ok(Math.max(...c2) - Math.min(...c2) <= 1, "quien llega tarde va a la bancada más chica: " + c2);
 });
 
+test("sortear con guía: quien hizo el compás conserva su bancada; el resto, a la más chica", () => {
+  const guia = { a1: 2, a2: 2, a3: 2, a4: 2, a5: 1, a6: 3, raro: 9 };
+  const s = L.sortear(["a1", "a2", "a3", "a4", "a5", "a6", "n1", "n2", "n3", "raro"], {}, azarFijo(), guia);
+  for (const u of ["a1", "a2", "a3", "a4", "a5", "a6"]) assert.equal(s[u], guia[u]);
+  assert.ok([1, 2, 3, 4].includes(s.raro), "una bancada inválida en la guía no se copia");
+  assert.notEqual(s.n1, 2); assert.notEqual(s.n2, 2); assert.notEqual(s.n3, 2);   // la 2 ya está llena
+  const previo = { a1: 4 };                                                        // quien ya tenía bancada en La Sala, la conserva
+  assert.equal(L.sortear(["a1"], previo, azarFijo(), guia).a1, 4);
+});
+
+test("compás: traer las bancadas de la galería antes o después del sorteo", () => {
+  const js = ["x1", "x2", "x3", "x4", "x5", "nuevo"].map(u => esc(u));
+  const ctx = { D, jugadores: js, ahora: 5000, azar: azarFijo() };
+  const reparto = { x1: 1, x2: 2, x3: 3, x4: 4, x5: 4, "mal/uid": 1, x9: 7 };
+  // antes: el sorteo respeta el compás
+  let sala = { fase: "generalR", nudo: 0, general: { estado: "cerrada" } };
+  assert.equal(L.aplicar(sala, { t: "compas", codigo: "ab12", reparto: {} }, ctx), null, "sin reparto no hay nada que traer");
+  sala = L.aplicarRutas(sala, L.aplicar(sala, { t: "compas", codigo: "ab12", reparto }, ctx).cambios);
+  assert.deepEqual(sala.delCompas.reparto, { x1: 1, x2: 2, x3: 3, x4: 4, x5: 4 });
+  assert.equal(sala.delCompas.codigo, "AB12");
+  sala = L.aplicarRutas(sala, L.siguiente(sala, ctx).cambios);
+  assert.equal(sala.fase, "sorteo");
+  for (const u of ["x1", "x2", "x3", "x4", "x5"]) assert.equal(sala.sorteo[u], reparto[u]);
+  assert.ok([1, 2, 3].includes(sala.sorteo.nuevo), "quien no hizo el compás no va a la bancada 4, que ya tiene dos");
+  // después: ya hubo sorteo al azar y el compás lo corrige
+  let otra = { fase: "sorteo", nudo: 0, sorteo: { x1: 3, x2: 3, x3: 3, x4: 1, x5: 1, nuevo: 2 } };
+  otra = L.aplicarRutas(otra, L.aplicar(otra, { t: "compas", codigo: "AB12", reparto }, ctx).cambios);
+  for (const u of ["x1", "x2", "x3", "x4", "x5"]) assert.equal(otra.sorteo[u], reparto[u]);
+  assert.equal(otra.sorteo.nuevo, 2);
+  // saltar directo al sorteo con «Ir» también usa el compás
+  let salto = { fase: "portada", nudo: 0, delCompas: { codigo: "AB12", reparto: { x1: 4 } } };
+  salto = L.aplicarRutas(salto, L.aplicar(salto, { t: "ir", fase: "sorteo" }, ctx).cambios);
+  assert.equal(salto.sorteo.x1, 4);
+  // quitarlo
+  otra = L.aplicarRutas(otra, L.aplicar(otra, { t: "compas", codigo: "" }, ctx).cambios);
+  assert.equal(otra.delCompas, null);
+});
+
 test("escaños: el equipo docente y los que salieron no ocupan escaño", () => {
   const js = [esc("a"), esc("b", { fuera: true }), { uid: "profe", nombre: "P", equipo: "", rol: "docente" }, esc("c")];
   assert.deepEqual(L.escanos(js).map(j => j.uid), ["a", "c"]);

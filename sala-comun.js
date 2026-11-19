@@ -107,7 +107,7 @@ export function iniciarMotor(S, { principal }) {
     if (!Object.keys(s).length) return;
     const nuevos = L.escanos(S.jugadores).map(j => j.uid).filter(u => !s[u]);
     if (!nuevos.length) return;
-    const s2 = L.sortear(nuevos, s), cambios = Object.fromEntries(nuevos.map(u => ["sorteo." + u, s2[u]]));
+    const s2 = L.sortear(nuevos, s, Math.random, L.guiaDe(S.sala)), cambios = Object.fromEntries(nuevos.map(u => ["sorteo." + u, s2[u]]));
     S.sala = L.aplicarRutas(S.sala, cambios);
     await S.canal.cambiarSala(S.codigo, cambios);
   }

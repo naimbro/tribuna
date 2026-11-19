@@ -55,8 +55,12 @@ const SalaLogica = (() => {
   }
   // Sorteo equilibrado: quien ya tiene bancada la conserva; el resto entra, al azar, a la
   // bancada con menos gente. Sirve igual para el sorteo inicial y para quien llega tarde.
-  function sortear(uids, previo = {}, azar = Math.random) {
-    const out = { ...previo }, c = porBancada(out);
+  // guia: las bancadas que dejó el compás de la galería ({uid: n}). Quien está ahí entra a esa
+  // bancada sin sorteo; el resto, como siempre.
+  function sortear(uids, previo = {}, azar = Math.random, guia = {}) {
+    const out = { ...previo };
+    for (const u of uids || []) if (!out[u] && [1, 2, 3, 4].includes(+(guia || {})[u])) out[u] = +guia[u];
+    const c = porBancada(out);
     const nuevos = (uids || []).filter(u => !out[u]);
     for (let i = nuevos.length - 1; i > 0; i--) { const j = Math.floor(azar() * (i + 1)); [nuevos[i], nuevos[j]] = [nuevos[j], nuevos[i]]; }
     for (const u of nuevos) {
@@ -65,6 +69,13 @@ const SalaLogica = (() => {
       const b = libres[Math.floor(azar() * libres.length)] || libres[0];
       out[u] = b; c[b]++;
     }
+    return out;
+  }
+  const guiaDe = sala => (sala && sala.delCompas && sala.delCompas.reparto) || {};
+  // El reparto de la sala del compás, validado: solo uids razonables y bancadas 1 a 4.
+  function limpiarReparto(reparto) {
+    const out = {};
+    for (const [u, n] of Object.entries(reparto || {})) if (/^[A-Za-z0-9_-]{1,128}$/.test(u) && [1, 2, 3, 4].includes(+n)) out[u] = +n;
     return out;
   }
   const bancadaDe = (sala, uid) => (sala && sala.sorteo && sala.sorteo[uid]) || 0;
@@ -552,7 +563,7 @@ Responde SOLO un JSON: {"voto": "favor" | "contra" | "abstencion", "frase": "…
         ir("generalR"); c.general = { estado: "cerrada", r: contar(votos, sentados(sala, jugadores).length), votos };
         break;
       }
-      case "generalR": ir("sorteo"); c.sorteo = sortear(escanos(jugadores).map(j => j.uid), sala.sorteo || {}, ctx.azar); c.aviso = null; break;
+      case "generalR": ir("sorteo"); c.sorteo = sortear(escanos(jugadores).map(j => j.uid), sala.sorteo || {}, ctx.azar, guiaDe(sala)); c.aviso = null; break;
       case "sorteo": ir("nudos", 1); break;
       case "nudos": if (n < D.nudos.length) ir("nudos", n + 1); else { ir("redaccion", 0); c.reloj = { ini: ahora, dur: D.tiempos.redaccion, b: 0 }; c.aviso = { txt: D.reglas.particular, t: ahora }; } break;
       case "redaccion":
@@ -677,7 +688,7 @@ Responde SOLO un JSON: {"voto": "favor" | "contra" | "abstencion", "frase": "…
         const m = FASES_NUDO.includes(a.fase) || ["nudos", "lectura", "inadmisible"].includes(a.fase) ? Math.max(1, Math.min(D.nudos.length, +a.nudo || n || 1)) : 0;
         c.fase = a.fase; c.nudo = m; c.t = ahora; c.reloj = null; c.palabra = 0; c.pedido = null; c.aviso = null;
         if (a.fase === "general") c.general = { estado: "abierta" };
-        if (a.fase === "sorteo" && !(sala.sorteo && Object.keys(sala.sorteo).length)) c.sorteo = sortear(escanos(ctx.jugadores).map(j => j.uid), {}, ctx.azar);
+        if (a.fase === "sorteo" && !(sala.sorteo && Object.keys(sala.sorteo).length)) c.sorteo = sortear(escanos(ctx.jugadores).map(j => j.uid), {}, ctx.azar, guiaDe(sala));
         if (FASES_NUDO.includes(a.fase)) conInd(sala, ctx, m, c);
         if (a.fase === "lectura") c.palabra = nudoDe(D, m).autora;
         if (a.fase === "votacion") { c["n." + m + ".v"] = { estado: "abierta" }; c["n." + m + ".sen"] = null; c["n." + m + ".ap"] = null; c["n." + m + ".inadm"] = false; }
@@ -719,6 +730,15 @@ Responde SOLO un JSON: {"voto": "favor" | "contra" | "abstencion", "frase": "…
         if (!a.id) { c.filtVer = null; return ok(); }
         if (!D.filtraciones.some(f => f.id === a.id)) return null;
         c.filt = [...new Set([...(sala.filt || []), a.id])]; c.filtVer = { id: a.id, t: ahora };
+        return ok();
+      }
+      case "compas": {                      // traer las bancadas que formó el compás de la galería
+        if (!a.codigo) { c.delCompas = null; return ok(); }
+        const codigo = String(a.codigo).toUpperCase().trim(), reparto = limpiarReparto(a.reparto);
+        if (!/^[A-Z0-9]{4,8}$/.test(codigo) || !Object.keys(reparto).length) return null;
+        c.delCompas = { codigo, reparto, t: ahora };
+        // si ya hubo sorteo, quien está en el compás pasa a su bancada del compás
+        for (const u of Object.keys(sala.sorteo || {})) if (reparto[u] && reparto[u] !== sala.sorteo[u]) c["sorteo." + u] = reparto[u];
         return ok();
       }
       case "partida": if (!nudoDe(D, a.n)) return null; c["ind." + a.n] = dePartida(D, a.n, ahora); return ok();
@@ -781,7 +801,7 @@ Responde SOLO un JSON: {"voto": "favor" | "contra" | "abstencion", "frase": "…
   }
 
   return { VOTOS, TIPOS, FASES_1, FASES_2, FASES_NUDO, FASES_DEBATE, MAX, CENTRO, actoDe, nombreCorto, semilla, aplicarRutas, plano,
-    escanos, sentados, porBancada, sortear, bancadaDe, votosDe, quorumDe, contar, dosTercios, apuestasDe, resumenApuestas,
+    escanos, sentados, porBancada, sortear, guiaDe, limpiarReparto, bancadaDe, votosDe, quorumDe, contar, dosTercios, apuestasDe, resumenApuestas,
     nudoDe, bancada, admisible, deNudo, estadoNudo, enLaLey, duracion, mover, triangulo, aXY,
     limpiarInd, faltaInd, borradorDe, dePartida, indicacionDe, concepto, catalogo,
     dichoDe, debateDe, tipoDicho, indDictada, aplaudir, quedanAplausos, aplausosDe, cuentaAplausos,

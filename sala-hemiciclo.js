@@ -6,7 +6,7 @@
    ===================================================================== */
 import { D, L, P, LOCAL, $, e, VOTO, ESTADO, conectar, urlDe, codigoPedido, recordar, reciente, salaNueva, pintar, nota,
   relojTexto, relojVencido, qrDe, despachar, motorPrincipal, crearHemiciclo, escanosConVoto, crearTriangulo, repartoTexto,
-  hojaVigente, comparado, chip, tablaPuntaje, tablaEscanosHTML, aplausosDelNudo, fraseVoto, vertice } from "./sala-comun.js?v=20261114b";
+  hojaVigente, comparado, chip, tablaPuntaje, tablaEscanosHTML, aplausosDelNudo, fraseVoto, vertice } from "./sala-comun.js?v=20261119a";
 
 const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false, voz: null };
 let micPintado = false, qrCurso = false;      // qrCurso: quien conduce pidió ver ya el QR del curso
@@ -61,7 +61,7 @@ const ESCENAS = {
   },
   sorteo() {
     const c = L.porBancada(S.sala.sorteo);
-    return `<div class="e-bancadas"><h2>Las cuatro bancadas</h2><div class="bancadas">${D.bancadas.map(b => `
+    return `<div class="e-bancadas"><h2>Las cuatro bancadas</h2>${S.sala.delCompas ? '<p class="guia">Cada uno queda en la bancada que le dio el compás.</p>' : ""}<div class="bancadas">${D.bancadas.map(b => `
       <article style="--b:${b.color}"><h3>${e(b.nombre)}</h3><p class="pos">${e(b.posicion)}</p>
         <p class="rol">Redacta el punto ${b.autora}: ${e(L.nudoDe(D, b.autora).titulo)}</p>
         <p class="rol">Responde el punto ${b.impugna}: ${e(L.nudoDe(D, b.impugna).titulo)}</p>

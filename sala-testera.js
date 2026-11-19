@@ -6,8 +6,8 @@
    En el teléfono de quien creó la sala, además, es el único micrófono (sala-voz.js).
    ===================================================================== */
 import { D, L, LOCAL, $, e, VOTO, ESTADO, TIPO, conectar, urlDe, codigoPedido, recordar, reciente, salaNueva, pintar, nota,
-  relojTexto, despachar, iniciarMotor, chip, tablaPuntaje, tablaEscanosHTML } from "./sala-comun.js?v=20261114b";
-import { crearVoz } from "./sala-voz.js?v=20261114b";
+  relojTexto, despachar, iniciarMotor, chip, tablaPuntaje, tablaEscanosHTML } from "./sala-comun.js?v=20261119a";
+import { crearVoz } from "./sala-voz.js?v=20261119a";
 
 const S = { canal: null, codigo: codigoPedido(), yo: null, sala: null, jugadores: [], dueno: false, docente: false };
 const U = { pestana: "presidente", notas: {}, latido: 0, oyendo: false, ed: {}, edN: 0, avisado: false };
@@ -85,7 +85,11 @@ function ejecutivo() {
 /* ---------------- Secretaría ---------------- */
 function secretaria() {
   const s = S.sala, pub = s.filt || [], enPantalla = s.filtVer ? s.filtVer.id : "";
-  return `<section><h2>Indicaciones</h2><p class="ayuda">Las bancadas redactan en papel y la leen en voz alta en la lectura: con el micrófono activo, lo leído pasa solo al comparado. Aquí puedes corregirlo.</p><div class="lista">${D.nudos.map(n => {
+  const dc = s.delCompas, rep = L.guiaDe(s), aqui = L.escanos(S.jugadores), conCompas = aqui.filter(j => rep[j.uid]).length;
+  return `<section><h2>Bancadas del compás</h2><p class="ayuda">Si la clase partió con el compás en la galería, escribe su código: cada estudiante queda en la bancada que le dio el compás. Quien no lo hizo entra a la bancada con menos gente.</p>
+      ${dc ? `<p class="estado">Compás <b>${e(dc.codigo)}</b>: ${Object.keys(rep).length} estudiantes con bancada. De los ${aqui.length} sentados aquí, ${conCompas} vienen del compás. <button class="texto" data-a="compasFuera">Quitar</button></p>` : ""}
+      <div class="fila"><label class="lbl" for="inCompas">Código del compás</label><input id="inCompas" maxlength="8" autocapitalize="characters" value="${e(U.compas ?? (dc ? dc.codigo : ""))}"><button data-a="compas">Traer las bancadas</button></div></section>
+    <section><h2>Indicaciones</h2><p class="ayuda">Las bancadas redactan en papel y la leen en voz alta en la lectura: con el micrófono activo, lo leído pasa solo al comparado. Aquí puedes corregirlo.</p><div class="lista">${D.nudos.map(n => {
       const of = (s.ind || {})[n.n], bor = L.borradorDe(s, S.jugadores, n.autora), dic = L.indDictada(s, D, n.n), x = of || bor || dic;
       const estado = of ? "En el comparado: " + (ORIGEN[of.origen] || ORIGEN.bancada) : bor ? (bor.lista ? "Entregada por " + bor.nombre : "Borrador de " + bor.nombre) : dic ? "Leída, sin recibir" : "Sin texto";
       const ed = U.ed[n.n] || { tipo: x ? x.tipo : n.partida.tipo, texto: x ? x.texto : "" };
@@ -148,6 +152,17 @@ document.addEventListener("click", async ev => {
   else if (a === "partida") await hacer({ t: "partida", n: +d.n });
   else if (a === "filtrar") await hacer({ t: "filtrar", id: d.id || null });
   else if (a === "bots") await hacer({ t: "bots", k: +$("inBots").value });
+  else if (a === "compasFuera") await hacer({ t: "compas", codigo: "" });
+  else if (a === "compas") {
+    const codigo = $("inCompas").value.toUpperCase().trim();
+    if (!codigo || codigo === S.codigo) { nota("Escribe el código de la sala del compás (la galería), no el de La Sala."); return; }
+    let otra = null;
+    try { otra = await S.canal.leerSala(codigo); } catch (x) { console.warn(x); }
+    const reparto = L.limpiarReparto(otra && otra.reparto);
+    if (!otra) nota("No encontré la sala " + codigo + ".");
+    else if (!Object.keys(reparto).length) nota("La sala " + codigo + " todavía no tiene bancadas: en el proyector del compás, «Formar las bancadas».");
+    else if (await hacer({ t: "compas", codigo, reparto })) { U.compas = undefined; nota(Object.keys(reparto).length + " estudiantes traen su bancada del compás."); }
+  }
   else if (a === "vozArmar") voz.armar(!voz.estado().armado);
   else if (a === "vozProbar") voz.probar(!voz.estado().probando);
   else if (a === "vozReabrir") voz.reabrir();
@@ -166,6 +181,7 @@ document.addEventListener("click", async ev => {
 });
 vista.addEventListener("input", ev => {
   if (ev.target.id === "inNota" && S.sala) U.notas[S.sala.nudo] = ev.target.value;
+  if (ev.target.id === "inCompas") U.compas = ev.target.value;
   // lo que la Secretaría va corrigiendo se guarda aparte: un repintado no se lo lleva
   const n = +ev.target.dataset.ed || 0;
   if (n) U.ed[n] = { tipo: $("edTipo" + n).value, texto: $("edTexto" + n).value };
